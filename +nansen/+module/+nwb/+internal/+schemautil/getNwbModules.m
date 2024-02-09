@@ -5,7 +5,7 @@ function keptModules = getNwbModules()
 
     moduleNames = strrep(S.filenames, 'nwb.', '');
     
-    ignoreModules = {'base', 'device', 'file'};
+    ignoreModules = {'device', 'file'};
     keptModules = string( setdiff(moduleNames, ignoreModules) );
 
     % Todo: get titles and description

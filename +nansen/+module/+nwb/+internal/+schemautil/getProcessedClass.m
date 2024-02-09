@@ -14,31 +14,45 @@ function [processedClass, propertyInfo] = getProcessedClass(className)
     
     [processedClassHierarchy, classprops, inherited] = file.processClass(className, Namespace, pregenerated);
     
-    % Get all groups, datasets, attributes and links
-    subgroups = [processedClassHierarchy.subgroups];
-    attributes = cat(1, processedClassHierarchy.attributes);
-    datasets = mergeDatasets( cat(1, processedClassHierarchy.datasets) );
-    links = cat(1, processedClassHierarchy.links);
-
-
-    %processedClassHierarchy(1)
-    % Create a struct where different constituents across class hierarchy
-    % are added...
-
-    processedClass = struct();
-    processedClass.type = processedClassHierarchy(1).type;
-    processedClass.attributes = attributes;
-    processedClass.datasets = datasets;
-    processedClass.subgroups = subgroups;
-    processedClass.links = links;
+    if isa(processedClassHierarchy, 'file.Group')
+        % Get all groups, datasets, attributes and links
+        subgroups = [processedClassHierarchy.subgroups];
+        attributes = cat(1, processedClassHierarchy.attributes);
+        datasets = mergeDatasets( cat(1, processedClassHierarchy.datasets) );
+        links = cat(1, processedClassHierarchy.links);
     
+    
+        %processedClassHierarchy(1)
+        % Create a struct where different constituents across class hierarchy
+        % are added...
+    
+        processedClass = struct();
+        processedClass.type = processedClassHierarchy(1).type;
+        processedClass.attributes = attributes;
+        processedClass.datasets = datasets;
+        processedClass.subgroups = subgroups;
+        processedClass.links = links;
+        
+
+    elseif isa(processedClassHierarchy, 'file.Dataset')
+        
+        processedClass = struct();
+        processedClass.type = processedClassHierarchy(1).type;
+        processedClass.attributes = cat(1, processedClassHierarchy.attributes);
+        processedClass.datasets = [];%mergeDatasets( cat(1, processedClassHierarchy.datasets) );
+        processedClass.subgroups = [];
+        processedClass.links = [];
+        %links = cat(1, processedClassHierarchy.links);
+    end
+
+    % Extract propertyInfo
     propertyInfo = struct('name', {}, 'readonly', {});
     tmpPropertyInfo = propertyInfo;
 
     for i = 1:numel(  processedClass.attributes )
         tmpPropertyInfo(1).name = processedClass.attributes(i).name;
         tmpPropertyInfo(1).readonly = processedClass.attributes(i).readonly;
-        propertyInfo(end+1) = tmpPropertyInfo;
+        propertyInfo(end+1) = tmpPropertyInfo; %#ok<*AGROW>
     end
     for i = 1:numel(  processedClass.datasets )
         tmpPropertyInfo(1).name = processedClass.datasets(i).name;
@@ -50,7 +64,7 @@ function [processedClass, propertyInfo] = getProcessedClass(className)
             tmpPropertyInfo.readonly = processedClass.datasets(i).attributes(j).readonly;
             propertyInfo(end+1) = tmpPropertyInfo;
         end
-    end 
+    end
 end
 
 function mergedDatasets = mergeDatasets(datasets)

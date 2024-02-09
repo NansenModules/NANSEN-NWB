@@ -4,7 +4,7 @@ function S = appendDropdownOptions(S, propertyName, propertyType)
     import nansen.module.nwb.internal.createNewNwbInstance
 
     % Note: propertyType comes without namespace name, i.e types.core
-    fullLinkedTypeName = sprintf("types.core.%s", propertyType);
+    fullLinkedTypeName = nansen.module.nwb.internal.lookup.getFullTypeName(propertyType);
     
     % Load existing metadata instances for this neurodata type
     metadataInstances = nansen.module.nwb.internal.getMetadataInstances(fullLinkedTypeName);

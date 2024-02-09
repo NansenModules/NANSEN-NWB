@@ -45,6 +45,10 @@ classdef NWBConfigurator < applify.AppWindow & applify.HasTheme
         dropdownOpen = false;
     end
     
+    properties (Access = private)
+        NWBConverters = dictionary % classname -> package-prefixed classname
+    end
+
     properties (Constant, Access=private)
         NWB_MODULES = nansen.module.nwb.internal.schemautil.getNwbModules()
     end
@@ -69,6 +73,8 @@ classdef NWBConfigurator < applify.AppWindow & applify.HasTheme
             if ~ismissing(options.FilePath)
                 obj.FilePath = options.FilePath;
             end
+
+            obj.listConverters()
 
             % Create components
             obj.createComponents()
@@ -135,6 +141,15 @@ classdef NWBConfigurator < applify.AppWindow & applify.HasTheme
     
     methods (Access = private)
         
+        function listConverters(obj)
+            currentProject = nansen.getCurrentProject();
+            nwbConverters = currentProject.listMixins('nwbconverter');
+
+            baseNames = utility.string.getSimpleClassName(nwbConverters);
+            
+            obj.NWBConverters(baseNames) = nwbConverters;
+        end
+
         function createComponents(obj)
             
             % Create search dialog
@@ -235,9 +250,13 @@ classdef NWBConfigurator < applify.AppWindow & applify.HasTheme
             [metadataColumnData{isEmpty}] = deal('<Unconfigured>');
             [metadataColumnData{~isEmpty}] = deal('<Customized>');
 
+            converterColumnData = obj.TableDataCurrent.Converter;
+            converterNames = utility.string.getSimpleClassName(converterColumnData);
+
             tableDataDisplay = obj.TableDataCurrent;
             tableDataDisplay.DefaultMetadata = metadataColumnData;
-            
+            tableDataDisplay.Converter = converterNames;
+
             % Set the DataTable for display
             obj.UITable.DataTable = tableDataDisplay;
 
@@ -246,13 +265,13 @@ classdef NWBConfigurator < applify.AppWindow & applify.HasTheme
                 numRows = size(obj.TableDataCurrent, 1);
 
                 % Update the column formatting properties
-                obj.UITable.ColumnFormat = {'char', 'char', 'popup', 'popup', 'popup', 'char', 'char'};
+                obj.UITable.ColumnFormat = {'char', 'char', 'popup', 'popup', 'popup', 'popup', 'char'};
 
                 nwbModules = obj.NWB_MODULES;
                 [~, neuroDataTypes] = enumeration( 'nansen.module.nwb.enum.NeuroDataType' );
                 [~, groupNames] = enumeration( 'nansen.module.nwb.enum.PrimaryGroupName' );
 
-                colFormatData = {[], [], groupNames, nwbModules, neuroDataTypes, [], []};
+                colFormatData = {[], [], groupNames, nwbModules, neuroDataTypes, [{''}; obj.NWBConverters.keys()], []};
 
                 obj.UITable.ColumnFormatData = colFormatData;
 
@@ -272,6 +291,8 @@ classdef NWBConfigurator < applify.AppWindow & applify.HasTheme
             rowNumber = evt.Indices(1);
             colNumber = evt.Indices(2);
             columnName = obj.getColumnName(colNumber);
+
+            newValue = evt.NewValue;
 
             switch columnName
                 case 'NeuroDataType'
@@ -299,11 +320,15 @@ classdef NWBConfigurator < applify.AppWindow & applify.HasTheme
                     % Reset value for neurodata type
                     obj.TableDataCurrent{rowNumber, 'NeuroDataType'} = {''};
 
+                case 'Converter'
+                    if ~isempty(newValue)
+                        newValue = obj.NWBConverters{{newValue}};
+                    end
                 otherwise
                     % pass
             end
 
-            obj.TableDataCurrent{rowNumber, colNumber} = {evt.NewValue};
+            obj.TableDataCurrent{rowNumber, colNumber} = {newValue};
             return
             % Do we need to rearrange rows?
             % switch evt.Indices(2) % Column numbers..
@@ -664,11 +689,14 @@ classdef NWBConfigurator < applify.AppWindow & applify.HasTheme
             nwbModuleName = obj.TableDataCurrent.NwbModule{rowNumber};
             if isempty(nwbModuleName); return; end
             %disp(nwbModuleName)
-
+            
             neuroDataTypes = getTypesForModule(nwbModuleName);
-
+            
+            % Todo: Should this filtering be included in function above?
             metadataTypes = nansen.module.nwb.internal.lookup.getMetadataClassNames();
+            abstractTypes = nansen.module.nwb.internal.lookup.getAbstractClassNames();
             neuroDataTypes = setdiff(neuroDataTypes, metadataTypes);
+            neuroDataTypes = setdiff(neuroDataTypes, abstractTypes);
 
             isColumn = strcmp( obj.TableDataCurrent.Properties.VariableNames, 'NeuroDataType');
 
@@ -684,6 +712,7 @@ classdef NWBConfigurator < applify.AppWindow & applify.HasTheme
             nwbConfigurationData = obj.NWBConfigurationData;
             % Update with current table.
             nwbConfigurationData.DataItems = table2struct(obj.TableDataCurrent);
+
             save(obj.FilePath, 'nwbConfigurationData')
 
             % Update original table data to last saved
@@ -701,9 +730,10 @@ classdef NWBConfigurator < applify.AppWindow & applify.HasTheme
                 return
             end
 
-            nwbClassName = sprintf( 'types.core.%s', neuroDataType );
+            nwbClassName = nansen.module.nwb.internal.lookup.getFullTypeName(neuroDataType);
+            %nwbClassName = sprintf( 'types.core.%s', neuroDataType );
             [S, info, isRequired] = nansen.module.nwb.internal.getTypeMetadataStruct(nwbClassName);
-
+            
             if ~isempty( obj.TableDataCurrent{rowNumber, 'DefaultMetadata'}{1} )
                 S = obj.TableDataCurrent{rowNumber, 'DefaultMetadata'}{1};
             end

@@ -15,16 +15,18 @@ function [S, info, isRequired] = getTypeMetadataStruct(typeName)
     if isempty(customPropertyMap)
         customPropertyMap = nansen.module.nwb.internal.customPropertyLookupMap();
     end
-    
+
     %typeName = 'types.core.RoiResponseSeries';
 
     mc = meta.class.fromName(typeName);
+    typeShortName = utility.string.getSimpleClassName(typeName);
 
     propertyList = mc.PropertyList;
 
     % Skip properties with non-public set access
     isEditable = string({propertyList.SetAccess}) == "public";
-    propertyList = propertyList(isEditable);
+    isHidden = [propertyList.Hidden];
+    propertyList = propertyList(isEditable & ~isHidden);
 
     numProperties = numel( propertyList );
 
@@ -83,14 +85,25 @@ function [S, info, isRequired] = getTypeMetadataStruct(typeName)
         else
             info.(outPropertyName) = cleanDescription( propertyDescription );
         end
-
-        if isfield(customPropertyMap, definingClassShortName)
-            if isfield(customPropertyMap.(definingClassShortName), thisPropertyName)
-                S.(outPropertyName) = customPropertyMap.(definingClassShortName).(thisPropertyName);
+        
+        % Check if there are any customizations based on this class
+        if isfield(customPropertyMap, typeShortName)
+            if isfield(customPropertyMap.(typeShortName), thisPropertyName)
+                S.(outPropertyName) = customPropertyMap.(typeShortName).(thisPropertyName);
                 continue
             end
         end
-        
+    
+        % Check if there are any customizations based on the defining class (could be superclass)
+        if ~strcmp(typeShortName, definingClassShortName)
+            if isfield(customPropertyMap, definingClassShortName)
+                if isfield(customPropertyMap.(definingClassShortName), thisPropertyName)
+                    S.(outPropertyName) = customPropertyMap.(definingClassShortName).(thisPropertyName);
+                    continue
+                end
+            end
+        end
+
         S.(outPropertyName) = defaultType.(thisPropertyName);
     end
 

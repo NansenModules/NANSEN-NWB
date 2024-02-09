@@ -5,6 +5,7 @@ function map = customPropertyLookupMap()
     map = struct();
     map.TimeSeries = struct("data_continuity", categorical("continuous", ["continuous", "instantaneous", "step"]));
     map.ImageSeries = struct("format", categorical("raw", ["raw", "external_file"]));
+    map.SpatialSeries = struct("data_unit", categorical("meters", ["meters", "degrees"]));
 
     
     %isData = dictionary();

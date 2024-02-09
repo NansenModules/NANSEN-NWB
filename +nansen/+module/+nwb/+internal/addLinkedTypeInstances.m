@@ -49,7 +49,20 @@ function S = addLinkedTypeInstances(S, neuroDataType)
         isMatch = strcmpi(allFields, subgroups(i).type);
         if any(isMatch)
             S = appendDropdownOptions(S, lower(subgroups(i).type), subgroups(i).type);
-            S.(lower(subgroups(i).type)) = '';
+            if isa(S.(lower(subgroups(i).type)), 'types.untyped.Set')
+                S.(lower(subgroups(i).type)) = '';
+            end
+        end
+    end
+
+    if ~isempty(classInfo.datasets)
+        datasetTypes = {classInfo.datasets.type};
+        isTyped = cellfun(@(c) ~isempty(c), datasetTypes);
+        typedDatasets = classInfo.datasets(isTyped);
+        
+        for i = 1:numel(typedDatasets)
+            % Todo: Resolve full type names...
+            S = appendDropdownOptions(S, typedDatasets(i).name, typedDatasets(i).type);
         end
     end
 end

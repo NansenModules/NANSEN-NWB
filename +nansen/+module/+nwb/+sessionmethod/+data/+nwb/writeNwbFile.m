@@ -85,48 +85,62 @@ import nansen.session.SessionMethod
     % % end
 
     %% Todo Add general metadata like dataset info, subjects etc.:
-     
+    
+
     
     %% Loop through each variable of the NWB configuration
     for i = 1:numel(configurationCatalog.DataItems)
         variableConfiguration = configurationCatalog.DataItems(i);
-        
+
         variableName = variableConfiguration.VariableName;
-
-        % Get custom metadata
+        
+        nwbDataType = variableConfiguration.NeuroDataType;
         metadata = variableConfiguration.DefaultMetadata;
-        metadata = utility.struct.removeConfigFields(metadata);
-
-        nvPairs = namedargs2cell(metadata);
-        nvPairs(1:2:end) = cellfun(@(c) utility.string.camel2snake(c), nvPairs(1:2:end), 'UniformOutput', false);
-
+        metadata = utility.struct.removeConfigFields(metadata); %todo: remove
+        
         % Load data
-        data = sessionObject.loadData(variableName);
-        if isa(data, 'timetable')
-            dataV = data{:,1};
-            nvPairs = [nvPairs, {'timestamps', seconds(data.Time), 'data' dataV}];
+        data = sessionObject.loadData(variableConfiguration.VariableName);
+
+        % Todo: Load metadata instances, resolve linked/embedded instances
+        if ~isempty(metadata)
+            metadata = nansen.module.nwb.internal.resolveMetadata(metadata, nwbDataType, nwbFile);
         end
         
-        
-        % Get custom conversion function
-        
-        % Neurodata type
-        nwbData = feval(sprintf('types.core.%s', variableConfiguration.NeuroDataType), nvPairs{:});
-        
-        
-        nwb.acquisition.set('2pInternal', InternalTwoPhoton);
-        
-        primaryGroupName = lower(variableConfiguration.PrimaryGroupName);
-        nwbVariableName = variableConfiguration.NWBVariableName;
-        nwbFile.(primaryGroupName).set(nwbVariableName, nwbData);
+        % Run default or custom converter.
+        if isempty(variableConfiguration.Converter)
+            try
+                neuroData = nansen.module.nwb.file.convertToDataType(metadata, data, nwbDataType);
+            catch ME
+                warning('Could not add %s to nwb file: Cause by\n %s\jn', variableName, ME.message);
+            end
+        else
+            customConverterFcn = variableConfiguration.Converter;
+            feval(customConverterFcn, metadata, data, nwbFilePath);
+            continue
+        end
+
+        switch variableConfiguration.PrimaryGroupName
+            case 'Acquisition'
+                nwbFile.acquisition.set(variableName, neuroData);
+            
+            case 'Processing'
+                %processingModule = wrappedNwbFile.getProcessingModule(variableName); %wrappedNwbFile?
+                % Create or get processing module based on nwb module
+        end
+
+        % primaryGroupName = lower(variableConfiguration.PrimaryGroupName);
+        % nwbVariableName = variableConfiguration.NWBVariableName;
+        % nwbFile.(primaryGroupName).set(nwbVariableName, nwbData);
         
         %nwbFile = nansen.module.nwb.convert.writeDataToFile(nwbFile, data, metadata, customConversinFcn); % anything else???
-    
     end
+            
+    nwbExport(nwbFile, nwbFilePath)
+    fprintf('Finished writing file ''%s''\n', nwbFilePath)
 
     %% Export the file
     if wasInitialized
-        nwbExport(obj.NWBObject, obj.PathName);
+        %nwbExport(obj.NWBObject, obj.PathName);
     end
 
 end
