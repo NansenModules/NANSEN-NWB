@@ -1,7 +1,11 @@
-function item = createNewNwbInstance(items, nwbDataType)
+function [itemName, itemData] = createNewNwbInstance(items, nwbDataType)
 
     % Todo. Add onValue changed callback and popup error dialog if provided
     % name already exists when a new item is created (but no if edited...)
+
+    % Todo: 
+    % Express function as 
+    % [itemName, itemData] = createNewNwbInstance(itemNames, itemData, nwbDataType)
     
     % The figure on top of the stack should be the reference figure.
     f = findall(0, 'type','figure');
@@ -39,7 +43,7 @@ function item = createNewNwbInstance(items, nwbDataType)
         'ValueChangedFcn', @onValueChanged );
             
     % Preallocate an empty item
-    item = '';
+    itemName = ''; itemData = feval([nwbDataType, '.empty']);
 
     if ~wasAborted
         % Save to persistent catalog.
@@ -60,7 +64,13 @@ function item = createNewNwbInstance(items, nwbDataType)
         end
         catalog.save()
 
-        item = S.name;
+        itemName = S.name;
+    end
+
+    if nargout == 2
+        S = rmfield(S, "name");
+        nvPairs = namedargs2cell(S);
+        itemData = feval( nwbDataType, nvPairs{:} );
     end
 end
 

@@ -1,4 +1,4 @@
-classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs
+classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mixin.HasUserData
 % UIDynamicTable - General UI for the dynamic table type of NWB.
 %
 %   Key features
@@ -20,8 +20,9 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs
     %  [ ] Strategy for setting column widths. Make table scrollable horizontally
     %  [ ] Populate dropdowns for columns of types "matnwb.types.core..."
     %  [ ] Have an add/create new instance method for the columns of nwb types...
+    %  [ ] Visible property to turn on/off visible state...
 
-    properties
+    properties (Dependent)
         DynamicTable % The original dynamic table data object
     end
 
@@ -70,13 +71,27 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs
     methods % Set/get
         
         function set.DynamicTable(obj, newValue)
-            obj.DynamicTable = newValue;
+            obj.Data = newValue;
             obj.onDynamicTableSet()
         end
-        
+
+        function value = get.DynamicTable(obj)
+            value = obj.Data;
+        end
     end
 
-    methods 
+    methods
+
+        function position = getpixelposition(obj, isRecursive)
+            if nargin < 2; isRecursive=false; end
+            position = getpixelposition(obj.UITable, isRecursive);
+        end
+
+        function setpixelposition(obj, position, isRecursive)
+            if nargin < 3; isRecursive=false; end
+            setpixelposition(obj.UITable, position, isRecursive);
+        end
+
         function addColumns(obj, numColumns, columnIndex, location)
             arguments
                 obj
@@ -144,12 +159,20 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs
             
             % Reformat table data before assigning.
             
-            % Convert metadata struct to a display string
-
-
             tableDataDisplay = obj.DynamicTable;
-           % tableDataDisplay.DefaultMetadata = metadataColumnData;
-           % tableDataDisplay.Converter = converterNames;
+
+            % Update values for nwb types based on the data in their
+            % dependent columns. Still remains to be seen if every
+            % vectordata nwb type has a dependent column...
+            columnNames = obj.DynamicTable.Properties.VariableNames;
+            columnFormat = cellfun(@(c) class( obj.DynamicTable.(c) ), columnNames, 'UniformOutput', false );
+            isNwbType = startsWith(columnFormat, 'matnwb.types.core');
+
+            nwbTypeInd = find(isNwbType);
+            for idx = nwbTypeInd
+                dependentColumnName = obj.getDependentColumnName(idx);
+                tableDataDisplay.(columnNames{idx}) = tableDataDisplay.(dependentColumnName);
+            end
 
             % Set the DataTable for display
             obj.UITable.DataTable = tableDataDisplay;
@@ -169,6 +192,23 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs
                     obj.createNewNWBType(rowNumber, colNumber)
                     return
                 end
+            end
+
+            if obj.isNwbType(colNumber)
+                nwbDataType = obj.getNwbType(colNumber);
+                % Get the corresponding item for the catalog.
+                catalog = nansen.module.nwb.internal.getMetadataCatalog(nwbDataType);
+                
+                instanceName = newValue;
+                S = catalog.get(instanceName);
+
+                % Todo: This should be internal to the catalog...
+                S = rmfield(S, ["name", "Uuid"]);
+                nvPairs = namedargs2cell(S);
+                newValue = feval( nwbDataType, nvPairs{:} );
+                
+                % Update dependent column.
+                obj.updateDependentColumn(rowNumber, colNumber, instanceName)
             end
 
             if ischar(newValue)
@@ -196,7 +236,6 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs
                     obj.UITable.ColumnEditable(:) = false;
                 end
             end
-
         end
 
         function onMouseRightClickedInTable(obj, src, evt)
@@ -233,11 +272,8 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs
             
             if row >= 1 && col >= 0
                 obj.UITable.ColumnEditable(col) = true;
-
                 obj.UITable.JTable.editCellAt(row-1, col-1);
-
             end
-            
         end
 
         function onAddNewRowMenuItemClicked(obj, src, evt, location)
@@ -253,9 +289,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs
                 rowNumber = obj.LastClickedCell(1);
                 obj.addRows(x, rowNumber, location)
             end
-
         end
-
     end
 
     methods (Access = private)
@@ -299,7 +333,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs
                         'FontName', 'avenir next', ...
                         'Theme', uim.style.tableLight, ...
                         'Units', 'normalized', ...
-                        'Position', [0.05,0.05,0.9,0.9]);
+                        'Position', [0.05,0.025,0.9,0.95]);
             
             obj.UITable.CellEditCallback = @obj.onTableCellEdited;
             obj.UITable.MouseClickedCallback = @obj.onTableCellClicked;
@@ -307,8 +341,6 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs
             % obj.UITable.KeyPressFcn = @obj.onKeyPressedInTable;
 
             % addlistener(obj.UITable, 'MouseMotion', @obj.onMouseMotionOnTable);
-
-
         end
     
         function createContextMenus(obj)
@@ -426,10 +458,47 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs
             fullLinkedTypeName = class( obj.DynamicTable{rowNumber, colNumber});
             
             existingItems = obj.DynamicTable{:, colNumber};
-            newItem = nansen.module.nwb.internal.createNewNwbInstance(existingItems, fullLinkedTypeName);
-
-            obj.UITable.ColumnFormatData{colNumber}{end+1} = newItem;
+            [newItemName, newItem] = nansen.module.nwb.internal.createNewNwbInstance(existingItems, fullLinkedTypeName);
+            
+            obj.UITable.ColumnFormatData{colNumber}{end+1} = newItemName;
             obj.DynamicTable{rowNumber, colNumber} = newItem;
+
+            % Todo: Figure out if this is general:
+            obj.updateDependentColumn(rowNumber, colNumber, newItemName)
+        end
+    end
+
+    % Internal methods the might be moved to a DynamicTable class if the
+    % need for such a class arises.
+    methods (Access = private)
+        
+        function columnName = getColumnName(obj, columnNumber)
+            columnName = obj.DynamicTable.Properties.VariableNames{columnNumber};
+        end
+
+        function columnName = getDependentColumnName(obj, columnNumber)
+            columnName = obj.DynamicTable.Properties.CustomProperties.ColumnDependency(columnNumber);
+        end
+
+        function tf = isNwbType(obj, columnNumber)
+            columnNames = obj.DynamicTable.Properties.VariableNames(columnNumber);
+            columnFormat = cellfun(@(c) class( obj.DynamicTable.(c) ), columnNames, 'UniformOutput', false );
+            tf = startsWith(columnFormat, 'matnwb.types.core');
+        end
+
+        function nwbType = getNwbType(obj, columnNumber)
+            columnName = obj.getColumnName(columnNumber);
+            nwbType = class( obj.DynamicTable.(columnName) );
+        end
+               
+        function updateDependentColumn(obj, rowNumber, colNumber, newItemName)
+            % This is some ad hoc code to place the name to the correct
+            % columns. Todo: Still remains to be seen if this will be a 
+            % general pattern for dynamic tables.
+            dependentColumnName = obj.getDependentColumnName(colNumber);
+            if ~ismissing(dependentColumnName)
+                obj.DynamicTable{rowNumber, dependentColumnName} = {newItemName};
+            end
         end
     end
 end
