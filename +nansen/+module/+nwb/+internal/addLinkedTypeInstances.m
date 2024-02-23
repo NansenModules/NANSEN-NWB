@@ -1,4 +1,4 @@
-function S = addLinkedTypeInstances(S, neuroDataType)
+function S = addLinkedTypeInstances(S, neuroDataType, nwbNodeStack)
 % addLinkedTypeInstances - Add linked type instances to a metadata structure.
 %
 %   This function adds "config" fields for linked types of an NWB metadata
@@ -19,14 +19,19 @@ function S = addLinkedTypeInstances(S, neuroDataType)
 %   - S: Structure to which linked type config fields will be added.
 %   - neuroDataType: The type of neuro data (NWB) for which linked type 
 %     instances need to be added.
+%   - nwbNodeStack: stack of NWB nodes, used when creating nested instances
 %
 %   Output:
 %   - S: Updated structure with linked type config fields added.
 %
-%   See also: getMetadataInstances, createNewNwbInstance, structeditor.App
-    
-    import nansen.module.nwb.internal.getMetadataInstances
-    import nansen.module.nwb.internal.createNewNwbInstance
+%   See also: structeditor.App
+
+    arguments
+        S (1,1) struct
+        neuroDataType (1,1) string
+        nwbNodeStack (1,:) nansen.module.nwb.internal.NwbNode = nansen.module.nwb.internal.NwbNode.empty
+    end
+
     import nansen.module.nwb.internal.appendDropdownOptions
 
     % Gets class info for specific neurodata type.
@@ -39,8 +44,8 @@ function S = addLinkedTypeInstances(S, neuroDataType)
         
         linkName = links(i).name;
         linkType = links(i).type; % Note: comes without namespace name, i.e types.core
-
-        S = appendDropdownOptions(S, linkName, linkType);
+        nwbNode = nansen.module.nwb.internal.NwbNode(linkName, linkType);
+        S = appendDropdownOptions(S, [nwbNodeStack, nwbNode]);
     end
 
     allFields = fieldnames(S);
@@ -48,8 +53,15 @@ function S = addLinkedTypeInstances(S, neuroDataType)
     for i = 1:numel(subgroups)
         isMatch = strcmpi(allFields, subgroups(i).type);
         if any(isMatch)
-            S = appendDropdownOptions(S, lower(subgroups(i).type), subgroups(i).type);
-            if isa(S.(lower(subgroups(i).type)), 'types.untyped.Set')
+            nwbNode = nansen.module.nwb.internal.NwbNode(...
+                lower(subgroups(i).type), subgroups(i).type);
+
+            S = appendDropdownOptions(S, [nwbNodeStack, nwbNode]);
+            
+            if isa(S.(lower(subgroups(i).type)), 'types.untyped.Set') || isa(S.(lower(subgroups(i).type)), 'matnwb.types.untyped.Set')
+                % This is an internal nwb type and the value needs to 
+                % initialized to a char in order to correctly render in the
+                % struct editor
                 S.(lower(subgroups(i).type)) = '';
             end
         end
@@ -61,8 +73,28 @@ function S = addLinkedTypeInstances(S, neuroDataType)
         typedDatasets = classInfo.datasets(isTyped);
         
         for i = 1:numel(typedDatasets)
-            % Todo: Resolve full type names...
-            S = appendDropdownOptions(S, typedDatasets(i).name, typedDatasets(i).type);
+            nwbNode = nansen.module.nwb.internal.NwbNode(...
+                typedDatasets(i).name, typedDatasets(i).type, neuroDataType);
+
+            S = appendDropdownOptions(S, [nwbNodeStack, nwbNode]);
+        end
+    end
+
+    if ~isempty(classInfo.attributes)
+        dataTypes = {classInfo.attributes.dtype};
+        isTyped = cellfun(@(c) isa(c, 'containers.Map'), dataTypes);
+        
+        typedAttributes = classInfo.attributes(isTyped);
+        for i = 1:numel(typedAttributes)
+            assert(strcmp(typedAttributes(i).dtype('reftype'), 'object'), ...
+                'Expected object') 
+            
+            dataType = typedAttributes(i).dtype('target_type');
+                       
+            nwbNode = nansen.module.nwb.internal.NwbNode(...
+                typedAttributes(i).name, dataType, neuroDataType);
+
+            S = appendDropdownOptions(S, [nwbNodeStack, nwbNode]);
         end
     end
 end

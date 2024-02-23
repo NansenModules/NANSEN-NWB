@@ -8,13 +8,13 @@ function [processedClass, propertyInfo] = getProcessedClass(className)
 
     className = utility.string.getSimpleClassName(className);
     
-    nwbSourceDir = misc.getMatnwbDir();
+    nwbSourceDir = matnwb.misc.getMatnwbDir();
     namespaceName = 'core';
-    Namespace = schemes.loadNamespace(namespaceName, nwbSourceDir);
+    Namespace = matnwb.schemes.loadNamespace(namespaceName, nwbSourceDir);
     
-    [processedClassHierarchy, classprops, inherited] = file.processClass(className, Namespace, pregenerated);
+    [processedClassHierarchy, classprops, inherited] = matnwb.file.processClass(className, Namespace, pregenerated);
     
-    if isa(processedClassHierarchy, 'file.Group')
+    if isa(processedClassHierarchy, 'matnwb.file.Group')
         % Get all groups, datasets, attributes and links
         subgroups = [processedClassHierarchy.subgroups];
         attributes = cat(1, processedClassHierarchy.attributes);
@@ -22,8 +22,7 @@ function [processedClass, propertyInfo] = getProcessedClass(className)
         links = cat(1, processedClassHierarchy.links);
     
     
-        %processedClassHierarchy(1)
-        % Create a struct where different constituents across class hierarchy
+        % Create a struct where different elements across class hierarchy
         % are added...
     
         processedClass = struct();
@@ -34,11 +33,13 @@ function [processedClass, propertyInfo] = getProcessedClass(className)
         processedClass.links = links;
         
 
-    elseif isa(processedClassHierarchy, 'file.Dataset')
+    elseif isa(processedClassHierarchy, 'matnwb.file.Dataset')
         
+        dataset = mergeDatasets(processedClassHierarchy);
+
         processedClass = struct();
         processedClass.type = processedClassHierarchy(1).type;
-        processedClass.attributes = cat(1, processedClassHierarchy.attributes);
+        processedClass.attributes = dataset.attributes;
         processedClass.datasets = [];%mergeDatasets( cat(1, processedClassHierarchy.datasets) );
         processedClass.subgroups = [];
         processedClass.links = [];
@@ -111,7 +112,12 @@ end
 
 function mergedAttributes = mergeAttributes(attributesChild, attributesParent)
     
-    mergedAttributes = attributesParent;
+    if isempty(attributesParent)
+        mergedAttributes = attributesChild;
+        return
+    else
+        mergedAttributes = attributesParent;
+    end
 
     if isempty(attributesChild); return; end
 
@@ -121,4 +127,8 @@ function mergedAttributes = mergeAttributes(attributesChild, attributesParent)
     [~, iA, iC] = intersect(attributeNamesParent, attributeNamesChild);
     
     mergedAttributes(iA) = attributesChild(iC);
+
+    % Todo: Also add attributes which are unique to the child...
+    [~, isUniqueToChild] = setdiff(attributeNamesChild, attributeNamesParent);
+    mergedAttributes = [mergedAttributes, attributesChild(isUniqueToChild)];
 end

@@ -1,12 +1,14 @@
 classdef DynamicTableCollection < handle
-%DataVariableConfigTable
-    %   Detailed explanation goes here
-
+%DynamicTableCollection A GUI tab component for handling a collection of
+%dynamic tables.
+    
+    % Note: Currently only supports an electrodes table.
 
     % Todo: 
     %   [ ] Store multiple tables
-    %   [ ] Have a button for each table to initialize table
-    %   [ ] OR: An option in the sidebar to add new table from a dropdown
+    %   [ ] Add options for creating new dynamic tables.
+    %   [ ] Add dynamic tables programmatically, i.e from a function or
+    %       from tabular files, i.e csv, or excel files
     
     properties (Constant, Hidden)
         DEFAULT_THEME = nansen.theme.getThemeColors('deepblue')
@@ -85,6 +87,28 @@ classdef DynamicTableCollection < handle
         function tf = isDirty(obj)
             tf = arrayfun(@(dt) dt.IsDirty, obj.DynamicTable.values);
         end
+    
+        function deactivate(obj)
+            % Save dynamic tables
+            
+            catalog = nansen.module.nwb.internal.getMetadataCatalog("ElectrodesTable");
+            
+            catalogItem = catalog.get("ElectrodesTable");
+            catalogItem.DynamicTable = obj.DynamicTable("General_ExtracellularEphys_Electrodes").DynamicTable;
+            catalog.replace(catalogItem)
+
+            catalog.save()
+        end
+
+        function activate(obj)
+            % Reload dynamic tables
+            
+            catalog = nansen.module.nwb.internal.getMetadataCatalog("ElectrodesTable");
+            catalogItem = catalog.get("ElectrodesTable");
+            electrodeTable = catalogItem.DynamicTable;
+        
+            obj.DynamicTable("General_ExtracellularEphys_Electrodes").DynamicTable = electrodeTable;
+        end
     end
 
     methods %(Access = protected) % Override AppWindow methods
@@ -120,7 +144,9 @@ classdef DynamicTableCollection < handle
             buttonGroup.updateLocation()
             buttonGroup.SelectionChangedFcn = @obj.onDynamicTableTypeChanged;
             obj.DynamicTableSelector = buttonGroup;
-            %app.updateTablePosition()
+
+            obj.createAddTableButton()
+            %obj.updateTablePosition()
         end
         
         function createContextMenus(obj)
@@ -129,14 +155,46 @@ classdef DynamicTableCollection < handle
             mitem = uimenu(obj.TableContextMenu, 'Text', 'Remove Task');
             %mitem.Callback = @obj.onRemoveTaskMenuItemClicked;
         end
-   
+        
+        function createAddTableButton(obj)
+
+            % Todo: This should be retrieved from a private property, and
+            % used also when configuring the buttongroup for switching
+            % tables
+            xPad = 4;
+
+            ICONS = uim.style.iconSet(nansen.App.getIconPath);
+            icon = ICONS.plus;
+
+            buttonConfig = {'FontSize', 15, 'FontName', 'helvetica', ...
+                'Padding', [xPad,2,xPad,2], 'CornerRadius', 7, ...
+                'Mode', 'pushbutton', 'Style', uim.style.tabButtonLight, ...
+                'Icon', icon, 'IconSize', [14,14], 'IconTextSpacing', 7};
+
+            W = obj.DynamicTableSelector.Width - 8;
+
+            hButton = uim.control.Button_(obj.Parent, buttonConfig{:});
+            hButton.Text = 'Add Table';
+            hButton.updateLocation()
+            hButton.Size = [W, 26];
+            hButton.Margin = [0,5,4,0]; % Note: Ad hoc placement..
+            hButton.Callback = @obj.addDynamicTable;
+        end
+
         function initializeTables(obj)
 
             % obj.NWBConfigurationData.General.ExtracellularEphys.Electrodes = ...
             %     nansen.module.nwb.internal.dtable.initializeElectrodesTable();
-            electrodeTable = obj.NWBConfigurationData.General.ExtracellularEphys.Electrodes;
+            % electrodeTable = obj.NWBConfigurationData.General.ExtracellularEphys.Electrodes;
+        
+            catalog = nansen.module.nwb.internal.getMetadataCatalog("ElectrodesTable");
+            catalogItem = catalog.get("ElectrodesTable");
+            electrodeTable = catalogItem.DynamicTable;
+    
+            % Todo: Create panels and dynamic tables for each dynamic table
+            % of the NWB Configuration
 
-            hPanel = uipanel(obj.Parent, BorderType="none", BackgroundColor='b');
+            hPanel = uipanel(obj.Parent, BorderType="none");
             obj.TablePanels('Trials') = hPanel;
 
             hPanel = uipanel(obj.Parent, BorderType="none");
@@ -146,9 +204,10 @@ classdef DynamicTableCollection < handle
 
             obj.DynamicTable(key) = nansen.module.nwb.gui.UIDynamicTable(...
                 electrodeTable, 'TableName', 'Electrode', 'Parent', hPanel);
+
             obj.updateTablePosition()
         end
-
+    
         function updateTablePosition(obj)
         % updateTablePosition - Update position of table
         %
@@ -179,6 +238,22 @@ classdef DynamicTableCollection < handle
     
     methods (Access = protected)
         
+        function addDynamicTable(obj, src, evt)
+            msgbox('Not implemented yet', 'Error')
+            % Todo: 
+            
+            % Select table from list
+
+            % Abort if table already exists...?
+
+            % Initialize table
+
+            % Add table to NWB Configuration Data
+
+            % Add button to GUI
+
+        end
+
         function onDynamicTableTypeChanged(obj, s, e)
 
             selectedTableName = s.Text;

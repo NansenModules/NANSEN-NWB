@@ -4,7 +4,7 @@ classdef NWBConfigurator < applify.MultiPageApp
 % 
 %   [x] Load/save NWB configuration data from this class.
 %   [ ] Set/get relevant pieces of configuration data to subcomponents
-%   [ ] 
+%   [ ] How to increase margins?
 
     properties (Constant, Access = protected)
         AppName = 'NWB Configurator'
@@ -126,6 +126,7 @@ classdef NWBConfigurator < applify.MultiPageApp
                             [filename, folder] = uigetfile('.m')
                         else
                             obj.saveNwbConfigurationData()
+                            obj.DynamicTableConfigurator.deactivate()
                         end
                     case 'No'
 

@@ -1,5 +1,6 @@
 function electrodeTable = initializeElectrodesTable()
 % Todo: Add ID.
+    
     electrodeGroup = nansen.module.nwb.internal.schemautil.getElectrodesTableGroup();
 
     dynamicTableColumns = electrodeGroup.datasets;
@@ -26,6 +27,7 @@ function electrodeTable = initializeElectrodesTable()
     columnDependency = repmat(string(missing), 1, width(electrodeTable));
     isGroup = strcmp(electrodeTable.Properties.VariableNames, 'group');
     columnDependency(isGroup) = "group_name";
-    
     electrodeTable.Properties.CustomProperties.ColumnDependency = columnDependency;
+    
+    electrodeTable.Properties.DimensionNames{1} = 'Electrode';
 end

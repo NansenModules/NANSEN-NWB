@@ -1,13 +1,33 @@
 function neuroData = convertToDataType(metadata, data, neuroDataType)
+% convertToDataType - Create an NWB "data" object
+%
+%   Create an NWB "data" object given metadata, data and the name of the
+%   neurodata type.
+%
+%   Note: Work in progress, currently handles timeseries somewhat...
 
+%   Todo: 
+%     [ ] Handle other types. 
+%        [ ] Dynamic tables?
+%        [ ] Images
 
-    % Get custom metadata
+    arguments
+        metadata (1,1) struct
+        data % ?? Could be whatever?
+        neuroDataType (1,1) string
+    end
+
+    import nansen.module.nwb.internal.lookup.getFullTypeName
+
+    % Special case: Handle "wrapper" types. 
     wrapperNames = nansen.module.nwb.internal.lookup.getWrapperClassNames();
     isContainerType = any(wrapperNames==neuroDataType);
+    
     if isContainerType
         classInfo = nansen.module.nwb.internal.schemautil.getProcessedClass(neuroDataType);
         containerType = neuroDataType;
         neuroDataType = classInfo.subgroups.type;
+        
         metadata = struct2cell(metadata);
         metadata = metadata{1};
 
@@ -16,7 +36,7 @@ function neuroData = convertToDataType(metadata, data, neuroDataType)
         % todo: recursive:
         neuroData = nansen.module.nwb.file.convertToDataType(metadata, data, neuroDataType);
 
-        fcn = str2func( "types.core." + containerType);
+        fcn = str2func( getFullTypeName(containerType) );
 
         if isa(neuroData, 'struct')
             nvPairs = [{neuroData.name};{neuroData.data}];
@@ -27,8 +47,6 @@ function neuroData = convertToDataType(metadata, data, neuroDataType)
         return
     end
 
-    metadata = utility.struct.removeConfigFields(metadata);
-
     if isempty(metadata)
         nvPairs = {};
     else
@@ -37,7 +55,7 @@ function neuroData = convertToDataType(metadata, data, neuroDataType)
 
     % todo: resolve base neurodata type
     baseNeurodataType = "Timeseries";
-    fcn = str2func( "types.core."+neuroDataType);
+    fcn = str2func( getFullTypeName(neuroDataType) );
 
     switch baseNeurodataType
         case "Timeseries"
@@ -54,7 +72,6 @@ function neuroData = convertToDataType(metadata, data, neuroDataType)
                     
                     neuroData = struct;
                     for i = 1:numel(variables)
-                        neuroData(i).name = variables{i};
                         thisData = data.(variables{i});
                         neuroData(i).name = variables{i};
                         neuroData(i).data = feval(fcn, 'data', thisData, 'timestamps', time, nvPairs{:});
@@ -81,6 +98,5 @@ function neuroData = convertToDataType(metadata, data, neuroDataType)
     % Get custom conversion function
     
     % Neurodata type
-    %nwbData = feval(sprintf('types.core.%s', neuroDataType), nvPairs{:});
-    
+    % nwbData = feval(sprintf('types.core.%s', neuroDataType), nvPairs{:});
 end

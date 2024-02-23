@@ -5,7 +5,6 @@ function [S, info, isRequired] = getTypeMetadataStruct(typeName)
 %   list of properties associated with a neurodata type, returning only
 %   properties considered metadata.
 
-    import nansen.module.nwb.internal.addLinkedTypeInstances
     import nansen.module.nwb.internal.lookup.getDeprecatedPropertyNames
 
     persistent dataPropertyMap customPropertyMap
@@ -80,7 +79,7 @@ function [S, info, isRequired] = getTypeMetadataStruct(typeName)
         
         isLink = strcmp(linkNames, thisPropertyName);
         if any(isLink)
-            % Linked types have poor documnetation in the meta class...
+            % Linked types have poor documentation in the meta class...
             info.(outPropertyName) = cleanDescription( classInfo.links(isLink).doc );
         else
             info.(outPropertyName) = cleanDescription( propertyDescription );
@@ -107,7 +106,12 @@ function [S, info, isRequired] = getTypeMetadataStruct(typeName)
         S.(outPropertyName) = defaultType.(thisPropertyName);
     end
 
-    S = postprocessStruct(S);
+    % This is not needed at the moment, but if some other configurations
+    % are needed and this function is reintroduced, it should be made a
+    % separate function (As it is adding configuration fields, this needs
+    % to happen also for instances that already exist and are loaded from
+    % file)
+    %S = postprocessStruct(S);
 end
 
 function S = postprocessStruct(S)

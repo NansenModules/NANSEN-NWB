@@ -90,6 +90,16 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
 
     end
     
+    methods 
+        function deactivate(obj)
+            % pass
+        end
+
+        function activate(obj)
+            % pass
+        end
+    end
+
     methods %(Access = protected) % Override AppWindow methods
         
         function updateSize(obj)
@@ -672,9 +682,10 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             end
 
             nwbClassName = nansen.module.nwb.internal.lookup.getFullTypeName(neuroDataType);
-            %nwbClassName = sprintf( 'types.core.%s', neuroDataType );
+            %nwbClassName = sprintf( 'matnwb.types.core.%s', neuroDataType );
             [S, info, isRequired] = nansen.module.nwb.internal.getTypeMetadataStruct(nwbClassName);
             
+            % If data already exists, use that insted
             if ~isempty( obj.TableDataCurrent{rowNumber, 'DefaultMetadata'}{1} )
                 S = obj.TableDataCurrent{rowNumber, 'DefaultMetadata'}{1};
             end
@@ -691,6 +702,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             
             if ~wasAborted
                 % Update table
+                S = utility.struct.removeConfigFields(S);
                 obj.TableDataCurrent{rowNumber, 'DefaultMetadata'} = {S};
             end
         end

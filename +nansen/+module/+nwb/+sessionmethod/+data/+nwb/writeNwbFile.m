@@ -84,18 +84,23 @@ import nansen.session.SessionMethod
     % %     nwbExport(nwbFile, nwbFilePath);
     % % end
 
+    % Create a map for holding resolved metadata / neurodata types.
+    instanceMap = dictionary;
+
     %% Todo Add general metadata like dataset info, subjects etc.:
     
 
     
     %% Loop through each variable of the NWB configuration
     for i = 1:numel(configurationCatalog.DataItems)
+        
         variableConfiguration = configurationCatalog.DataItems(i);
 
         variableName = variableConfiguration.VariableName;
         
         nwbDataType = variableConfiguration.NeuroDataType;
         metadata = variableConfiguration.DefaultMetadata;
+
         metadata = utility.struct.removeConfigFields(metadata); %todo: remove
         
         % Load data
@@ -103,19 +108,25 @@ import nansen.session.SessionMethod
 
         % Todo: Load metadata instances, resolve linked/embedded instances
         if ~isempty(metadata)
-            metadata = nansen.module.nwb.internal.resolveMetadata(metadata, nwbDataType, nwbFile);
+            [metadata, instanceMap] = ...
+                nansen.module.nwb.internal.resolveMetadata(...
+                    metadata, nwbDataType, nwbFile, instanceMap);
         end
         
         % Run default or custom converter.
         if isempty(variableConfiguration.Converter)
             try
-                neuroData = nansen.module.nwb.file.convertToDataType(metadata, data, nwbDataType);
+                neuroData = ...
+                    nansen.module.nwb.file.convertToDataType(...
+                        metadata, data, nwbDataType);
             catch ME
                 warning('Could not add %s to nwb file: Cause by\n %s\jn', variableName, ME.message);
+                continue
             end
         else
             customConverterFcn = variableConfiguration.Converter;
             feval(customConverterFcn, metadata, data, nwbFilePath);
+            nwbFile = nwbRead(nwbFilePath);
             continue
         end
 
@@ -133,9 +144,11 @@ import nansen.session.SessionMethod
         % nwbFile.(primaryGroupName).set(nwbVariableName, nwbData);
         
         %nwbFile = nansen.module.nwb.convert.writeDataToFile(nwbFile, data, metadata, customConversinFcn); % anything else???
+    
+        nwbExport(nwbFile, nwbFilePath)
     end
             
-    nwbExport(nwbFile, nwbFilePath)
+    %nwbExport(nwbFile, nwbFilePath)
     fprintf('Finished writing file ''%s''\n', nwbFilePath)
 
     %% Export the file

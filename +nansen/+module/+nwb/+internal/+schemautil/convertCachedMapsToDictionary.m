@@ -1,6 +1,6 @@
 function D = convertCachedMapsToDictionary()
 
-    folderPath = fullfile(misc.getMatnwbDir(), 'namespaces');
+    folderPath = fullfile(matnwb.misc.getMatnwbDir(), 'namespaces');
     S = load(fullfile(folderPath, "core.mat") );
 
     % Simplify the representation of the actual schemas.

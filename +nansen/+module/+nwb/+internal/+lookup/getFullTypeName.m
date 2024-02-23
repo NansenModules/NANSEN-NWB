@@ -3,8 +3,8 @@ function fullName = getFullTypeName(shortName)
 
     persistent typeMap
     if isempty(typeMap)
-        rootFolder = misc.getMatnwbDir();
-        filePaths = utility.dir.recursiveDir(fullfile(rootFolder, '+types'), ...
+        rootFolder = matnwb.misc.getMatnwbDir();
+        filePaths = utility.dir.recursiveDir(fullfile(rootFolder, '+matnwb', '+types'), ...
             'FileType', 'm', 'OutputType', 'FilePath', 'IgnoreList', {'+util'});
 
         packagePrefixedNames = utility.path.abspath2funcname(filePaths);

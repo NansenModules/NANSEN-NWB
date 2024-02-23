@@ -1,6 +1,6 @@
 function keptModules = getNwbModules()
 
-    folderPath = fullfile(misc.getMatnwbDir(), 'namespaces');
+    folderPath = fullfile(matnwb.misc.getMatnwbDir(), 'namespaces');
     S = load(fullfile(folderPath, "core.mat") );
 
     moduleNames = strrep(S.filenames, 'nwb.', '');
