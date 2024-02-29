@@ -21,6 +21,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
     %  [ ] Populate dropdowns for columns of types "matnwb.types.core..."
     %  [ ] Have an add/create new instance method for the columns of nwb types...
     %  [ ] Visible property to turn on/off visible state...
+    %  [ ] Implement padding property
 
     properties (Dependent)
         DynamicTable % The original dynamic table data object
@@ -28,10 +29,15 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
 
     properties (Access = private)
         LastClickedCell
+        % Column editable of table is set to false, and changed to true on
+        % double click. However, some columns should not be editable at
+        % all, and that state/flag is saved on this property.
+        ColumnEditable
     end
 
     properties (Access = ?nansen.ui.mixin.HasPropertyArgs)
         TableName
+        SelectionMode
     end
 
     properties (Access = ?nansen.ui.mixin.HasPropertyArgs)
@@ -48,6 +54,8 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
                 dynamicTable = []
                 options.Parent = []
                 options.TableName (1,1) string = missing
+                options.SelectionMode (1,1) string ...
+                    {mustBeMember(options.SelectionMode, {'single','contiguous','discontiguous'})} = "single"
             end
 
             obj.assignPropertyArguments(options)
@@ -204,6 +212,11 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
 
                 % Todo: This should be internal to the catalog...
                 S = rmfield(S, ["name", "Uuid"]);
+                
+                [S, ~] = ...
+                    nansen.module.nwb.internal.resolveMetadata(...
+                        S, nwbDataType, [], dictionary);
+
                 nvPairs = namedargs2cell(S);
                 newValue = feval( nwbDataType, nvPairs{:} );
                 
@@ -218,7 +231,6 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             end
 
             obj.UITable.ColumnEditable(colNumber) = false;
-
         end
 
         function onTableCellSelected(obj, src, evt)
@@ -271,8 +283,10 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             col = evt.Cell(2);
             
             if row >= 1 && col >= 0
-                obj.UITable.ColumnEditable(col) = true;
-                obj.UITable.JTable.editCellAt(row-1, col-1);
+                if obj.ColumnEditable(col)
+                    obj.UITable.ColumnEditable(col) = true;
+                    obj.UITable.JTable.editCellAt(row-1, col-1);
+                end
             end
         end
 
@@ -289,6 +303,11 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
                 rowNumber = obj.LastClickedCell(1);
                 obj.addRows(x, rowNumber, location)
             end
+        end
+
+        function onDeleteRowMenuItemClicked(obj, src, evt)
+            rowNumber = obj.LastClickedCell(1);
+            obj.DynamicTable(rowNumber, :) = [];
         end
     end
 
@@ -333,7 +352,9 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
                         'FontName', 'avenir next', ...
                         'Theme', uim.style.tableLight, ...
                         'Units', 'normalized', ...
-                        'Position', [0.05,0.025,0.9,0.95]);
+                        'Position', [0,0,1,1], ...
+                        'SelectionMode', obj.SelectionMode);
+                         %'Position', [0.05,0.025,0.9,0.95]);
             
             obj.UITable.CellEditCallback = @obj.onTableCellEdited;
             obj.UITable.MouseClickedCallback = @obj.onTableCellClicked;
@@ -368,7 +389,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             mitem.Callback = @(s,e) obj.onAddXNewRowsMenuItemClicked(s,e,'below');
 
             mitem = uimenu(obj.UITableContextMenu, 'Text', 'Delete Row', 'Separator', 'on');
-            %mitem.Callback = @obj.onRemoveTaskMenuItemClicked;
+            mitem.Callback = @obj.onDeleteRowMenuItemClicked;
             mitem = uimenu(obj.UITableContextMenu, 'Text', 'Delete Column');
 
         end
@@ -385,9 +406,9 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             tableLocationX = tablePosition(1) + 1; % +1 because ad hoc...
             tableHeight = tablePosition(4);
             
-            offset = 0; % 15
+            offset = tablePosition(2) - obj.UITable.RowHeight; % 15
             cMenuPos = [tableLocationX + x, tableHeight - y + offset]; % +15 because ad hoc...
-                        
+
             % Set position and make menu visible.
             obj.UITableContextMenu.Position = cMenuPos;
             obj.UITableContextMenu.Visible = 'on';
@@ -403,9 +424,10 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             columnWidth = ones(size(columnNames))*150;
             colFormatData = cell(size(columnNames));
 
+            obj.ColumnEditable = true(size(columnNames));
 
+            % Configure column formats:
             columnFormat(strcmp(columnFormat, 'single'))={'numeric'};
-            columnWidth(strcmp(columnFormat, 'numeric')) = 60;
             columnFormat(strcmp(columnFormat, 'string'))={'char'};
 
             isNwbType = startsWith(columnFormat, 'matnwb.types.core');
@@ -416,6 +438,18 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
 
             columnFormat(isNwbType)={'popup'};
 
+            % Configure column widths
+            columnWidth(strcmp(columnFormat, 'numeric')) = 60;
+           
+            % Configure column editable
+            if isprop(obj.DynamicTable, 'ColumnDependency')
+                dependentColumnNames = obj.DynamicTable.Properties.CustomProperties.ColumnDependency;
+                dependentColumnNames(ismissing(dependentColumnNames)) = [];
+
+                [~, iA] = intersect(obj.DynamicTable.Properties.VariableNames, dependentColumnNames, 'stable');
+                obj.ColumnEditable(iA) = false;
+            end
+            
             % Update the column formatting properties
             %obj.UITable.ColumnFormat = {'char', 'char', 'popup', 'popup', 'popup', 'popup', 'char'};
 
@@ -457,9 +491,23 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
 
             fullLinkedTypeName = class( obj.DynamicTable{rowNumber, colNumber});
             
-            existingItems = obj.DynamicTable{:, colNumber};
-            [newItemName, newItem] = nansen.module.nwb.internal.createNewNwbInstance(existingItems, fullLinkedTypeName);
-            
+            % existingItems = obj.DynamicTable{:, colNumber};
+
+            dependentColumnName = obj.getDependentColumnName(colNumber);
+            existingNames = obj.DynamicTable.(dependentColumnName);
+            existingNames(ismissing(existingNames))=[];
+            existingNames = unique(existingNames);
+
+            currentSelection = obj.DynamicTable{rowNumber, dependentColumnName};
+
+            nwbNode = nansen.module.nwb.internal.NwbNode('', fullLinkedTypeName);
+
+            [newItemName, newItem] = nansen.module.nwb.internal.createNewNwbInstance(existingNames, nwbNode);
+            if isempty(newItemName)
+                obj.DynamicTable{rowNumber, dependentColumnName} = currentSelection;
+                return
+            end
+
             obj.UITable.ColumnFormatData{colNumber}{end+1} = newItemName;
             obj.DynamicTable{rowNumber, colNumber} = newItem;
 
@@ -499,6 +547,16 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             if ~ismissing(dependentColumnName)
                 obj.DynamicTable{rowNumber, dependentColumnName} = {newItemName};
             end
+        end
+    end
+
+    methods (Access = ?nansen.module.nwb.gui.UIDynamicTableRegionSelector)
+        function selectedRows = getRowSelection(obj)
+            selectedRows = obj.UITable.SelectedRows;
+        end
+
+        function setRowSelection(obj, selectedRows)
+            obj.UITable.SelectedRows = selectedRows;
         end
     end
 end
