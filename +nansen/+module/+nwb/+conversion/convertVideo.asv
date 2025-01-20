@@ -1,0 +1,19 @@
+function convertVideo(nwbReference, videoFilePath, videoName, nwbFileOptions, deviceOptions)
+
+    arguments
+        nwbReference (1,1) = "test" %{mustBeNwbFileReference} 
+        videoFilePath (1,:) string = "test.avi"; %{mustBeFile}
+        videoName (1,1) string
+        
+        nwbFileOptions.module (1,1) string = 'acquisition'
+        nwbFileOptions.processingModule (1,1) string = 'acquisition'
+        
+        deviceDescription 
+        deviceManufacturer
+    end
+
+    keyboard
+
+
+
+end
