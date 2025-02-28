@@ -1,5 +1,18 @@
 function nwbFilePath = initNwbFile(sessionObject, targetFolder, options)
-    
+% initNwbFile - Initializes an NWB file using session details and metadata.
+% 
+% Syntax:
+%   nwbFilePath = initNwbFile(sessionObject, targetFolder, options)
+%
+% Input Arguments:
+%   sessionObject - An object representing the session information.
+%   targetFolder - The folder path where the NWB file will be saved.
+%   options - A structure containing additional options for file creation.
+%     options.FilenameSuffix - Optional string suffix for the file name.
+%
+% Output Arguments:
+%   nwbFilePath - The full file path of the created NWB file.
+
     arguments
         sessionObject
         targetFolder (1,1) string {mustBeFolder}
@@ -46,6 +59,22 @@ function nwbFilePath = initNwbFile(sessionObject, targetFolder, options)
 end
 
 function nwbFilePath = createNwbFilePath(targetFolder, options)
+% createNwbFilePath - Creates a file path for the NWB file based on
+% the specified folder and options.
+%
+% Syntax:
+%   nwbFilePath = createNwbFilePath(targetFolder, options)
+%
+% Input Arguments:
+%   targetFolder - The folder path where the NWB file will be saved.
+%   options - A structure containing options for file naming.
+%     options.SessionID - The session identifier.
+%     options.SubjectID - The subject identifier.
+%     options.FilenameSuffix - Optional string suffix for the file name.
+%
+% Output Arguments:
+%   nwbFilePath - The constructed path for the NWB file.
+
     arguments
         targetFolder
         options.SessionID
