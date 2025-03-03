@@ -37,6 +37,7 @@ classdef NwbFileConverter < handle
     methods % Exporter
         function export(obj)
             nwbExport(obj.NwbFile, obj.FilePath)
+            fprintf ('Exported file to "%s"\n', obj.FilePath)
         end
     end
 
@@ -115,7 +116,7 @@ classdef NwbFileConverter < handle
                 type (1,1) string {mustBeMember(type, ["Fluorescence", "DeltaFOverF"])} = "Fluorescence"
                 isCell (:,1) logical = logical.empty
                 converter function_handle = ...
-                    @nansen.module.nwb.conversion.ophys.convertFluorescence
+                    @nansen.module.nwb.conversion.ophys.convertRoiResponses
             end
             
             params = struct();
