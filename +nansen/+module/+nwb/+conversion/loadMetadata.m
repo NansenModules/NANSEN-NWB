@@ -18,9 +18,17 @@ function metadataNameValuePairs = loadMetadata(nwbType, options)
         metadata = jsondecode( fileread(filePath{1}) );
 
         if isfield(metadata, nwbType)
-            % Todo: Check if there are named instances... 
+            
+            typeMetadata = metadata.(nwbType);
+            
             % Todo: Need a convention for named instances...
-            metadataNameValuePairs = namedargs2cell(metadata.(nwbType));
+            if numel(typeMetadata) && isfield(typeMetadata, 'name')
+                isMatch = strcmp({typeMetadata.name}, options.Name);
+                typeMetadata = typeMetadata(isMatch);
+                typeMetadata = rmfield(typeMetadata, 'name');
+            end
+
+            metadataNameValuePairs = namedargs2cell(typeMetadata);
         else
             return
         end
