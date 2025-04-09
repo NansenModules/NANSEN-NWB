@@ -160,7 +160,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             variableNames = variableModel.VariableNames;
             
             obj.AutoCompleteWidget = uics.searchAutoCompleteInputDlg(obj.Parent, variableNames);
-            obj.AutoCompleteWidget.PromptText = 'Search for variable to add';
+            obj.AutoCompleteWidget.PromptText = 'Search for data variable to add...';
             
             % Create buttons
             buttonProps = {'Style', uim.style.buttonLightMode, ...
@@ -267,7 +267,12 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
                 [~, neuroDataTypes] = enumeration( 'nansen.module.nwb.enum.NeuroDataType' );
                 [~, groupNames] = enumeration( 'nansen.module.nwb.enum.PrimaryGroupName' );
 
-                colFormatData = {[], [], groupNames, nwbModules, neuroDataTypes, [{''}; obj.NWBConverters.keys()], []};
+                groupNames = [{'<Select a group>'}; groupNames];
+                nwbModules = [{'<Select an NWB module>'}; nwbModules'];
+                neuroDataTypes = [{'<Select a neurodata type>'}; neuroDataTypes];
+                converterNames = [{'Default'}; obj.NWBConverters.keys()];
+
+                colFormatData = {[], [], groupNames, nwbModules, neuroDataTypes, converterNames, []};
 
                 obj.UITable.ColumnFormatData = colFormatData;
 
@@ -650,7 +655,11 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             if isempty(nwbModuleName); return; end
             %disp(nwbModuleName)
             
-            neuroDataTypes = getTypesForModule(nwbModuleName);
+            if strcmp(nwbModuleName, '<Select an NWB module>');
+                neuroDataTypes = '<Select an NWB module>';
+            else
+                neuroDataTypes = getTypesForModule(nwbModuleName);
+            end
             
             % Todo: Should this filtering be included in function above?
             metadataTypes = nansen.module.nwb.internal.lookup.getMetadataClassNames();
