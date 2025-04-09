@@ -155,10 +155,12 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
         function createComponents(obj)
             
             % Create search dialog
-            variableNames = obj.NWBConfigurationData.AllVariableNames;
+            %variableNames = obj.NWBConfigurationData.AllVariableNames;
+            variableModel = nansen.VariableModel();
+            variableNames = variableModel.VariableNames;
             
             obj.AutoCompleteWidget = uics.searchAutoCompleteInputDlg(obj.Parent, variableNames);
-            obj.AutoCompleteWidget.PromptText = 'Search for variable to add';
+            obj.AutoCompleteWidget.PromptText = 'Search for data variable to add...';
             
             % Create buttons
             buttonProps = {'Style', uim.style.buttonLightMode, ...
@@ -265,7 +267,12 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
                 [~, neuroDataTypes] = enumeration( 'nansen.module.nwb.enum.NeuroDataType' );
                 [~, groupNames] = enumeration( 'nansen.module.nwb.enum.PrimaryGroupName' );
 
-                colFormatData = {[], [], groupNames, nwbModules, neuroDataTypes, [{''}; obj.NWBConverters.keys()], []};
+                groupNames = [{'<Select a group>'}; groupNames];
+                nwbModules = [{'<Select an NWB module>'}; nwbModules'];
+                neuroDataTypes = [{'<Select a neurodata type>'}; neuroDataTypes];
+                converterNames = [{'Default'}; obj.NWBConverters.keys()];
+
+                colFormatData = {[], [], groupNames, nwbModules, neuroDataTypes, converterNames, []};
 
                 obj.UITable.ColumnFormatData = colFormatData;
 
@@ -310,7 +317,6 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
                     end
 
                 case 'NwbModule'
-                    obj.updateNeurodataTypeSelectionDropdown(rowNumber)
                     % Reset value for neurodata type
                     obj.TableDataCurrent{rowNumber, 'NeuroDataType'} = {''};
 
@@ -323,6 +329,13 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             end
 
             obj.TableDataCurrent{rowNumber, colNumber} = {newValue};
+            
+            % Post updating data in table cell:
+            switch columnName
+                case 'NwbModule'
+                    obj.updateNeurodataTypeSelectionDropdown(rowNumber)
+            end
+            
             return
             % Do we need to rearrange rows?
             % switch evt.Indices(2) % Column numbers..
@@ -457,15 +470,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
         end
         
         function onAddTaskButtonPushed(obj, src, evt)
-            
-            % Retrieve current task name from autocomplete field.
-            errordlg('')
-            % retrieve task object from task catalog
-            
-            % create a table data row
-            
-            % Add to table..
-            % obj.addTask()
+            obj.addVariable()
         end
         
         function onBrowseFunctionButtonPushed(obj, src, evt)
@@ -582,39 +587,34 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
 
     methods (Access = private) % Actions
         
-        function addTask(obj, newTask)
-            
-            functionName = obj.AutoCompleteWidget.Value;
-            
-            if isempty(functionName); return; end
-            
-            % Find in sessionMethodCatalog
-            sMethodItem = obj.SessionMethodCatalog.getItem(functionName);
-            
-            % Create task...
-            task = nansen.pipeline.PipelineCatalog.getTask();
-            task.TaskNum = uint8( size(obj.TableDataCurrent, 1) ) + 1;
-            task.TaskName = sMethodItem.FunctionAlias;
-            task.TaskFunction = sMethodItem.FunctionName;
-            task.OptionPresetSelection = sMethodItem.OptionsAlternatives{1};
-            
-            % Initialize task table, or add task to existing table.
-            taskAsTable = struct2table(task, 'AsArray', true);
+        function addVariable(obj, newVariable)
+           
+            import nansen.module.nwb.file.getDefaultFileConfigurationItem
+
+            variableName = obj.AutoCompleteWidget.Value;
+            if isempty(variableName); return; end
+
+            newItem = getDefaultFileConfigurationItem();
+            newItem.VariableName = variableName;
+            newItem.NWBVariableName = variableName;
+
+            newRow = struct2table(newItem, 'AsArray', true);
+
+            % Initialize table, or add variable entry to existing table.
             if isempty(obj.TableDataCurrent)
-                obj.TableDataCurrent = taskAsTable;
+                obj.TableDataCurrent = newRow;
             else
-                obj.TableDataCurrent(end+1,:) = struct2table(task, 'AsArray', true);
+                obj.TableDataCurrent(end+1,:) = newRow;
             end
-            
             
             if size(obj.TableDataCurrent, 1) == 1
                 obj.updateOptionSelectionDropdown(1)
             end
             
-            fprintf('Added task %s\n', obj.AutoCompleteWidget.Value)
+            fprintf('Added variable "%s"\n', variableName)
             
             % Update task numbers
-            obj.updateRowOrder()
+            % obj.updateRowOrder()
         end
         
         function removeTask(obj, rowIdx)
@@ -655,7 +655,11 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             if isempty(nwbModuleName); return; end
             %disp(nwbModuleName)
             
-            neuroDataTypes = getTypesForModule(nwbModuleName);
+            if strcmp(nwbModuleName, '<Select an NWB module>');
+                neuroDataTypes = '<Select an NWB module>';
+            else
+                neuroDataTypes = getTypesForModule(nwbModuleName);
+            end
             
             % Todo: Should this filtering be included in function above?
             metadataTypes = nansen.module.nwb.internal.lookup.getMetadataClassNames();

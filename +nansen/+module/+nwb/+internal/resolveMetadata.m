@@ -46,7 +46,7 @@ function [metadata, instanceMap] = resolveMetadata(metadata, neuroDataType, nwbF
             instanceMap(linkInstanceName) = {nwbType};
 
             if ~isempty(nwbFile)
-                nansen.module.nwb.file.addMetadata(nwbFile, name, nwbType);
+                nansen.module.nwb.file.addMetadataObject(nwbFile, name, nwbType);
             end
         end
         
@@ -134,7 +134,7 @@ function [metadata, instanceMap] = resolveMetadata(metadata, neuroDataType, nwbF
                     nwbType = matnwb.util.table2nwb(dynamicTable);
                 
                     if ~isempty(nwbFile)
-                        nansen.module.nwb.file.addMetadata(nwbFile, instanceName, nwbType);
+                        nansen.module.nwb.file.addMetadataObject(nwbFile, instanceName, nwbType);
                     end
                 end
             else
@@ -197,7 +197,7 @@ function [dynamicTable, instanceMap] = convertElectrodeGroups(dynamicTable, nwbF
         iElectrodeGroup = feval(nwbType, nvPairs{:}); %#ok<FVAL>
 
         nwbFile.general_extracellular_ephys.set(iGroupName, iElectrodeGroup);
-        %nansen.module.nwb.file.addMetadata(nwbFile, iGroupName, iElectrodeGroup);
+        %nansen.module.nwb.file.addMetadataObject(nwbFile, iGroupName, iElectrodeGroup);
 
         objectViews{i} =  matnwb.types.untyped.ObjectView( iElectrodeGroup );
     end

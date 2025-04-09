@@ -74,13 +74,14 @@ classdef NWBConfigurator < applify.MultiPageApp
             nwbConfigurationData.DataItems = dataItems;
 
             % Dynamic tables:
-            keys = obj.DynamicTableConfigurator.DynamicTable.keys();
-            for key = keys
-                thisTable = obj.DynamicTableConfigurator.DynamicTable(key).Data;
-                subs = getSubsFromKey(key);
-                nwbConfigurationData = subsasgn(nwbConfigurationData, subs, thisTable);
+            if isConfigured(obj.DynamicTableConfigurator.DynamicTable)
+                keys = obj.DynamicTableConfigurator.DynamicTable.keys();
+                for key = keys
+                    thisTable = obj.DynamicTableConfigurator.DynamicTable(key).Data;
+                    subs = getSubsFromKey(key);
+                    nwbConfigurationData = subsasgn(nwbConfigurationData, subs, thisTable);
+                end
             end
-
             save(obj.FilePath, 'nwbConfigurationData')
 
             % Update original table data to last saved
