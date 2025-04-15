@@ -63,10 +63,11 @@ import nansen.session.SessionMethod
 
     % Create filepath
     % Todo: nwbConfig should specify data location
-    saveFolder = sessionObject.getSessionFolder();
-    nwbFilename = [configurationCatalog.Name, '.nwb'];
+    %saveFolder = sessionObject.getSessionFolder();
+    %nwbFilename = [configurationCatalog.Name, '.nwb'];
 
-    nwbFilePath = sessionObject.getDataFilePath(configurationCatalog.Name, 'FileType', 'nwb', 'DataLocation', 'Sharing');
+    nwbFilePath = sessionObject.getDataFilePath(char(configurationCatalog.Name), ...
+        '-w', 'FileType', 'nwb'); %, 'DataLocation', 'Sharing');
     
     if isfile(nwbFilePath); delete(nwbFilePath); end
 
@@ -114,7 +115,7 @@ import nansen.session.SessionMethod
         end
         
         % Run default or custom converter.
-        if isempty(variableConfiguration.Converter)
+        if isempty(variableConfiguration.Converter) || strcmp(variableConfiguration.Converter, 'Default')
             try
                 if isempty(metadata); metadata = struct(); end
                 neuroData = ...

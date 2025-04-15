@@ -64,15 +64,20 @@ function [metadata, instanceMap] = resolveMetadata(metadata, neuroDataType, nwbF
             nwbType = getFullTypeName(subgroups(i).type);
             instanceName = metadata.(lower(subgroups(i).type));
 
-            catalog = nansen.module.nwb.internal.getMetadataCatalog( nwbType );
-            embeddedMetadata = catalog.get(instanceName);
-            [embeddedMetadata, ~] = utility.struct.popfield(embeddedMetadata, 'Uuid', false);
-            
-            [embeddedMetadata, instanceMap] = ...
-                nansen.module.nwb.internal.resolveMetadata(...
-                    embeddedMetadata, nwbType, nwbFile, instanceMap);
-
-            metadata.(lower(subgroups(i).type)) = embeddedMetadata;
+            if isempty(instanceName)
+                % Todo
+                error('Metadata is missing for type "%s", please report', lower(subgroups(i).type))
+            else
+                catalog = nansen.module.nwb.internal.getMetadataCatalog( nwbType );
+                embeddedMetadata = catalog.get(instanceName);
+                [embeddedMetadata, ~] = utility.struct.popfield(embeddedMetadata, 'Uuid', false);
+                
+                [embeddedMetadata, instanceMap] = ...
+                    nansen.module.nwb.internal.resolveMetadata(...
+                        embeddedMetadata, nwbType, nwbFile, instanceMap);
+    
+                metadata.(lower(subgroups(i).type)) = embeddedMetadata;
+            end
         end
     end
 
