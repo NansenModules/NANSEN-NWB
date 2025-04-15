@@ -1,6 +1,9 @@
 # Nansen-NWB
 Development of NWB integration into Nansen (NWB hackaton participation project)
 
+## Requirements and Installation
+NANSEN-NWB requires **MATLAB R2022b** or later.
+
 ## Project Description
 
 Create a set of classes to interact with NWB data (read/write) from NANSEN. NANSEN is a matlab package for managing, processing and visualizing calcium imaging data: https://github.com/VervaekeLab/NANSEN
