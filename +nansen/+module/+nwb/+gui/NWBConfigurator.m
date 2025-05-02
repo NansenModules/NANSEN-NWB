@@ -110,6 +110,27 @@ classdef NWBConfigurator < applify.MultiPageApp
 
         function onFigureClosed(obj)
             
+            [hasMissingConfigurations, details] = obj.DataVariableConfigurator.hasMissingConfigurations();
+
+
+            if hasMissingConfigurations
+                varNameList = string({details.VariableName});
+                varNameList = strjoin(" - " + varNameList, newline);
+                message = sprintf('The following variables are not fully configured (Please ensure each variable in the list is assigned a group name and a neurodata type):\n%s\n\nAre you sure you want to quit?', varNameList);
+                title = 'Confirm Quit';
+
+                answer = questdlg(message, title, 'Yes', 'No', 'Cancel', 'Yes');
+                switch answer
+
+                    case 'Yes'
+                        % continue
+                    case 'No'
+                        return
+                    otherwise
+                        return
+                end
+            end
+            
             isDirty = obj.DataVariableConfigurator.IsDirty || obj.DynamicTableConfigurator.isDirty();
 
             if isDirty
@@ -143,7 +164,7 @@ classdef NWBConfigurator < applify.MultiPageApp
 end
 
 
-function subs = getSubsFromKey(key)                
+function subs = getSubsFromKey(key)
     nestedFieldNames = strsplit(key, '_');
     subs = struct('type', '.', 'subs', cellstr(nestedFieldNames));
 end

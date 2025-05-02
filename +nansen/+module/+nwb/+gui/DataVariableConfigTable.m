@@ -99,6 +99,28 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             % pass
         end
     end
+    
+    methods (Access = ?nansen.module.nwb.gui.NWBConfigurator)
+        function [tf, details] = hasMissingConfigurations(obj)
+
+            data = obj.Data;
+            details = struct('VariableName', {});
+
+            for i = 1:height(data)
+                thisRow = table2struct(data(i,:));
+                isFinished = ...
+                    ~strcmp(thisRow.PrimaryGroupName, '<Select a group>') ...
+                    && ~isempty(thisRow.NeuroDataType) ...
+                    && ~strcmp(thisRow.NeuroDataType, '<Select a neurodata type>');
+
+                if ~isFinished
+                    details(end+1).VariableName = data{i, 'VariableName'}{1}; %#ok<AGROW>
+                end
+            end
+
+            tf = ~isempty(details);
+        end
+    end
 
     methods %(Access = protected) % Override AppWindow methods
         
@@ -110,7 +132,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             
             % h+w of autocomplete and buttons:
             componentHeight = [30, 22, 22]; 
-            componentWidth = [1, 50, 60];
+            componentWidth = [1, 50]; %[1, 50, 60];
             
             % Calculate position:
             [x, w] = uim.utility.layout.subdividePosition(MARGIN(1), ...
@@ -123,7 +145,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             % Set positions:
             obj.AutoCompleteWidget.Position = [x(1), y(1), w(1), componentHeight(1)];
             obj.AddTaskButton.Position = [x(2), y(2), w(2), componentHeight(2)];
-            obj.BrowseTaskFunctionButton.Position = [x(3), y(3), w(3), componentHeight(3)];
+            %obj.BrowseTaskFunctionButton.Position = [x(3), y(3), w(3), componentHeight(3)];
             
             obj.UITable.Position = [MARGIN(1:2), ...
                 totalWidth, y(1) - sum(MARGIN([2,4])) - 10]; % Substract 10 to not interfere with button tooltips...Yeah, i know...
@@ -169,12 +191,12 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             obj.AddTaskButton = uim.control.Button_(obj.Parent, 'Text', 'Add', buttonProps{:});
             obj.AddTaskButton.Tooltip = 'Add data variable to configuration';
             obj.AddTaskButton.TooltipYOffset = 10;
-            obj.BrowseTaskFunctionButton = uim.control.Button_(obj.Parent, 'Text', 'Browse', buttonProps{:});
-            %obj.BrowseTaskFunctionButton.Tooltip = 'Browse to find function';
-            obj.BrowseTaskFunctionButton.TooltipYOffset = 10;
-            
             obj.AddTaskButton.Callback = @obj.onAddTaskButtonPushed;
-            obj.BrowseTaskFunctionButton.Callback = @obj.onBrowseFunctionButtonPushed;
+
+            %obj.BrowseTaskFunctionButton = uim.control.Button_(obj.Parent, 'Text', 'Browse', buttonProps{:});
+            %obj.BrowseTaskFunctionButton.Tooltip = 'Browse to find function';
+            %obj.BrowseTaskFunctionButton.TooltipYOffset = 10;
+            %obj.BrowseTaskFunctionButton.Callback = @obj.onBrowseFunctionButtonPushed;
             
             uicc = getappdata(obj.Parent, 'UIComponentCanvas');
             obj.HintTextbox = text(uicc.Axes, 1,1, '');
@@ -203,7 +225,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
         function createContextMenus(obj)
             hFigure = ancestor(obj.Parent, 'figure');
             obj.TableContextMenu = uicontextmenu(hFigure);
-            mitem = uimenu(obj.TableContextMenu, 'Text', 'Remove Task');
+            mitem = uimenu(obj.TableContextMenu, 'Text', 'Remove Variable');
             mitem.Callback = @obj.onRemoveTaskMenuItemClicked;
         end
     end
@@ -568,7 +590,10 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             if ~descriptionMap.isConfigured() || ~descriptionMap.isKey(neurodataType)
                 % Get nwb module from column
                 nwbModuleName = obj.TableDataCurrent.NwbModule{rowNumber};
+                
+                % Return if no module selection is made
                 if isempty(nwbModuleName); return; end
+                if strcmp(nwbModuleName, '<Select an NWB module>'); return; end
     
                 [neuroDataTypes, descriptions] = getTypesForModule(nwbModuleName);
                 descriptionMap(neuroDataTypes) = descriptions;
