@@ -10,6 +10,10 @@ function S = initializeNwbFileConfiguration(currentProject)
     filteredVariableItems = variableItems(~[variableItems.IsInternal]);
     filteredVariableItems = filteredVariableItems([filteredVariableItems.IsCustom]); % Todo: Remove as this is temporary
 
+    if isempty(filteredVariableItems)
+        S = struct.empty; return
+    end
+
     defaultItem = getDefaultFileConfigurationItem();
     configItems = repmat(defaultItem, 1, numel(filteredVariableItems));
 
