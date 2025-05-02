@@ -66,7 +66,8 @@ import nansen.session.SessionMethod
     %saveFolder = sessionObject.getSessionFolder();
     %nwbFilename = [configurationCatalog.Name, '.nwb'];
 
-    nwbFilePath = sessionObject.getDataFilePath(char(configurationCatalog.Name), ...
+    nwbFilePath = sessionObject.getDataFilePath(...
+        char(configurationCatalog.Name), ...
         '-w', 'FileType', 'nwb'); %, 'DataLocation', 'Sharing');
     
     if isfile(nwbFilePath); delete(nwbFilePath); end
