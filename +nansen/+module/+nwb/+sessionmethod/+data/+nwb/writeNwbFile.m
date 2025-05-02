@@ -72,16 +72,17 @@ import nansen.session.SessionMethod
     saveFolder = sessionObject.getSessionFolder();
     nwbFilename = [configurationCatalog.Name, '.nwb'];
 
-    nwbFilePath = sessionObject.getDataFilePath(configurationCatalog.Name, 'FileType', 'nwb');
+    nwbFilePath = sessionObject.getDataFilePath(configurationCatalog.Name, 'FileType', 'nwb', 'DataLocation', 'Sharing');
     
+    if isfile(nwbFilePath); delete(nwbFilePath); end
 
     %% Open or create NWB file depending on if file exists.
     % Todo: Function of nwb module:
     if isfile(nwbFilePath)
-        nwbFile = nwbRead(nwbFilePath);
+        nwbFile = nansen.module.nwb.file.NWBFile(nwbFilePath);
         wasInitialized = false;
     else
-        nwbFile = NwbFile();
+        nwbFile = nansen.module.nwb.file.NWBFile();
         wasInitialized = true;
     end
 
@@ -94,7 +95,6 @@ import nansen.session.SessionMethod
     instanceMap = dictionary;
 
     %% Todo Add general metadata like dataset info, subjects etc.:
-    
 
     
     %% Loop through each variable of the NWB configuration
@@ -122,17 +122,18 @@ import nansen.session.SessionMethod
         % Run default or custom converter.
         if isempty(variableConfiguration.Converter)
             try
+                if isempty(metadata); metadata = struct(); end
                 neuroData = ...
                     nansen.module.nwb.file.convertToDataType(...
                         metadata, data, nwbDataType);
             catch ME
-                warning('Could not add %s to nwb file: Cause by\n %s\jn', variableName, ME.message);
+                warning('Could not add %s to nwb file: Caused by\n %s\n', variableName, ME.message);
                 continue
             end
         else
             customConverterFcn = variableConfiguration.Converter;
             feval(customConverterFcn, metadata, data, nwbFilePath);
-            nwbFile = nwbRead(nwbFilePath);
+            nwbFile = nansen.module.nwb.file.NWBFile(nwbFilePath);
             continue
         end
 
@@ -141,8 +142,18 @@ import nansen.session.SessionMethod
                 nwbFile.acquisition.set(variableName, neuroData);
             
             case 'Processing'
-                %processingModule = wrappedNwbFile.getProcessingModule(variableName); %wrappedNwbFile?
+                moduleName = variableConfiguration.NwbModule;
                 % Create or get processing module based on nwb module
+                 processingModule = nwbFile.getProcessingModule(moduleName, 'No Description');
+                if isa(neuroData, 'struct')
+                    for j = 1:numel(neuroData)
+                        processingModule.nwbdatainterface.set(...
+                            neuroData(j).name, neuroData(j).data);
+                    end
+                else
+                    processingModule.nwbdatainterface.set(variableName, neuroData);
+                end
+                % Add to processing module
         end
 
         % primaryGroupName = lower(variableConfiguration.PrimaryGroupName);

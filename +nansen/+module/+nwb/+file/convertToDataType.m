@@ -29,9 +29,12 @@ function neuroData = convertToDataType(metadata, data, neuroDataType)
         neuroDataType = classInfo.subgroups.type;
         
         metadata = struct2cell(metadata);
-        metadata = metadata{1};
-
-        [metadata, name] = utility.struct.popfield(metadata, 'name');
+        if ~isempty(metadata)
+            metadata = metadata{1};
+            [metadata, name] = utility.struct.popfield(metadata, 'name');
+        else
+            metadata = struct;
+        end
 
         % todo: recursive:
         neuroData = nansen.module.nwb.file.convertToDataType(metadata, data, neuroDataType);
@@ -63,8 +66,9 @@ function neuroData = convertToDataType(metadata, data, neuroDataType)
             if isa(data, 'timetable')
                 %assert(isContainerType)
                 variables = data.Properties.VariableNames;
-
-                time = seconds( data.Time );
+                
+                %time = seconds( data.Time );
+                time = seconds( data.Properties.RowTimes );
 
                 if numel(variables) > 1
                     % % assert(isContainerType, ...
@@ -78,6 +82,13 @@ function neuroData = convertToDataType(metadata, data, neuroDataType)
                     end
                 else
                     data = data.(variables{1});
+                    if ismatrix(data) && size(data, 1) == numel(time)
+                        data = transpose(data);
+                    elseif ismatrix(data) && size(data, 2) == numel(time)
+                        % Do nothing
+                    else
+                        error('Unhandled data shape')
+                    end
                     neuroData = feval(fcn, 'data', data, 'timestamps', time, nvPairs{:});
                 end
 

@@ -85,29 +85,44 @@ classdef DynamicTableCollection < handle
     
     methods 
         function tf = isDirty(obj)
+            % Check if any tables are dirty, handling case where tables might not exist
+            if ~isConfigured(obj.DynamicTable)
+                tf = false;
+                return
+            end
             tf = arrayfun(@(dt) dt.IsDirty, obj.DynamicTable.values);
         end
     
         function deactivate(obj)
             % Save dynamic tables
             
-            catalog = nansen.module.nwb.internal.getMetadataCatalog("ElectrodesTable");
-            
-            catalogItem = catalog.get("ElectrodesTable");
-            catalogItem.DynamicTable = obj.DynamicTable("General_ExtracellularEphys_Electrodes").DynamicTable;
-            catalog.replace(catalogItem)
-
-            catalog.save()
+            % Check if electrodes table exists before saving
+            if isConfigured(obj.DynamicTable)
+                if isKey(obj.DynamicTable, "General_ExtracellularEphys_Electrodes")
+                    catalog = nansen.module.nwb.internal.getMetadataCatalog("ElectrodesTable");
+                    
+                    catalogItem = catalog.get("ElectrodesTable");
+                    catalogItem.DynamicTable = obj.DynamicTable("General_ExtracellularEphys_Electrodes").DynamicTable;
+                    catalog.replace(catalogItem)
+        
+                    catalog.save()
+                end
+            end
         end
 
         function activate(obj)
             % Reload dynamic tables
             
-            catalog = nansen.module.nwb.internal.getMetadataCatalog("ElectrodesTable");
-            catalogItem = catalog.get("ElectrodesTable");
-            electrodeTable = catalogItem.DynamicTable;
-        
-            obj.DynamicTable("General_ExtracellularEphys_Electrodes").DynamicTable = electrodeTable;
+            % Check if electrodes table exists before reloading
+            if isConfigured(obj.DynamicTable)
+                if isKey(obj.DynamicTable, "General_ExtracellularEphys_Electrodes")
+                    catalog = nansen.module.nwb.internal.getMetadataCatalog("ElectrodesTable");
+                    catalogItem = catalog.get("ElectrodesTable");
+                    electrodeTable = catalogItem.DynamicTable;
+                
+                    obj.DynamicTable("General_ExtracellularEphys_Electrodes").DynamicTable = electrodeTable;
+                end
+            end
         end
     end
 
@@ -139,7 +154,15 @@ classdef DynamicTableCollection < handle
             obj.Parent.BackgroundColor = ones(1,3)*0.91;
 
             % Create table menu (menu for selecting tables):
-            tableNames = {'Electrodes', 'Trials'};
+            % Make table names dynamic based on which tables exist
+            tableNames = {'Trials'};
+            
+            % Add Electrodes to table names if it exists in the catalog
+            catalog = nansen.module.nwb.internal.getMetadataCatalog("ElectrodesTable");
+            if catalog.contains("ElectrodesTable")
+                tableNames = [{'Electrodes'}, tableNames];
+            end
+            
             buttonGroup = nansen.ui.widget.ButtonGroup(obj.Parent, 'Items', tableNames);
             buttonGroup.updateLocation()
             buttonGroup.SelectionChangedFcn = @obj.onDynamicTableTypeChanged;
@@ -187,9 +210,7 @@ classdef DynamicTableCollection < handle
             %     nansen.module.nwb.internal.dtable.initializeElectrodesTable();
             % electrodeTable = obj.NWBConfigurationData.General.ExtracellularEphys.Electrodes;
         
-            catalog = nansen.module.nwb.internal.getMetadataCatalog("ElectrodesTable");
-            catalogItem = catalog.get("ElectrodesTable");
-            electrodeTable = catalogItem.DynamicTable;
+
     
             % Todo: Create panels and dynamic tables for each dynamic table
             % of the NWB Configuration
@@ -197,13 +218,18 @@ classdef DynamicTableCollection < handle
             hPanel = uipanel(obj.Parent, BorderType="none");
             obj.TablePanels('Trials') = hPanel;
 
-            hPanel = uipanel(obj.Parent, BorderType="none");
-            obj.TablePanels('Electrodes') = hPanel;
-
-            key = "General_ExtracellularEphys_Electrodes";
-
-            obj.DynamicTable(key) = nansen.module.nwb.gui.UIDynamicTable(...
-                electrodeTable, 'TableName', 'Electrode', 'Parent', hPanel);
+            catalog = nansen.module.nwb.internal.getMetadataCatalog("ElectrodesTable");
+            if catalog.contains("ElectrodesTable")
+                catalogItem = catalog.get("ElectrodesTable");
+                electrodeTable = catalogItem.DynamicTable;
+                hPanel = uipanel(obj.Parent, BorderType="none");
+                obj.TablePanels('Electrodes') = hPanel;
+    
+                key = "General_ExtracellularEphys_Electrodes";
+    
+                obj.DynamicTable(key) = nansen.module.nwb.gui.UIDynamicTable(...
+                    electrodeTable, 'TableName', 'Electrode', 'Parent', hPanel);
+            end
 
             obj.updateTablePosition()
         end
@@ -225,14 +251,23 @@ classdef DynamicTableCollection < handle
             parentPosition = getpixelposition(obj.Parent);
             panelWidth = parentPosition(3);
 
-            %tablePosition = getpixelposition(uiTable);
-            tablePosition = getpixelposition( obj.TablePanels('Electrodes') );
+            % Get position from any available panel
+            if isKey(obj.TablePanels, 'Trials')
+                tablePosition = getpixelposition(obj.TablePanels('Trials'));
+            elseif isKey(obj.TablePanels, 'Electrodes')
+                tablePosition = getpixelposition(obj.TablePanels('Electrodes'));
+            else
+                % Create a default position if no panels exist
+                tablePosition = [w + xPadding, 1, panelWidth - (w + xPadding + 1), parentPosition(4)];
+            end
+            
             tablePosition(1) = w + xPadding;
             tablePosition(3) = panelWidth - (w + xPadding + 1);
-            %tablePosition(4) =  parentPosition(4);
-            %setpixelposition(uiTable, tablePosition)
             
-            arrayfun( @(h) setpixelposition(h, tablePosition), [obj.TablePanels.values]);
+            % Only update panels that exist
+            if ~isempty(obj.TablePanels)
+                arrayfun(@(h) setpixelposition(h, tablePosition), [obj.TablePanels.values]);
+            end
         end
     end
     
@@ -257,8 +292,13 @@ classdef DynamicTableCollection < handle
         function onDynamicTableTypeChanged(obj, s, e)
 
             selectedTableName = s.Text;
-            set( [obj.TablePanels.values], 'Visible', 'off')
-            obj.TablePanels(selectedTableName).Visible='on';
+            % Only hide/show panels if they exist
+            if ~isempty(obj.TablePanels)
+                set([obj.TablePanels.values], 'Visible', 'off')
+                if isKey(obj.TablePanels, selectedTableName)
+                    obj.TablePanels(selectedTableName).Visible='on';
+                end
+            end
         end
             
         function setDefaultFigureCallbacks(obj)
