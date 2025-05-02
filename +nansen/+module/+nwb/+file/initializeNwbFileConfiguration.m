@@ -11,8 +11,9 @@ function S = initializeNwbFileConfiguration(currentProject)
     filteredVariableItems = filteredVariableItems([filteredVariableItems.IsCustom]); % Todo: Remove as this is temporary
 
     if isempty(filteredVariableItems)
-        errordlg('There are no data variables in your NANSEN project. Please configure some data variables in order to start NWB conversion configuration')
-        error('There are no data variables in NANSEN. Please configure some data variables in order to start NWB conversion configuration')
+        %errordlg('There are no data variables in your NANSEN project. Please configure some data variables in order to start NWB conversion configuration')
+        %error('There are no data variables in NANSEN. Please configure some data variables in order to start NWB conversion configuration')
+        S = struct.empty; return
     end
 
     defaultItem = getDefaultFileConfigurationItem();

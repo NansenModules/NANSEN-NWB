@@ -11,6 +11,11 @@ function configureNwbFile()
         % Todo: Open dialog for entering file name and description plus
         % other options.
         configurationCatalog = initializeNwbFileConfiguration();
+        if isempty(configurationCatalog)
+            errordlg(['This project does not contain any data variables.', ...
+                'Please configure data variables before configuring an NWB conversion.'])
+            return
+        end
         % Todo: Save configuration catalog here or later?
     else
         % Todo: create listbox for selecting which configuration to load

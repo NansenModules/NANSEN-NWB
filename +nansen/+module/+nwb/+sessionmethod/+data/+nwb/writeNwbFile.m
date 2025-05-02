@@ -54,6 +54,12 @@ import nansen.session.SessionMethod
     configurationFolderPath = currentProject.getConfigurationFolder('Subfolder', 'nwb');
     configurationFilePath = fullfile(configurationFolderPath, 'test.mat');
 
+    if ~isfile(configurationFilePath)
+        errordlg(['NWB conversion configuration was not found. Please run ', ...
+            'the NWB Configuration under Tools -> NWB -> Configure NWB File.'])
+        return
+    end
+
     S = load(configurationFilePath);
     configurationCatalog = S.nwbConfigurationData;
 
