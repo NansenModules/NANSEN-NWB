@@ -165,9 +165,11 @@ classdef NwbFileConverter < handle
                 'data', image.getFrameSet(1) );
 
             % Todo: get or create image collection...
-            imageCollectionName = "FovProjectionImages";
+            imageCollectionName = char("FovProjectionImages");
             
-            result = obj.NwbFile.searchFor('types.core.Images', 'Name', imageCollectionName);
+            result = obj.NwbFile.searchFor('types.core.Images');
+            result = filterNwbResults(result, 'types.core.Images', 'Name', imageCollectionName);
+
             if result.Count == 1
                 imageCollection = result.values;
                 imageCollection = imageCollection{1};
@@ -181,7 +183,11 @@ classdef NwbFileConverter < handle
             end
 
             name = sprintf('%sImage', name);
-            imageCollection.image.set(name, neurodata);
+            try
+                imageCollection.image.set(name, neurodata);
+            catch % NWB >= v2.9.0
+                imageCollection.baseimage.set(name, neurodata);
+            end
         end
 
         function addProcessingModule(obj, name, description)
@@ -269,4 +275,27 @@ function nwbFilePath = createNwbFilePath(targetFolder, options)
 
     fileName = join([subjectPart, sessionPart, options.FilenameSuffix], "_");
     nwbFilePath = fullfile(targetFolder, fileName+".nwb");
+end
+
+
+function nwbObjectMap = filterNwbResults(nwbObjectMap, typeName, options)
+% Utility function as NwbFile/searchFor is not very specific
+    arguments
+        nwbObjectMap containers.Map
+        typeName (1,1) string
+        options.Name (1,1) string = missing
+    end
+    
+    mapKeys = nwbObjectMap.keys();
+    typeNames = cellfun(@(c) class(c), nwbObjectMap.values(), 'UniformOutput', false);
+    keep = strcmp(typeName, typeNames);
+
+    mapKeysToRemove = mapKeys(~keep);
+    nwbObjectMap.remove(mapKeysToRemove);
+
+    if ~ismissing(options.Name)
+        mapKeys = nwbObjectMap.keys();
+        keep = endsWith(mapKeys, options.Name);
+        nwbObjectMap.remove(mapKeys(~keep));
+    end
 end
