@@ -1,4 +1,23 @@
 function [neuroDataTypes, descriptions] = getTypesForModule(moduleName)
+% getTypesForModule - Retrieve neurodata types and descriptions for a given module.
+%
+% Syntax:
+%   [neuroDataTypes, descriptions] = getTypesForModule(moduleName)
+%   This function retrieves the neurodata types and their corresponding
+%   descriptions for a specified module name. If the module name does not
+%   start with 'nwb.', it is prefixed accordingly.
+%
+% Input Arguments: 
+%   moduleName - A string representing the name of the module for which
+%                neurodata types and descriptions are to be retrieved.
+%
+% Output Arguments:
+%   neuroDataTypes - A cell array of strings containing the neurodata 
+%                    types associated with the specified module.
+%   descriptions - A cell array of strings containing the descriptions 
+%                  of each neurodata type.
+
+% Todo: Also detect dataset classes.
 
     import nansen.module.nwb.internal.schemautil.convertCachedMapsToDictionary
 
@@ -7,6 +26,12 @@ function [neuroDataTypes, descriptions] = getTypesForModule(moduleName)
         D = convertCachedMapsToDictionary();
         typeMap = dictionary;
         descriptionMap = dictionary;
+    end
+
+    if strcmp(moduleName, '<Select an NWB module>')
+        neuroDataTypes = string.empty;
+        descriptions = string.empty;
+        return
     end
 
     if ~strncmp(moduleName, 'nwb.', 4)
@@ -23,6 +48,9 @@ function [neuroDataTypes, descriptions] = getTypesForModule(moduleName)
         end
     end
 
+    assert(isKey(D, moduleName), ...
+        'NANSEN_NWB:Internal:InvalidModuleName', ...
+        'Internal error: Please report.')
     groups = D{moduleName}{"groups"};
 
     numNeuroDataTypes = numel(groups);
@@ -46,3 +74,4 @@ function [neuroDataTypes, descriptions] = getTypesForModule(moduleName)
         clear descriptions
     end
 end
+
