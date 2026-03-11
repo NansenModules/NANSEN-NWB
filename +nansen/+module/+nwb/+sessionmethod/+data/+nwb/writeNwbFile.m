@@ -52,7 +52,7 @@ import nansen.session.SessionMethod
     % Load default NWB Conversion settings
     currentProject = nansen.getCurrentProject();
     configurationFolderPath = currentProject.getConfigurationFolder('Subfolder', 'nwb');
-    configurationFilePath = fullfile(configurationFolderPath, 'test.mat');
+    configurationFilePath = fullfile(configurationFolderPath, params.ConfigurationName + ".mat");
 
     if ~isfile(configurationFilePath)
         errordlg(['NWB conversion configuration was not found. Please run ', ...
@@ -183,4 +183,5 @@ function params = getDefaultParameters()
 %getDefaultParameters Define the default parameters for this function
     params = struct();
     params.WriteMode = 'Overwrite'; % 'Overwrite' | 'Append'
+    params.ConfigurationName = 'nwbConfiguration';
 end

@@ -4,27 +4,21 @@ function configureNwbFile()
 
     currentProject = nansen.getCurrentProject();
     configurationFolderPath = currentProject.getConfigurationFolder('Subfolder', 'nwb');
-    configurationFilePath = fullfile(configurationFolderPath, 'test.mat');
+    configurationFilePath = fullfile(configurationFolderPath, 'nwbConfiguration.mat');
 
-    L = dir(fullfile( configurationFolderPath, '*.mat' ) );
-    if isempty(L)
+    if isfile(configurationFilePath)
+        S = load(configurationFilePath);
+        configurationCatalog = S.nwbConfigurationData;
+    else
         % Todo: Open dialog for entering file name and description plus
         % other options.
         configurationCatalog = initializeNwbFileConfiguration();
         if isempty(configurationCatalog)
-            errordlg(['This project does not contain any data variables.', ...
+            errordlg(['This project does not contain any data variables. ', ...
                 'Please configure data variables before configuring an NWB conversion.'])
             return
         end
         % Todo: Save configuration catalog here or later?
-    else
-        % Todo: create listbox for selecting which configuration to load
-        if isfile(configurationFilePath)
-            S = load(configurationFilePath);
-            configurationCatalog = S.nwbConfigurationData;
-        else
-            error('Test file not available')
-        end
     end
     
     % Todo: Pass filepath where to save configuration
