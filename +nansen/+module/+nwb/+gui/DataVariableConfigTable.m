@@ -260,6 +260,10 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
 
             isInitialized = ~isempty(obj.UITable.DataTable);
             
+            if isempty(obj.TableDataCurrent)
+                return
+            end
+
             % Reformat table data before assigning.
             metadataColumnData = obj.TableDataCurrent.DefaultMetadata;
             
@@ -340,7 +344,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
 
                 case 'NwbModule'
                     % Reset value for neurodata type
-                    obj.TableDataCurrent{rowNumber, 'NeuroDataType'} = {''};
+                    obj.TableDataCurrent{rowNumber, 'NeuroDataType'} = {'<Select a neurodata type>'};
 
                 case 'Converter'
                     if ~isempty(newValue)
