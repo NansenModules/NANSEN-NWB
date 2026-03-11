@@ -76,7 +76,9 @@ import nansen.session.SessionMethod
         char(configurationCatalog.Name), ...
         '-w', 'FileType', 'nwb'); %, 'DataLocation', 'Sharing');
     
-    if isfile(nwbFilePath); delete(nwbFilePath); end
+    if strcmp(params.WriteMode, 'Overwrite') && isfile(nwbFilePath)
+        delete(nwbFilePath);
+    end
 
     %% Open or create NWB file depending on if file exists.
     % Todo: Function of nwb module:
@@ -180,4 +182,5 @@ end
 function params = getDefaultParameters()
 %getDefaultParameters Define the default parameters for this function
     params = struct();
+    params.WriteMode = 'Overwrite'; % 'Overwrite' | 'Append'
 end
