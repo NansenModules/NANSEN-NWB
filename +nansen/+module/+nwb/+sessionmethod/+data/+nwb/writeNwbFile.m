@@ -68,11 +68,14 @@ import nansen.session.SessionMethod
     % Todo: Merge
 
     % Create filepath
-    % Todo: nwbConfig should specify data location
-    saveFolder = sessionObject.getSessionFolder();
-    nwbFilename = [configurationCatalog.Name, '.nwb'];
+    % Todo: nwbConfig should specify data location. For now, use default
+    % data location
+    saveFolder = sessionObject.getSessionFolder('', 'create');
 
-    nwbFilePath = sessionObject.getDataFilePath(configurationCatalog.Name, 'FileType', 'nwb', 'DataLocation', 'Sharing');
+    % We build the filename using BIDS/DandiArchive convention.
+    % Todo: Add custom postfix via configuration
+    nwbFilename = sprintf('sub-%s_ses-%s.nwb', sessionObject.subjectID, sessionObject.sessionID);
+    nwbFilePath = fullfile(saveFolder, nwbFilename);
     
     if isfile(nwbFilePath); delete(nwbFilePath); end
 
@@ -120,7 +123,7 @@ import nansen.session.SessionMethod
         end
         
         % Run default or custom converter.
-        if isempty(variableConfiguration.Converter)
+        if isempty(variableConfiguration.Converter) || strcmp(variableConfiguration.Converter, "Default")
             try
                 if isempty(metadata); metadata = struct(); end
                 neuroData = ...
