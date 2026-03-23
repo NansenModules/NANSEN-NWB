@@ -29,9 +29,9 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
 
     properties (Access = protected) % UI Components
         Parent
-        AddTaskButton
+        AddVariableButton
+        AddManyVariablesButton
         AutoCompleteWidget
-        BrowseTaskFunctionButton
         UITable
         
         HintTextbox
@@ -110,7 +110,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             
             % h+w of autocomplete and buttons:
             componentHeight = [30, 22, 22]; 
-            componentWidth = [1, 50, 60];
+            componentWidth = [1, 50, 85];
             
             % Calculate position:
             [x, w] = uim.utility.layout.subdividePosition(MARGIN(1), ...
@@ -122,8 +122,8 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             
             % Set positions:
             obj.AutoCompleteWidget.Position = [x(1), y(1), w(1), componentHeight(1)];
-            obj.AddTaskButton.Position = [x(2), y(2), w(2), componentHeight(2)];
-            obj.BrowseTaskFunctionButton.Position = [x(3), y(3), w(3), componentHeight(3)];
+            obj.AddVariableButton.Position = [x(2), y(2), w(2), componentHeight(2)];
+            obj.AddManyVariablesButton.Position = [x(3), y(3), w(3), componentHeight(3)];
             
             obj.UITable.Position = [MARGIN(1:2), ...
                 totalWidth, y(1) - sum(MARGIN([2,4])) - 10]; % Substract 10 to not interfere with button tooltips...Yeah, i know...
@@ -166,15 +166,16 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             buttonProps = {'Style', uim.style.buttonLightMode, ...
                 'HorizontalTextAlignment', 'center'};
             
-            obj.AddTaskButton = uim.control.Button_(obj.Parent, 'Text', 'Add', buttonProps{:});
-            obj.AddTaskButton.Tooltip = 'Add data variable to configuration';
-            obj.AddTaskButton.TooltipYOffset = 10;
-            obj.BrowseTaskFunctionButton = uim.control.Button_(obj.Parent, 'Text', 'Browse', buttonProps{:});
-            %obj.BrowseTaskFunctionButton.Tooltip = 'Browse to find function';
-            obj.BrowseTaskFunctionButton.TooltipYOffset = 10;
+            obj.AddVariableButton = uim.control.Button_(obj.Parent, 'Text', 'Add', buttonProps{:});
+            obj.AddVariableButton.Tooltip = 'Add data variable to configuration';
+            obj.AddVariableButton.TooltipYOffset = 10;
             
-            obj.AddTaskButton.Callback = @obj.onAddTaskButtonPushed;
-            obj.BrowseTaskFunctionButton.Callback = @obj.onBrowseFunctionButtonPushed;
+            obj.AddManyVariablesButton = uim.control.Button_(obj.Parent, 'Text', 'Add Many...', buttonProps{:});
+            obj.AddManyVariablesButton.Tooltip = 'Add multiple data variables at once';
+            obj.AddManyVariablesButton.TooltipYOffset = 10;
+
+            obj.AddVariableButton.Callback = @obj.onAddVariableButtonPushed;
+            obj.AddManyVariablesButton.Callback = @obj.onAddManyVariablesButtonPushed;
             
             uicc = getappdata(obj.Parent, 'UIComponentCanvas');
             obj.HintTextbox = text(uicc.Axes, 1,1, '');
@@ -203,8 +204,8 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
         function createContextMenus(obj)
             hFigure = ancestor(obj.Parent, 'figure');
             obj.TableContextMenu = uicontextmenu(hFigure);
-            mitem = uimenu(obj.TableContextMenu, 'Text', 'Remove Task');
-            mitem.Callback = @obj.onRemoveTaskMenuItemClicked;
+            mitem = uimenu(obj.TableContextMenu, 'Text', 'Remove Variable');
+            mitem.Callback = @obj.onRemoveVariableMenuItemClicked;
         end
     end
 
@@ -228,7 +229,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
                 case {'backspace', '⌫'}
                     selectedRow = obj.UITable.SelectedRows;
                     if ~isempty(selectedRow)
-                        obj.removeTask(selectedRow)
+                        obj.RemoveVariable(selectedRow)
                     end
             end
             
@@ -240,6 +241,8 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             
             % Reformat table data before assigning.
             metadataColumnData = obj.TableDataCurrent.DefaultMetadata;
+
+            if isempty(metadataColumnData); return; end
             
             % Convert metadata struct to a display string
             isEmpty = cellfun(@(c) isempty(c), metadataColumnData);
@@ -335,17 +338,6 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
                 case 'NwbModule'
                     obj.updateNeurodataTypeSelectionDropdown(rowNumber)
             end
-            
-            return
-            % Do we need to rearrange rows?
-            % switch evt.Indices(2) % Column numbers..
-            % 
-            %     case 1 % Column showing task numbers
-            %         obj.rearrangeRows(src, evt)
-            % 
-            %     case 4 % Column showing option presets
-            %         obj.TableDataCurrent{evt.Indices(1), evt.Indices(2)} = {evt.NewValue};
-            % end
         end
 
         function onTableCellClicked(obj, src, evt)
@@ -469,51 +461,36 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
 
         end
         
-        function onAddTaskButtonPushed(obj, src, evt)
+        function onAddVariableButtonPushed(obj, src, evt)
             obj.addVariable()
         end
         
-        function onBrowseFunctionButtonPushed(obj, src, evt)
-        %onBrowseFunctionButtonPushed Callback for browse button
-        
-            % Open uigetfile in nansen (filter for .m files)
-            fileSpec = {  '*.m', 'M Files (*.mat)'; ...
-                            '*', 'All Files (*.*)' };
-            
-            [filename, folder] = uigetfile(fileSpec, 'Find Session Method');
-            
-            if filename == 0; return; end
-            
-            % Get full filepath. return if 0
-            
-            filePath = fullfile(folder, filename);
-            
-            %Todo: make sure function is on path....
-            % IS this relevant for this class?
-            % % S = obj.SessionMethodCatalog.addSessionMethodFromPath(filePath);
+        function onAddManyVariablesButtonPushed(obj, src, evt)
+            variableModel = nansen.VariableModel();
+            availableNames = variableModel.VariableNames;
 
-            % Update autocomplete widget.
-            obj.AutoCompleteWidget.Items{end+1} = S.FunctionName;
-            obj.AutoCompleteWidget.Value = S.FunctionName;
-            
-            
-            % Store:
-            %   - filepath
-            %   - package+function name
-            %   - function name
-            
-            % Save to taskCatalog
-            % Add to search list
-            % Set as current string
-            
-            
+            [selectedIndices, wasConfirmed] = listdlg( ...
+                'ListString', availableNames, ...
+                'SelectionMode', 'multiple', ...
+                'Name', 'Add Variables', ...
+                'PromptString', 'Select data variables to add:');
+
+            if ~wasConfirmed || isempty(selectedIndices)
+                return
+            end
+
+            selectedNames = availableNames(selectedIndices);
+            for i = 1:numel(selectedNames)
+                obj.AutoCompleteWidget.Value = selectedNames{i};
+                obj.addVariable()
+            end
         end
         
-        function onRemoveTaskMenuItemClicked(obj, src, evt)
+        function onRemoveVariableMenuItemClicked(obj, src, evt)
             rowNumber = obj.UITable.SelectedRows;
             
             if ~isempty(rowNumber)
-                obj.removeTask(rowNumber)
+                obj.RemoveVariable(rowNumber)
             end
 
         end
@@ -608,23 +585,18 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             end
             
             if size(obj.TableDataCurrent, 1) == 1
-                obj.updateOptionSelectionDropdown(1)
+                %obj.updateOptionSelectionDropdown(1)
+                obj.updateNeurodataTypeSelectionDropdown(1)
             end
             
             fprintf('Added variable "%s"\n', variableName)
-            
-            % Update task numbers
-            % obj.updateRowOrder()
         end
         
-        function removeTask(obj, rowIdx)
+        function RemoveVariable(obj, rowIdx)
             variableName = obj.TableDataCurrent{rowIdx, 'VariableName'};
             if iscell(variableName); variableName = variableName{1}; end
             obj.TableDataCurrent(rowIdx, :) = [];
             fprintf('Removed variable %s\n', variableName)
-
-            % Update task numbers
-            % obj.updateRowOrder()
         end
         
         function openTableContextMenu(obj, x, y)

@@ -19,6 +19,16 @@ classdef NWBConfigurator < applify.MultiPageApp
         NWBConfigurationData % Todo: Should this be a "file" object?
     end
 
+    properties (Access = private) % UI Components
+        SaveButton
+        SaveAndCloseButton
+    end
+
+    properties (Constant, Access = private)
+        SAVE_BUTTON_HEIGHT = 40
+        SAVE_BUTTON_MARGIN = 10
+    end
+
     % Page modules are added as dependent properties to make them more
     % explicitly expressed within this subclass.
     properties (Dependent, Access = private)
@@ -44,12 +54,64 @@ classdef NWBConfigurator < applify.MultiPageApp
 
             obj.initializeModules()
 
-            %obj.Figure.SizeChangedFcn = @(s,e) obj.updateSize;
             obj.Figure.CloseRequestFcn = @(s,e) obj.onFigureClosed;
+            obj.hLayout.MainPanel.SizeChangedFcn = @(s,e) obj.updateLayoutPositions();
 
             if ~nargout; clear obj; end
         end
         
+    end
+
+    methods (Access = protected) % Layout overrides
+
+        function updateLayoutPositions(obj)
+            panelPosition = getpixelposition(obj.hLayout.MainPanel);
+            panelWidth = panelPosition(3);
+            panelHeight = panelPosition(4);
+
+            buttonBottomY = obj.SAVE_BUTTON_MARGIN + 10;
+            buttonWidth = 200;
+            buttonSpacing = 15;
+            totalButtonsWidth = 2 * buttonWidth + buttonSpacing;
+            leftButtonX = (panelWidth - totalButtonsWidth) / 2;
+            rightButtonX = leftButtonX + buttonWidth + buttonSpacing;
+
+            tabGroupHeight = panelHeight ...
+                - obj.SAVE_BUTTON_HEIGHT ...
+                - 2 * obj.SAVE_BUTTON_MARGIN;
+
+            obj.hLayout.TabGroup.Units = 'pixels';
+            obj.hLayout.TabGroup.Position = [0, ...
+                obj.SAVE_BUTTON_HEIGHT + 2 * obj.SAVE_BUTTON_MARGIN, ...
+                panelWidth, ...
+                tabGroupHeight];
+
+            if ~isempty(obj.SaveButton) && isvalid(obj.SaveButton)
+                obj.SaveButton.Position = [leftButtonX, buttonBottomY, buttonWidth, obj.SAVE_BUTTON_HEIGHT];
+            end
+            if ~isempty(obj.SaveAndCloseButton) && isvalid(obj.SaveAndCloseButton)
+                obj.SaveAndCloseButton.Position = [rightButtonX, buttonBottomY, buttonWidth, obj.SAVE_BUTTON_HEIGHT];
+            end
+        end
+
+        function createComponents(obj)
+            obj.createTabPages()
+            obj.SaveButton = uicontrol( ...
+                'Parent', obj.hLayout.MainPanel, ...
+                'Style', 'pushbutton', ...
+                'String', 'Save Configuration', ...
+                'FontSize', 14, ...
+                'Tooltip', 'Save NWB configuration', ...
+                'Callback', @(s,e) obj.saveNwbConfigurationData());
+            obj.SaveAndCloseButton = uicontrol( ...
+                'Parent', obj.hLayout.MainPanel, ...
+                'Style', 'pushbutton', ...
+                'String', 'Save and Close', ...
+                'FontSize', 14, ...
+                'Tooltip', 'Save NWB configuration and close', ...
+                'Callback', @(s,e) obj.onSaveAndCloseButtonPushed());
+            obj.updateLayoutPositions()
+        end
     end
 
     methods % Set/Get
@@ -84,9 +146,10 @@ classdef NWBConfigurator < applify.MultiPageApp
             end
             save(obj.FilePath, 'nwbConfigurationData')
 
-            % Update original table data to last saved
-            % version
+            % Update original table data to last saved version
             obj.DataVariableConfigurator.markClean()
+
+            msgbox('NWB configuration saved successfully.', 'Save Successful', 'help')
         end
     end
 
@@ -107,6 +170,11 @@ classdef NWBConfigurator < applify.MultiPageApp
     end
 
     methods (Access = private) % Internal callbacks
+
+        function onSaveAndCloseButtonPushed(obj)
+            obj.saveNwbConfigurationData()
+            delete(obj.Figure)
+        end
 
         function onFigureClosed(obj)
             
