@@ -186,8 +186,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             % Create table
             obj.UITable  = uim.widget.StylableTable('Parent', obj.Parent, ...
                         'RowHeight', 25, ...
-                        'FontSize', 8, ...
-                        'FontName', 'helvetica', ...
+                        'FontSize', 9, ...
                         'FontName', 'avenir next', ...
                         'Theme', uim.style.tableLight, ...
                         'Units', 'pixels' );
@@ -552,8 +551,8 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             end
             try
                 str = descriptionMap(neurodataType);
-            catch
-                disp('a')
+            catch exception
+                str = sprintf('error: %s', exception.message);
             end
             str = utility.string.foldStr(str, 100);
 
@@ -564,7 +563,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
 
     methods (Access = private) % Actions
         
-        function addVariable(obj, newVariable)
+        function addVariable(obj)
            
             import nansen.module.nwb.file.getDefaultFileConfigurationItem
 
