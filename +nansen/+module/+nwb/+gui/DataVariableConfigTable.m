@@ -16,7 +16,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
     end
 
     properties (Dependent)
-        ColumnWidth
+        % ColumnWidth - Not implemented
     end
     
     properties (SetAccess = private)
@@ -626,7 +626,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             if isempty(nwbModuleName); return; end
             %disp(nwbModuleName)
             
-            if strcmp(nwbModuleName, '<Select an NWB module>');
+            if strcmp(nwbModuleName, '<Select an NWB module>')
                 neuroDataTypes = '<Select an NWB module>';
             else
                 neuroDataTypes = getTypesForModule(nwbModuleName);

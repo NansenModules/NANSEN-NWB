@@ -1,5 +1,4 @@
 function convertVideo(nwbReference, videoFilePath, videoName, nwbFileOptions, deviceOptions)
-
     arguments
         nwbReference (1,1) {mustBeNwbFileReference} 
         videoFilePath (1,:) string {mustBeFile}
@@ -8,12 +7,7 @@ function convertVideo(nwbReference, videoFilePath, videoName, nwbFileOptions, de
         nwbFileOptions.module (1,1) string = 'acquisition'
         nwbFileOptions.processingModule (1,1) string = 'acquisition'
         
-        deviceDescription 
-        deviceManufacturer
+        deviceOptions.Description 
+        deviceOptions.Manufacturer
     end
-
-    keyboard
-
-
-
 end

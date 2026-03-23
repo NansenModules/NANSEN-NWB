@@ -1,4 +1,4 @@
-function varargout = configureNwbFile(sessionObject, options)
+function varargout = configureNwbFile(sessionObject, varargin)
 % configureNwbFile - Configure an NWB file for a session
 %
 %   Customize the configuration of an NWB file for an individual or multiple
@@ -34,8 +34,6 @@ import nansen.session.SessionMethod
         varargout = {fcnAttributes};   return
     end
     
-    params.Alternative = datalocationNames{1}; % Set a default value.
-
     % % % Parse name-value pairs from function input.
     params = utility.parsenvpairs(params, true, varargin);
     

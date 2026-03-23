@@ -117,8 +117,6 @@ classdef UICreateDynamicTable < uiw.abstract.AppWindow
         function updatePanelPositions(app)
         % updatePanelPositions - Update the layout (panel positions)
 
-            persistent T1 T2
-
             MARGIN = [30,30,30,40];
 
             figurePosition = getpixelposition(app.Figure);

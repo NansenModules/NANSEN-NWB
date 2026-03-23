@@ -11,6 +11,7 @@ classdef NWBDataConfiguration < handle
     end
 
     properties (Dependent)
-        IsProcessing
+        % IsProcessing - Is this a processing module?
+        % IsProcessing -  Todo: useful?
     end
 end
