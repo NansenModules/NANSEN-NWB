@@ -190,7 +190,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             end
         end
         
-        function onTableCellEdited(obj, src, evt)
+        function onTableCellEdited(obj, ~, evt)
             rowNumber = evt.Indices(1);
             colNumber = evt.Indices(2);  
             newValue = evt.NewValue;
@@ -233,7 +233,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             obj.UITable.ColumnEditable(colNumber) = false;
         end
 
-        function onTableCellSelected(obj, src, evt)
+        function onTableCellSelected(obj, ~, ~)
             %obj.UITable.ColumnEditable(:) = false;
         end
 
@@ -250,7 +250,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             end
         end
 
-        function onMouseRightClickedInTable(obj, src, evt)
+        function onMouseRightClickedInTable(obj, ~, evt)
             
             if isempty(obj.UITableContextMenu); return; end
 
@@ -278,7 +278,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             end
         end
         
-        function onTableCellDoubleClicked(obj, src, evt)
+        function onTableCellDoubleClicked(obj, ~, evt)
             row = evt.Cell(1);
             col = evt.Cell(2);
             
@@ -290,12 +290,12 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             end
         end
 
-        function onAddNewRowMenuItemClicked(obj, src, evt, location)
+        function onAddNewRowMenuItemClicked(obj, ~, ~, location)
             rowNumber = obj.LastClickedCell(1);
             obj.addRows(1, rowNumber, location)
         end
 
-        function onAddXNewRowsMenuItemClicked(obj, src, evt, location)
+        function onAddXNewRowsMenuItemClicked(obj, ~, ~, location)
             x = inputdlg('Enter number of rows');
 
             if ~isempty(x)
@@ -305,7 +305,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             end
         end
 
-        function onDeleteRowMenuItemClicked(obj, src, evt)
+        function onDeleteRowMenuItemClicked(obj, ~, ~)
             rowNumber = obj.LastClickedCell(1);
             obj.DynamicTable(rowNumber, :) = [];
         end

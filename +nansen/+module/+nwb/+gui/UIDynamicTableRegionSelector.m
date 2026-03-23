@@ -158,7 +158,7 @@ classdef UIDynamicTableRegionSelector < uiw.abstract.AppWindow
 
     methods (Access = private) % Callbacks
 
-        function onUseRowSelectionButtonClicked(app, src, evt)
+        function onUseRowSelectionButtonClicked(app, ~, ~)
             
             % Check that there is a row selection
             tf = app.assertRowsSelected();

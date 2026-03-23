@@ -273,7 +273,7 @@ classdef DynamicTableCollection < handle
     
     methods (Access = protected)
         
-        function addDynamicTable(obj, src, evt)
+        function addDynamicTable(obj, ~, ~)
             msgbox('Not implemented yet', 'Error')
             % Todo: 
             

@@ -222,7 +222,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
     
     methods (Access = private) % Component and user invoked callbacks
         
-        function onKeyPressedInTable(obj, src, evt)
+        function onKeyPressedInTable(obj, ~, evt)
             
             switch evt.Key
                 case {'backspace', '⌫'}
@@ -288,7 +288,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             end
         end
         
-        function onTableCellEdited(obj, src, evt)
+        function onTableCellEdited(obj, ~, evt)
         %onTableCellEdited Callback for table cell edits..
             
             rowNumber = evt.Indices(1);
@@ -349,7 +349,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
 
         end
 
-        function onTableCellDoubleClicked(obj, src, evt)
+        function onTableCellDoubleClicked(obj, ~, evt)
             rowNumber = evt.Cell(1);
             columnNumber = evt.Cell(2);
 
@@ -360,7 +360,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             end
         end
         
-        function onTableCellSelected(obj, src, evt)
+        function onTableCellSelected(obj, ~, evt)
                          
             colNum = obj.UITable.JTable.getSelectedColumns() + 1;
             rowNum = evt.SelectedRows;
@@ -382,7 +382,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             
         end
         
-        function onMouseRightClickedInTable(obj, src, evt)
+        function onMouseRightClickedInTable(obj, ~, evt)
             
             % Get row where mouse press ocurred.
             row = evt.Cell(1);
@@ -407,7 +407,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             end
         end
         
-        function onMouseMotionOnTable(obj, src, evt)
+        function onMouseMotionOnTable(obj, ~, evt)
 
             persistent previousRow
             if isempty(previousRow); previousRow = 0; end
@@ -460,11 +460,11 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
 
         end
         
-        function onAddVariableButtonPushed(obj, src, evt)
+        function onAddVariableButtonPushed(obj, ~, ~)
             obj.addVariable()
         end
         
-        function onAddManyVariablesButtonPushed(obj, src, evt)
+        function onAddManyVariablesButtonPushed(obj, ~, ~)
             variableModel = nansen.VariableModel();
             availableNames = variableModel.VariableNames;
 
@@ -485,7 +485,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             end
         end
         
-        function onRemoveVariableMenuItemClicked(obj, src, evt)
+        function onRemoveVariableMenuItemClicked(obj, ~, ~)
             rowNumber = obj.UITable.SelectedRows;
             
             if ~isempty(rowNumber)
@@ -682,7 +682,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             end
         end
 
-        function onValueChanged(obj, src, evt)
+        function onValueChanged(obj, ~, ~)
             % Todo: should not be part of this class
             %disp('a')
         end

@@ -146,7 +146,7 @@ classdef UICreateDynamicTable < uiw.abstract.AppWindow
 
     methods (Access = private) % Callbacks
 
-        function onSaveButtonClicked(app, src, evt)
+        function onSaveButtonClicked(app, ~, ~)
             
             % Store on object
             app.Data('Table') = app.UIDynamicTable.DynamicTable;
