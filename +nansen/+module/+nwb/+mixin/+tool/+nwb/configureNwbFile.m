@@ -26,7 +26,15 @@ function configureNwbFile()
             error('Test file not available')
         end
     end
-    
+
+    variableModel = nansen.VariableModel();
+    if variableModel.NumVariables == 0
+        errordlg([...
+            'No data variables are present on this project. One or more ', ...
+            'data variables are needed to configure NWB conversion. Please ', ...
+            'add data variables and try again.'], 'Aborted NWB configuration.')
+    end
+
     % Todo: Pass filepath where to save configuration
     % If this is a catalog, it should be a persistent catalog ant it will
     % alread have a filepath.
