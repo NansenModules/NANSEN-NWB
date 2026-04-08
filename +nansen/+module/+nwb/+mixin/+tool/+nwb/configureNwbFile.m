@@ -4,7 +4,7 @@ function configureNwbFile()
 
     currentProject = nansen.getCurrentProject();
     configurationFolderPath = currentProject.getConfigurationFolder('Subfolder', 'nwb');
-    configurationFilePath = fullfile(configurationFolderPath, 'test.mat');
+    configurationFilePath = fullfile(configurationFolderPath, 'nwb_conversion_configuration.mat');
 
     L = dir(fullfile( configurationFolderPath, '*.mat' ) );
     if isempty(L)
@@ -18,13 +18,24 @@ function configureNwbFile()
         end
         % Todo: Save configuration catalog here or later?
     else
-        % Todo: create listbox for selecting which configuration to load
-        if isfile(configurationFilePath)
-            S = load(configurationFilePath);
-            configurationCatalog = S.nwbConfigurationData;
+        if numel(L) == 1
+            configurationFilePath = fullfile(L(1).folder, L(1).name);
         else
-            error('Test file not available')
+            [selectedIndex, wasConfirmed] = listdlg( ...
+                'ListString', {L.name}, ...
+                'SelectionMode', 'single', ...
+                'Name', 'Select NWB Configuration', ...
+                'PromptString', 'Select an NWB conversion configuration to load:');
+
+            if ~wasConfirmed || isempty(selectedIndex)
+                return
+            end
+
+            configurationFilePath = fullfile(L(selectedIndex).folder, L(selectedIndex).name);
         end
+
+        S = load(configurationFilePath);
+        configurationCatalog = S.nwbConfigurationData;
     end
 
     variableModel = nansen.VariableModel();

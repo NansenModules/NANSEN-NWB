@@ -4,7 +4,10 @@ function varargout = writeNwbFile(sessionObject, varargin)
 %   This method requires an NWB Configuration File to be present. This file
 %   can be created from tools -> Configure NWB File. It is also possible to
 %   customize the NWB Configuration for individual sessions by running the
-%   session method from data -> nwb -> Customize Nwb Configuration
+%   session method from data -> nwb -> Customize Nwb Configuration.
+%
+%   Use the 'ConfigurationFileName' parameter to select a specific
+%   configuration file when multiple NWB configuration files are present.
 
 import nansen.session.SessionMethod
 
@@ -19,11 +22,6 @@ import nansen.session.SessionMethod
     params = getDefaultParameters();
     ATTRIBUTES = {'serial', 'queueable'};
     
-    % Todo: Provide each of the configured NWB files as alternatives
-    % nwbFiles = getNwbFileNames();
-    % ATTRIBUTES = [ATTRIBUTES, {'Alternatives', nwbFiles}];
-    
-
 % % % % % % % % % % % % % DEFAULT CODE BLOCK % % % % % % % % % % % % % % 
 % - - - - - - - - - - Please do not edit this part - - - - - - - - - - - 
    
@@ -49,12 +47,12 @@ import nansen.session.SessionMethod
 
     %% Initialize configurations
 
-    % Load default NWB Conversion settings
     currentProject = nansen.getCurrentProject();
     configurationFolderPath = currentProject.getConfigurationFolder('Subfolder', 'nwb');
-    configurationFilePath = fullfile(configurationFolderPath, 'test.mat');
+    configurationFilePath = getConfigurationFilePath( ...
+        configurationFolderPath, params.ConfigurationFileName);
 
-    if ~isfile(configurationFilePath)
+    if ismissing(configurationFilePath)
         errordlg(['NWB conversion configuration was not found. Please run ', ...
             'the NWB Configuration under Tools -> NWB -> Configure NWB File.'])
         return
@@ -181,4 +179,50 @@ end
 function params = getDefaultParameters()
 %getDefaultParameters Define the default parameters for this function
     params = struct();
+    params.ConfigurationFileName = "";
+end
+
+function configurationFilePath = getConfigurationFilePath(configurationFolderPath, configurationFileName)
+
+    defaultConfigurationFileName = "nwb_conversion_configuration.mat";
+    configurationFilePath = string(missing);
+    configurationFileName = string(configurationFileName);
+
+    if ~ismissing(configurationFileName) && strlength(configurationFileName) > 0
+        requestedFilePath = string(fullfile(configurationFolderPath, configurationFileName));
+        if isfile(requestedFilePath)
+            configurationFilePath = requestedFilePath;
+        else
+            errordlg(sprintf('NWB conversion configuration "%s" was not found.', ...
+                configurationFileName), 'Missing NWB Configuration')
+        end
+        return
+    end
+
+    availableFiles = dir(fullfile(configurationFolderPath, '*.mat'));
+    if isempty(availableFiles)
+        return
+    end
+
+    defaultConfigurationFilePath = string(fullfile(configurationFolderPath, defaultConfigurationFileName));
+    if isfile(defaultConfigurationFilePath)
+        configurationFilePath = defaultConfigurationFilePath;
+    elseif isscalar(availableFiles)
+        configurationFilePath = string(fullfile(availableFiles(1).folder, availableFiles(1).name));
+    elseif usejava('desktop')
+        [selectedIndex, wasConfirmed] = listdlg( ...
+            'ListString', {availableFiles.name}, ...
+            'SelectionMode', 'single', ...
+            'Name', 'Select NWB Configuration', ...
+            'PromptString', 'Select an NWB conversion configuration to use:');
+
+        if wasConfirmed && ~isempty(selectedIndex)
+            configurationFilePath = string(fullfile( ...
+                availableFiles(selectedIndex).folder, ...
+                availableFiles(selectedIndex).name));
+        end
+    else
+        error(['Multiple NWB configuration files were found. Specify ', ...
+            '''ConfigurationFileName'' when running writeNwbFile without a desktop session.'])
+    end
 end
