@@ -52,7 +52,7 @@ function [itemName, itemData] = createNewNwbInstance(items, nwbNodeStack, option
     SOrig = nansen.module.nwb.internal.addLinkedTypeInstances(SOrig, nwbDataType, nwbNodeStack);
 
     % This is so custom that it is added manually
-    if strcmp(nwbDataType, "matnwb.types.hdmf_common.DynamicTableRegion")
+    if strcmp(nwbDataType, nansen.module.nwb.internal.lookup.getMatNwbTypeName('hdmf_common', 'DynamicTableRegion'))
         nwbNode = nansen.module.nwb.internal.NwbNode(...
                 'table', 'ObjectView', nwbDataType);
         SOrig = appendTableDropdownOptions(SOrig, [nwbNodeStack, nwbNode]);

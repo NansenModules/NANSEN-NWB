@@ -31,6 +31,8 @@ end
 
 function electrodeTable = initializeElectrodesTable()
 % Todo: Add ID.
+    import nansen.module.nwb.internal.lookup.getMatNwbTypeName
+
     electrodeGroup = nansen.module.nwb.internal.schemautil.getElectrodesTableGroup();
 
     dynamicTableColumns = electrodeGroup.datasets;
@@ -40,7 +42,7 @@ function electrodeTable = initializeElectrodesTable()
     numColumns = numel(columnNames);
 
     variableTypes = {dynamicTableColumns.dtype};
-    variableTypes{7} = 'matnwb.types.core.ElectrodeGroup';
+    variableTypes{7} = getMatNwbTypeName('core', 'ElectrodeGroup');
     variableTypes = string(variableTypes);
     variableTypes(variableTypes=="char")="string";
 

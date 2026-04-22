@@ -58,7 +58,7 @@ function S = addLinkedTypeInstances(S, neuroDataType, nwbNodeStack)
 
             S = appendDropdownOptions(S, [nwbNodeStack, nwbNode]);
             
-            if isa(S.(lower(subgroups(i).type)), 'types.untyped.Set') || isa(S.(lower(subgroups(i).type)), 'matnwb.types.untyped.Set')
+            if isa(S.(lower(subgroups(i).type)), 'types.untyped.Set') || isa(S.(lower(subgroups(i).type)), nansen.module.nwb.internal.lookup.getMatNwbTypeName('untyped', 'Set'))
                 % This is an internal nwb type and the value needs to 
                 % initialized to a char in order to correctly render in the
                 % struct editor

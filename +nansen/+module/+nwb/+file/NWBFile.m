@@ -56,7 +56,8 @@ classdef NWBFile < NwbFile
                        name )
             end
 
-            processingModule = matnwb.types.core.ProcessingModule( ...
+            processingModule = feval( ...
+                nansen.module.nwb.internal.lookup.getMatNwbTypeName('core', 'ProcessingModule'), ...
                 'description', char(description));
             obj.processing.set(name, processingModule);
         end
