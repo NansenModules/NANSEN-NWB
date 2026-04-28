@@ -124,8 +124,8 @@ classdef NWBConfigurator < applify.MultiPageApp
         end
     end
 
-    methods 
-        
+    methods
+
         function saveNwbConfigurationData(obj)
         % saveNwbConfigurationData - Save NWB configuration to file
 
@@ -148,6 +148,9 @@ classdef NWBConfigurator < applify.MultiPageApp
 
             % Update original table data to last saved version
             obj.DataVariableConfigurator.markClean()
+
+            % Warn about any configuration issues (non-blocking)
+            obj.warnIfConfigurationIssues(dataItems)
 
             msgbox('NWB configuration saved successfully.', 'Save Successful', 'help')
         end
@@ -177,34 +180,60 @@ classdef NWBConfigurator < applify.MultiPageApp
         end
 
         function onFigureClosed(obj)
-            
+
             isDirty = obj.DataVariableConfigurator.IsDirty || obj.DynamicTableConfigurator.isDirty();
 
             if isDirty
-                message = sprintf('Save changes to NWB Configuration?');%, obj.NWBConfigurationData.PipelineName);
+                message = 'Save changes to NWB Configuration?';
                 title = 'Confirm Save';
 
                 answer = questdlg(message, title, 'Yes', 'No', 'Cancel', 'Yes');
 
                 switch answer
-
                     case 'Yes'
                         if ismissing(obj.FilePath)
                             error('Filepath is not set')
                             % Todo:
-                            [filename, folder] = uigetfile('.m')
+                            [filename, folder] = uigetfile('.m') %#ok<NASGU,ASGLU>
                         else
                             obj.saveNwbConfigurationData()
                             obj.DynamicTableConfigurator.deactivate()
                         end
                     case 'No'
-
+                        % discard changes
                     otherwise
                         return
                 end
             end
-            
+
             delete(obj.Figure)
+        end
+
+        function warnIfConfigurationIssues(obj, dataItems)
+        % warnIfConfigurationIssues - Show a warning dialog for any issues
+        %   found in the configuration. The save is not blocked — this is
+        %   informational only.
+
+            if isempty(dataItems)
+                return
+            end
+
+            warnings = nansen.module.nwb.file.validateNwbConfiguration(dataItems);
+
+            if isempty(warnings)
+                return
+            end
+
+            % Build message: one bullet per warning, wrapped to 80 chars
+            bulletLines = strjoin( cellfun(@(w) sprintf('  \x2022 %s', w), ...
+                warnings, 'UniformOutput', false), newline );
+
+            message = sprintf( ...
+                ['The configuration was saved, but the following issues ', ...
+                 'were found:\n\n%s\n\n', ...
+                 'Please review before writing NWB files.'], bulletLines);
+
+            warndlg(message, 'NWB Configuration Warnings', 'modal')
         end
     end
     
