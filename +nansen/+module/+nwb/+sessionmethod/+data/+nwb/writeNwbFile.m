@@ -78,12 +78,11 @@ import nansen.session.SessionMethod
     if isfile(nwbFilePath); delete(nwbFilePath); end
 
     %% Open or create NWB file depending on if file exists.
-    % Todo: Function of nwb module:
     if isfile(nwbFilePath)
-        nwbFile = nansen.module.nwb.file.NWBFile(nwbFilePath);
+        nwbFile = nwbRead(nwbFilePath);
         wasInitialized = false;
     else
-        nwbFile = nansen.module.nwb.file.NWBFile();
+        nwbFile = NwbFile();
         wasInitialized = true;
     end
 
@@ -134,7 +133,7 @@ import nansen.session.SessionMethod
         else
             customConverterFcn = variableConfiguration.Converter;
             feval(customConverterFcn, metadata, data, nwbFilePath);
-            nwbFile = nansen.module.nwb.file.NWBFile(nwbFilePath);
+            nwbFile = nwbRead(nwbFilePath);
             continue
         end
 
@@ -145,7 +144,7 @@ import nansen.session.SessionMethod
             case 'Processing'
                 moduleName = variableConfiguration.NwbModule;
                 % Create or get processing module based on nwb module
-                 processingModule = nwbFile.getProcessingModule(moduleName, 'No Description');
+                processingModule = nansen.module.nwb.file.getProcessingModule(nwbFile, moduleName, 'No Description');
                 if isa(neuroData, 'struct')
                     for j = 1:numel(neuroData)
                         processingModule.nwbdatainterface.set(...
