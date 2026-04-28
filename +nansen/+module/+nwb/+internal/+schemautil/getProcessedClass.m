@@ -8,13 +8,13 @@ function [processedClass, propertyInfo] = getProcessedClass(className)
 
     className = utility.string.getSimpleClassName(className);
     
-    nwbSourceDir = matnwb.misc.getMatnwbDir();
+    nwbSourceDir = misc.getMatnwbDir();
     namespaceName = 'core';
-    Namespace = matnwb.schemes.loadNamespace(namespaceName, nwbSourceDir);
-    
-    [processedClassHierarchy, classprops, inherited] = matnwb.file.processClass(className, Namespace, pregenerated);
-    
-    if isa(processedClassHierarchy, 'matnwb.file.Group')
+    Namespace = schemes.loadNamespace(namespaceName, nwbSourceDir);
+
+    [processedClassHierarchy, classprops, inherited] = file.processClass(className, Namespace, pregenerated);
+
+    if isa(processedClassHierarchy, 'file.Group')
         % Get all groups, datasets, attributes and links
         subgroups = [processedClassHierarchy.subgroups];
         attributes = cat(1, processedClassHierarchy.attributes);
@@ -33,7 +33,7 @@ function [processedClass, propertyInfo] = getProcessedClass(className)
         processedClass.links = links;
         
 
-    elseif isa(processedClassHierarchy, 'matnwb.file.Dataset')
+    elseif isa(processedClassHierarchy, 'file.Dataset')
         
         dataset = mergeDatasets(processedClassHierarchy);
 

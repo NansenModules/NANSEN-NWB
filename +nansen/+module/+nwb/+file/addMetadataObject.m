@@ -28,9 +28,9 @@ function addMetadataObject(nwbFile, name, nwbObject)
 %          currently hardcoded throughout
 
     arguments
-        nwbFile (1,1) matnwb.types.core.NWBFile
+        nwbFile (1,1) types.core.NWBFile
         name (1,1) string
-        nwbObject (1,1) matnwb.types.hdmf_common.Container
+        nwbObject (1,1) types.hdmf_common.Container
     end
 
     % Todo: Generate this programmatically:

@@ -1,12 +1,12 @@
 function qualifiedName = getMatNwbTypeName(namespace, typeName)
-% getMatNwbTypeName - Get fully qualified matnwb type name
+% getMatNwbTypeName - Get fully qualified NWB type name
 %
 %   qualifiedName = getMatNwbTypeName(namespace, typeName) returns the
-%   fully qualified matnwb type name for the given namespace and class name.
+%   fully qualified NWB type name for the given namespace and class name.
 %
 %   Example:
 %       getMatNwbTypeName('core', 'TimeSeries')
-%       returns 'matnwb.types.core.TimeSeries'
+%       returns 'types.core.TimeSeries'
 
-    qualifiedName = sprintf('matnwb.types.%s.%s', namespace, typeName);
+    qualifiedName = sprintf('types.%s.%s', namespace, typeName);
 end

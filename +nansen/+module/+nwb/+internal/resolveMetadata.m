@@ -132,7 +132,7 @@ function [metadata, instanceMap] = resolveMetadata(metadata, neuroDataType, nwbF
                     end
                     %matnwb.types.untyped.ObjectView(EGroup)
 
-                    nwbType = matnwb.util.table2nwb(dynamicTable);
+                    nwbType = util.table2nwb(dynamicTable);
                 
                     if ~isempty(nwbFile)
                         nansen.module.nwb.file.addMetadataObject(nwbFile, instanceName, nwbType);
