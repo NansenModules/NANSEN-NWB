@@ -48,6 +48,8 @@ import nansen.session.SessionMethod
     %% Initialize configurations
 
     currentProject = nansen.getCurrentProject();
+    projectName = string(currentProject.Name);
+
     configurationFolderPath = currentProject.getConfigurationFolder('Subfolder', 'nwb');
     configurationFilePath = getConfigurationFilePath( ...
         configurationFolderPath, params.ConfigurationFileName);
@@ -82,7 +84,12 @@ import nansen.session.SessionMethod
         nwbFile = nwbRead(nwbFilePath);
         wasInitialized = false;
     else
-        nwbFile = NwbFile();
+        nwbFile = NwbFile(...
+            'identifier', strjoin([projectName, string(sessionObject.subjectID), string(sessionObject.sessionID)], '_'), ...
+            'session_description', sessionObject.Description, ...
+            'session_start_time', sessionObject.Date + duration( char( sessionObject.Time ) ), ...
+            'general_session_id', sessionObject.sessionID);
+
         wasInitialized = true;
     end
 
@@ -139,8 +146,14 @@ import nansen.session.SessionMethod
 
         switch variableConfiguration.PrimaryGroupName
             case 'Acquisition'
-                nwbFile.acquisition.set(variableName, neuroData);
-            
+                if isa(neuroData, 'struct')
+                    for i = 1:numel(neuroData)
+                        nwbFile.acquisition.set(neuroData(i).name, neuroData(i).data);
+                    end
+                else
+                    nwbFile.acquisition.set(variableName, neuroData);
+                end
+
             case 'Processing'
                 moduleName = variableConfiguration.NwbModule;
                 % Create or get processing module based on nwb module
@@ -164,7 +177,7 @@ import nansen.session.SessionMethod
     
         nwbExport(nwbFile, nwbFilePath)
     end
-            
+    
     %nwbExport(nwbFile, nwbFilePath)
     fprintf('Finished writing file ''%s''\n', nwbFilePath)
 
