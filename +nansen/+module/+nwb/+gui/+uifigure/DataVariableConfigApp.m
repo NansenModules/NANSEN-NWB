@@ -108,14 +108,9 @@ classdef DataVariableConfigApp < handle
             newRow = obj.createDataTable(struct('DataItems', newItem));
             obj.Data = [obj.Data; newRow];
 
-            displayRow = obj.createDisplayTable(newRow);
-            if isempty(obj.Table.Data)
-                obj.Table.addRow(displayRow)
-            else
-                obj.Table.addRow(displayRow)
-            end
-
-            obj.applyNeuroDataTypeOptions(height(obj.Data))
+            % WidgetTable cannot append rows after its internal add/remove
+            % column is hidden, so refresh from the canonical table.
+            obj.renderTable()
         end
 
         function setCellValue(obj, rowIndex, columnName, value)
@@ -215,7 +210,6 @@ classdef DataVariableConfigApp < handle
             hintLabel.Layout.Row = 2;
 
             obj.Table = WidgetTable(rootGrid, ...
-                'EnableAddRows', 'off', ...
                 'ShowColumnHeaderHelp', 'off', ...
                 'HeaderBackgroundColor', '#FFFFFF', ...
                 'HeaderForegroundColor', '#002054', ...
@@ -260,6 +254,7 @@ classdef DataVariableConfigApp < handle
             displayTable = obj.createDisplayTable(obj.Data);
             if ~isempty(displayTable)
                 obj.Table.Data = displayTable;
+                obj.Table.EnableAddRows = 'off';
                 for iRow = 1:height(displayTable)
                     obj.applyNeuroDataTypeOptions(iRow)
                 end
@@ -537,6 +532,7 @@ classdef DataVariableConfigApp < handle
             catch
                 % Keep the placeholder if enum metadata is unavailable.
             end
+            options = obj.appendOptionValues(options, obj.Data.PrimaryGroupName);
         end
 
         function options = getNwbModuleOptions(obj)
@@ -547,6 +543,7 @@ classdef DataVariableConfigApp < handle
             catch
                 % Keep the placeholder if schema metadata is unavailable.
             end
+            options = obj.appendOptionValues(options, obj.Data.NwbModule);
         end
 
         function options = getConverterOptions(obj)
@@ -554,6 +551,8 @@ classdef DataVariableConfigApp < handle
             if isa(obj.NWBConverters, 'containers.Map') && obj.NWBConverters.Count > 0
                 options = [options, string(keys(obj.NWBConverters))];
             end
+            currentNames = obj.getConverterDisplayNames(obj.Data.Converter);
+            options = obj.appendOptionValues(options, currentNames);
         end
 
         function options = getNeuroDataTypeOptions(obj, rowIndex)
@@ -581,6 +580,19 @@ classdef DataVariableConfigApp < handle
 
             if currentValue ~= "" && ~any(currentValue == options)
                 options = [options, currentValue];
+            end
+        end
+
+        function options = appendOptionValues(~, options, values)
+            values = string(values);
+            values = strtrim(values(:)');
+            values = values(values ~= "" & ~ismissing(values));
+            values = unique(values, 'stable');
+
+            for i = 1:numel(values)
+                if ~any(values(i) == options)
+                    options = [options, values(i)]; %#ok<AGROW>
+                end
             end
         end
 
