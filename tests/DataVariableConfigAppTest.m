@@ -58,6 +58,8 @@ classdef DataVariableConfigAppTest < matlab.unittest.TestCase
 
     methods
         function assumeCanRunModernUi(testCase)
+            testCase.applyFixture( ...
+                matlab.unittest.fixtures.PathFixture(testCase.getRepoRoot()))
             testCase.assumeFalse( ...
                 verLessThan('matlab', '24.1'), ...
                 'Modern data-variable app requires MATLAB R2024a or newer.')
@@ -74,6 +76,10 @@ classdef DataVariableConfigAppTest < matlab.unittest.TestCase
     end
 
     methods (Static)
+        function repoRoot = getRepoRoot()
+            repoRoot = fileparts(fileparts(mfilename('fullpath')));
+        end
+
         function nwbConfigurationData = createConfiguration()
             nwbConfigurationData = struct();
             nwbConfigurationData.Name = "Processed";

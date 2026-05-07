@@ -1,6 +1,9 @@
 function app = launchDataVariableConfigApp()
 %launchDataVariableConfigApp Open the modern data-variable config app.
 
+    repoRoot = fileparts(fileparts(fileparts(mfilename('fullpath'))));
+    addpath(repoRoot)
+
     if exist('WidgetTable', 'class') ~= 8
         error(['WidgetTable is required. Install dependencies from ', ...
             'requirements.txt or add WidgetTable/widget_table to the MATLAB path.'])
