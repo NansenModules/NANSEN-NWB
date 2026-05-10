@@ -669,6 +669,7 @@ classdef DataVariableConfigApp < handle
             descriptors = [descriptorCells{:}];
             moduleName = string(obj.getDataValue(rowIndex, "NwbModule"));
             if obj.isPlaceholder(moduleName, "NwbModule")
+                descriptors = obj.filterDescriptorsBySourceInfo(rowIndex, descriptors);
                 return
             end
 
@@ -677,6 +678,50 @@ classdef DataVariableConfigApp < handle
                 isMatch(i) = obj.matchesNwbModule(descriptors(i), moduleName);
             end
             descriptors = descriptors(isMatch);
+            descriptors = obj.filterDescriptorsBySourceInfo(rowIndex, descriptors);
+        end
+
+        function descriptors = filterDescriptorsBySourceInfo(obj, rowIndex, descriptors)
+            if isempty(descriptors)
+                return
+            end
+
+            sourceInfo = obj.getDataValue(rowIndex, "SourceInfo");
+            if ~obj.hasSourceInfoEvidence(sourceInfo)
+                return
+            end
+
+            try
+                registry = nansen.module.nwb.conversion.ConverterRegistry.instance();
+                sourceDescriptors = registry.findBySourceInfo(sourceInfo);
+            catch
+                return
+            end
+
+            sourceNames = string({sourceDescriptors.Name});
+            descriptorNames = string({descriptors.Name});
+            descriptors = descriptors(ismember(descriptorNames, sourceNames));
+        end
+
+        function tf = hasSourceInfoEvidence(~, sourceInfo)
+            if ~isstruct(sourceInfo) || ~isscalar(sourceInfo)
+                tf = false;
+                return
+            end
+
+            evidenceFields = ["DataType", "ClassName", "Format", "SourceFormat", ...
+                "Modality", "FileExtension", "Path", "FilePath"];
+            tf = false;
+            for i = 1:numel(evidenceFields)
+                fieldName = char(evidenceFields(i));
+                if isfield(sourceInfo, fieldName) && ~isempty(sourceInfo.(fieldName))
+                    tf = strlength(strtrim(string(sourceInfo.(fieldName)))) > 0;
+                    if any(tf)
+                        tf = true;
+                        return
+                    end
+                end
+            end
         end
 
         function tf = matchesNwbModule(obj, descriptor, moduleName)

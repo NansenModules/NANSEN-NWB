@@ -14,7 +14,14 @@ classdef ConverterRegistry < handle
 
         function add(obj, descriptor)
             descriptor = nansen.module.nwb.conversion.NwbConverterDescriptor.fromAny(descriptor);
-            obj.Descriptors(char(descriptor.Name)) = descriptor;
+            key = char(descriptor.Name);
+            if isKey(obj.Descriptors, key)
+                error("NansenNwb:DuplicateConverter", ...
+                    "Converter '%s' is already registered.", descriptor.Name)
+            end
+
+            obj.assertUniqueDisplayName(descriptor)
+            obj.Descriptors(key) = descriptor;
         end
 
         function descriptor = get(obj, converterName)
@@ -57,6 +64,10 @@ classdef ConverterRegistry < handle
             descriptors = allDescriptors(isMatch);
         end
 
+        function descriptors = findByDataType(obj, dataType)
+            descriptors = obj.findByAcceptedType(dataType);
+        end
+
         function descriptors = findByNwbType(obj, nwbType)
             allDescriptors = obj.list();
             nwbType = string(nwbType);
@@ -85,14 +96,7 @@ classdef ConverterRegistry < handle
                 sourceInfo (1,1) struct
             end
 
-            candidateTypes = strings(1, 0);
-            sourceFields = ["DataType", "ClassName", "Format"];
-            for i = 1:numel(sourceFields)
-                fieldName = sourceFields(i);
-                if isfield(sourceInfo, fieldName) && ~isempty(sourceInfo.(fieldName))
-                    candidateTypes(end+1) = string(sourceInfo.(fieldName)); %#ok<AGROW>
-                end
-            end
+            candidateTypes = obj.getSourceInfoCandidateTypes(sourceInfo);
 
             if isempty(candidateTypes)
                 descriptors = obj.list();
@@ -108,6 +112,10 @@ classdef ConverterRegistry < handle
                 end
             end
             descriptors = allDescriptors(isMatch);
+        end
+
+        function descriptors = findBySourceInfo(obj, sourceInfo)
+            descriptors = obj.findForSourceInfo(sourceInfo);
         end
 
         function registerFolder(obj, folderPath)
@@ -325,13 +333,59 @@ classdef ConverterRegistry < handle
                 descriptor = [];
             end
         end
+
+        function assertUniqueDisplayName(obj, descriptor)
+            descriptorCells = values(obj.Descriptors);
+            for i = 1:numel(descriptorCells)
+                existingDescriptor = descriptorCells{i};
+                if existingDescriptor.DisplayName == descriptor.DisplayName
+                    error("NansenNwb:DuplicateConverterDisplayName", ...
+                        "Converter display name '%s' is already registered by '%s'.", ...
+                        descriptor.DisplayName, existingDescriptor.Name)
+                end
+            end
+        end
     end
 
     methods (Static, Access = private)
         function tf = matchesAcceptedType(descriptor, dataType)
-            acceptedTypes = lower(string(descriptor.AcceptedTypes));
-            dataType = lower(string(dataType));
+            acceptedTypes = nansen.module.nwb.conversion.ConverterRegistry.normalizeMatchText( ...
+                descriptor.AcceptedTypes);
+            dataType = nansen.module.nwb.conversion.ConverterRegistry.normalizeMatchText(dataType);
             tf = any(acceptedTypes == "*" | acceptedTypes == dataType);
+        end
+
+        function candidateTypes = getSourceInfoCandidateTypes(sourceInfo)
+            candidateTypes = strings(1, 0);
+            sourceFields = ["DataType", "ClassName", "Format", "SourceFormat", ...
+                "Modality", "FileExtension"];
+            for i = 1:numel(sourceFields)
+                fieldName = char(sourceFields(i));
+                if isfield(sourceInfo, fieldName) && ~isempty(sourceInfo.(fieldName))
+                    candidateTypes = [candidateTypes, string(sourceInfo.(fieldName))]; %#ok<AGROW>
+                end
+            end
+
+            pathFields = ["Path", "FilePath"];
+            for i = 1:numel(pathFields)
+                fieldName = char(pathFields(i));
+                if isfield(sourceInfo, fieldName) && ~isempty(sourceInfo.(fieldName))
+                    [~, ~, extension] = fileparts(string(sourceInfo.(fieldName)));
+                    if extension ~= ""
+                        candidateTypes = [candidateTypes, extension]; %#ok<AGROW>
+                    end
+                end
+            end
+
+            candidateTypes = nansen.module.nwb.conversion.ConverterRegistry.normalizeMatchText( ...
+                candidateTypes);
+            candidateTypes = unique(candidateTypes(candidateTypes ~= ""), "stable");
+        end
+
+        function values = normalizeMatchText(values)
+            values = lower(strtrim(string(values)));
+            values = erase(values, ".");
+            values = values(values ~= "" & ~ismissing(values));
         end
     end
 end

@@ -97,7 +97,7 @@ classdef NwbFileConverter < handle
             end
 
             if descriptor.ExecutionMode == "mutate"
-                nwbFile = obj.getReturnedNwbFile(result, context.NwbFile);
+                nwbFile = obj.getReturnedNwbFile(result, context);
                 nwbExport(nwbFile, obj.Config.OutputPath)
             else
                 obj.assertExternalConverterWroteFile(result, descriptor)
@@ -267,13 +267,23 @@ classdef NwbFileConverter < handle
             end
         end
 
-        function nwbFile = getReturnedNwbFile(result, currentNwbFile)
+        function nwbFile = getReturnedNwbFile(result, context)
             if isa(result, "NwbFile")
                 nwbFile = result;
             elseif isstruct(result) && isfield(result, "NwbFile") && isa(result.NwbFile, "NwbFile")
                 nwbFile = result.NwbFile;
+            elseif isstruct(result) && isfield(result, "NeuroData") && ~isempty(result.NeuroData)
+                placement = nansen.module.nwb.conversion.resolvePlacement( ...
+                    context.Placement, result, context.Descriptor);
+                nwbFile = nansen.module.nwb.conversion.placeNeurodata( ...
+                    context.NwbFile, result.NeuroData, placement, context.Placement.Name);
+            elseif isstruct(result) && isfield(result, "NwbObject") && ~isempty(result.NwbObject)
+                placement = nansen.module.nwb.conversion.resolvePlacement( ...
+                    context.Placement, result, context.Descriptor);
+                nwbFile = nansen.module.nwb.conversion.placeNeurodata( ...
+                    context.NwbFile, result.NwbObject, placement, context.Placement.Name);
             else
-                nwbFile = currentNwbFile;
+                nwbFile = context.NwbFile;
             end
         end
 

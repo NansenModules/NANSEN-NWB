@@ -70,15 +70,27 @@ classdef NwbConverterDescriptor
                     "Converter descriptor Name must be non-empty.")
             end
 
-            if isempty(obj.AcceptedTypes)
+            obj.assertNonEmptyTextVector(obj.AcceptedTypes, "AcceptedTypes")
+            obj.assertNonEmptyTextVector(obj.ProducesNwbType, "ProducesNwbType")
+            obj.assertNonEmptyTextVector(obj.PrimaryGroup, "PrimaryGroup")
+            obj.assertValidPrimaryGroup()
+
+            if ~isempty(obj.NwbModuleTags)
+                obj.assertNonEmptyTextVector(obj.NwbModuleTags, "NwbModuleTags")
+            end
+
+            if ~(isstruct(obj.MetadataSchema) || isa(obj.MetadataSchema, "function_handle"))
                 error("NansenNwb:InvalidConverterDescriptor", ...
-                    "Converter descriptor %s must declare at least one AcceptedTypes value.", obj.Name)
+                    "Converter descriptor %s MetadataSchema must be a struct or function handle.", obj.Name)
             end
 
             if obj.ExecutionMode == "external" && obj.PlacementPolicy ~= "converter"
                 error("NansenNwb:InvalidConverterDescriptor", ...
                     "External converter %s must use PlacementPolicy='converter'.", obj.Name)
             end
+
+            obj.assertValidFunctionSignature()
+            obj.assertValidNeuroconvDefaults()
         end
 
         function S = toStruct(obj)
@@ -166,6 +178,80 @@ classdef NwbConverterDescriptor
                 if ~isfield(S, fieldName) || isempty(S.(fieldName))
                     S.(fieldName) = defaults.(fieldName);
                 end
+            end
+        end
+    end
+
+    methods (Access = private)
+        function assertValidPrimaryGroup(obj)
+            validGroups = ["Acquisition", "Processing", "Analysis", "Intervals", "Stimulus"];
+            if ~any(string(obj.PrimaryGroup) == validGroups)
+                error("NansenNwb:InvalidConverterDescriptor", ...
+                    "Converter descriptor %s PrimaryGroup must be one of: %s.", ...
+                    obj.Name, strjoin(validGroups, ", "))
+            end
+        end
+
+        function assertValidFunctionSignature(obj)
+            try
+                numInputs = nargin(obj.Function);
+            catch
+                numInputs = -1;
+            end
+
+            if ~(numInputs == 1 || numInputs < 0)
+                error("NansenNwb:InvalidConverterDescriptor", ...
+                    "Converter descriptor %s Function must accept one context argument or varargin.", ...
+                    obj.Name)
+            end
+        end
+
+        function assertValidNeuroconvDefaults(obj)
+            if obj.Source ~= "neuroconv"
+                return
+            end
+
+            if ~obj.RequiresPython
+                error("NansenNwb:InvalidConverterDescriptor", ...
+                    "NeuroConv converter %s must set RequiresPython=true.", obj.Name)
+            end
+
+            if obj.ExecutionMode ~= "external" || obj.PlacementPolicy ~= "converter" || obj.NeedsData
+                error("NansenNwb:InvalidConverterDescriptor", ...
+                    "NeuroConv converter %s must be an external, converter-owned, path-based converter.", ...
+                    obj.Name)
+            end
+
+            args = obj.DefaultConverterArgs;
+            if isempty(fieldnames(args))
+                return
+            end
+
+            requiredFields = ["InterfaceClassName", "SourceArgumentName", "SourcePathMode"];
+            for i = 1:numel(requiredFields)
+                fieldName = char(requiredFields(i));
+                if ~isfield(args, fieldName) || strlength(strtrim(string(args.(fieldName)))) == 0
+                    error("NansenNwb:InvalidConverterDescriptor", ...
+                        "NeuroConv converter %s DefaultConverterArgs.%s must be non-empty.", ...
+                        obj.Name, fieldName)
+                end
+            end
+
+            validPathModes = ["file", "path", "folder", "parentFolder", "fileList"];
+            if ~any(string(args.SourcePathMode) == validPathModes)
+                error("NansenNwb:InvalidConverterDescriptor", ...
+                    "NeuroConv converter %s SourcePathMode must be one of: %s.", ...
+                    obj.Name, strjoin(validPathModes, ", "))
+            end
+        end
+    end
+
+    methods (Static, Access = private)
+        function assertNonEmptyTextVector(value, propertyName)
+            value = strtrim(string(value));
+            if isempty(value) || any(value == "" | ismissing(value))
+                error("NansenNwb:InvalidConverterDescriptor", ...
+                    "Converter descriptor %s must contain non-empty text.", propertyName)
             end
         end
     end
