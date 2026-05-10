@@ -33,11 +33,13 @@ classdef DataVariableConfigAppTest < matlab.unittest.TestCase
 
             fixture = testCase.applyFixture( ...
                 matlab.unittest.fixtures.TemporaryFolderFixture);
-            configFilePath = fullfile(fixture.Folder, 'nwb-config.mat');
+            configFilePath = fullfile(fixture.Folder, 'nwb-config.json');
 
             nwbConfigurationData = testCase.createConfiguration();
-            nwbConfigurationData.General.Subject = "Mouse-001";
-            save(configFilePath, 'nwbConfigurationData')
+            nwbConfigurationData.GeneralMetadata.institution = "Vervaeke Lab";
+            nansen.module.nwb.config.saveConfiguration( ...
+                nansen.module.nwb.config.NwbFileConfiguration.fromStruct(nwbConfigurationData), ...
+                string(configFilePath))
 
             app = nansen.module.nwb.gui.uifigure.DataVariableConfigApp( ...
                 nwbConfigurationData, ...
@@ -48,10 +50,10 @@ classdef DataVariableConfigAppTest < matlab.unittest.TestCase
             app.addVariable("WheelData")
             app.saveNwbConfigurationData()
 
-            savedData = load(configFilePath, 'nwbConfigurationData');
+            savedData = nansen.module.nwb.config.loadConfiguration(string(configFilePath));
 
-            testCase.verifyEqual(numel(savedData.nwbConfigurationData.DataItems), 3)
-            testCase.verifyEqual(savedData.nwbConfigurationData.General.Subject, "Mouse-001")
+            testCase.verifyEqual(numel(savedData.DataItems), 3)
+            testCase.verifyEqual(string(savedData.GeneralMetadata.institution), "Vervaeke Lab")
             testCase.verifyFalse(app.IsDirty)
         end
     end
@@ -82,8 +84,7 @@ classdef DataVariableConfigAppTest < matlab.unittest.TestCase
 
         function nwbConfigurationData = createConfiguration()
             nwbConfigurationData = struct();
-            nwbConfigurationData.Name = "Processed";
-            nwbConfigurationData.Description = "Processed Data for Sharing";
+            nwbConfigurationData = nansen.module.nwb.config.NwbFileConfiguration().toStruct();
             nwbConfigurationData.AllVariableNames = {'Eeg', 'LineScan', 'WheelData'};
 
             defaultItem = nansen.module.nwb.file.getDefaultFileConfigurationItem();
@@ -91,15 +92,15 @@ classdef DataVariableConfigAppTest < matlab.unittest.TestCase
 
             dataItems(1).VariableName = 'Eeg';
             dataItems(1).NWBVariableName = 'Eeg';
-            dataItems(1).PrimaryGroupName = 'acquisition';
+            dataItems(1).PrimaryGroup = 'Acquisition';
             dataItems(1).NwbModule = 'ecephys';
-            dataItems(1).NeuroDataType = 'ElectricalSeries';
+            dataItems(1).TargetNwbType = 'ElectricalSeries';
 
             dataItems(2).VariableName = 'LineScan';
             dataItems(2).NWBVariableName = 'LineScan';
-            dataItems(2).PrimaryGroupName = 'acquisition';
+            dataItems(2).PrimaryGroup = 'Acquisition';
             dataItems(2).NwbModule = 'ophys';
-            dataItems(2).NeuroDataType = 'ImageSeries';
+            dataItems(2).TargetNwbType = 'ImageSeries';
 
             nwbConfigurationData.DataItems = dataItems;
         end

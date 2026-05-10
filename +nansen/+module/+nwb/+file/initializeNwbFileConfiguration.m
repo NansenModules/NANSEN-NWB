@@ -1,17 +1,24 @@
 function S = initializeNwbFileConfiguration(currentProject)
+%initializeNwbFileConfiguration Create a blank project-level NWB config.
 
     import nansen.module.nwb.file.getDefaultFileConfigurationItem
-    
+
     if ~nargin
         currentProject = nansen.getCurrentProject();
     end
 
     variableItems = currentProject.VariableModel.Data;
     filteredVariableItems = variableItems(~[variableItems.IsInternal]);
-    filteredVariableItems = filteredVariableItems([filteredVariableItems.IsCustom]); % Todo: Remove as this is temporary
+
+    baseConfig = nansen.module.nwb.config.NwbFileConfiguration();
+    S = baseConfig.toStruct();
+    S.Name = "Processed";
+    S.Description = "Processed Data for Sharing";
+    S.AllVariableNames = {variableItems.VariableName};
 
     if isempty(filteredVariableItems)
-        S = struct.empty; return
+        S.DataItems = struct.empty;
+        return
     end
 
     defaultItem = getDefaultFileConfigurationItem();
@@ -20,35 +27,5 @@ function S = initializeNwbFileConfiguration(currentProject)
     [configItems(:).VariableName] = deal(filteredVariableItems.VariableName);
     [configItems(:).NWBVariableName] = deal(filteredVariableItems.VariableName);
 
-    S = struct;
-    S.Name = "Processed"; % Use for differentiating different NWB files, i.e raw data for internal use, processed data for sharing
-    S.Description = "Processed Data for Sharing";
-
     S.DataItems = configItems;
-    S.General.ExtracellularEphys.Electrodes = initializeElectrodesTable();
-    S.AllVariableNames = {variableItems.VariableName};
-end
-
-function electrodeTable = initializeElectrodesTable()
-% Todo: Add ID.
-    import nansen.module.nwb.internal.lookup.getMatNwbTypeName
-
-    electrodeGroup = nansen.module.nwb.internal.schemautil.getElectrodesTableGroup();
-
-    dynamicTableColumns = electrodeGroup.datasets;
-
-    columnNames = {dynamicTableColumns.name};
-    columnDescriptions = {dynamicTableColumns.doc};
-    numColumns = numel(columnNames);
-
-    variableTypes = {dynamicTableColumns.dtype};
-    variableTypes{7} = getMatNwbTypeName('core', 'ElectrodeGroup');
-    variableTypes = string(variableTypes);
-    variableTypes(variableTypes=="char")="string";
-
-    electrodeTable = table('Size', [0,numColumns], 'VariableTypes', variableTypes);
-
-    electrodeTable.Properties.Description = electrodeGroup.doc;
-    electrodeTable.Properties.VariableNames = columnNames;
-    electrodeTable.Properties.VariableDescriptions = columnDescriptions;
 end

@@ -5,7 +5,11 @@ function metadataNameValuePairs = loadMetadata(nwbType, options)
     end
     metadataNameValuePairs = {};
     
-    project = nansen.getCurrentProject();
+    try
+        project = nansen.getCurrentProject();
+    catch
+        return
+    end
     metadataFolder = project.getMetadataFolder('nwb');
     
     L = dir(fullfile(metadataFolder, '*.json'));

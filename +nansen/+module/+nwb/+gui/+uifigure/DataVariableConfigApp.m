@@ -7,20 +7,20 @@ classdef DataVariableConfigApp < handle
         COLUMN_NAMES = { ...
             'VariableName', ...
             'NWBVariableName', ...
-            'PrimaryGroupName', ...
+            'PrimaryGroup', ...
             'NwbModule', ...
-            'NeuroDataType', ...
-            'Converter', ...
-            'DefaultMetadata' }
+            'TargetNwbType', ...
+            'ConverterName', ...
+            'Metadata' }
 
         COLUMN_INDEX = struct( ...
             'VariableName', 1, ...
             'NWBVariableName', 2, ...
-            'PrimaryGroupName', 3, ...
+            'PrimaryGroup', 3, ...
             'NwbModule', 4, ...
-            'NeuroDataType', 5, ...
-            'Converter', 6, ...
-            'DefaultMetadata', 7)
+            'TargetNwbType', 5, ...
+            'ConverterName', 6, ...
+            'Metadata', 7)
 
         SELECT_GROUP_LABEL = '<Select a group>'
         SELECT_MODULE_LABEL = '<Select an NWB module>'
@@ -133,27 +133,25 @@ classdef DataVariableConfigApp < handle
         end
 
         function saveNwbConfigurationData(obj)
-        %saveNwbConfigurationData Save only DataItems back to the config file.
+        %saveNwbConfigurationData Save data-item settings back to JSON.
             if ismissing(obj.FilePath)
                 error('NansenNwb:MissingFilePath', ...
                     'FilePath is required for saving the NWB configuration.')
             end
-            if ~isfile(obj.FilePath)
-                error('NansenNwb:FileNotFound', ...
-                    'NWB configuration file does not exist: %s', obj.FilePath)
+
+            [~, ~, extension] = fileparts(obj.FilePath);
+            if extension ~= ".json"
+                error('NansenNwb:UnsupportedConfigurationFile', ...
+                    'NWB configurations are saved as JSON files. Unsupported file: %s', obj.FilePath)
             end
 
-            fileData = load(obj.FilePath, 'nwbConfigurationData');
-            if isfield(fileData, 'nwbConfigurationData')
-                nwbConfigurationData = fileData.nwbConfigurationData;
-            else
-                nwbConfigurationData = obj.NWBConfigurationData;
-            end
+            config = nansen.module.nwb.config.NwbFileConfiguration.fromAny( ...
+                obj.NWBConfigurationData);
+            config.DataItems = nansen.module.nwb.config.NwbDataItemConfig.fromStruct( ...
+                table2struct(obj.Data));
+            nansen.module.nwb.config.saveConfiguration(config, obj.FilePath)
 
-            nwbConfigurationData.DataItems = table2struct(obj.Data);
-            save(obj.FilePath, 'nwbConfigurationData')
-
-            obj.NWBConfigurationData = nwbConfigurationData;
+            obj.NWBConfigurationData = config.toStruct();
             obj.OriginalData = obj.Data;
         end
 
@@ -170,8 +168,8 @@ classdef DataVariableConfigApp < handle
                 'Visible', visibleState);
             obj.Figure.CloseRequestFcn = @(~, ~) obj.onFigureCloseRequested();
 
-            rootGrid = uigridlayout(obj.Figure, [4, 1]);
-            rootGrid.RowHeight = {40, 20, '1x', 50};
+            rootGrid = uigridlayout(obj.Figure, [5, 1]);
+            rootGrid.RowHeight = {25, 20, '1x', 5, 34};
             rootGrid.ColumnWidth = {'1x'};
             rootGrid.Padding = [18, 16, 18, 16];
             rootGrid.RowSpacing = 8;
@@ -233,7 +231,7 @@ classdef DataVariableConfigApp < handle
                 @obj.createMetadataCell };
 
             footerGrid = uigridlayout(rootGrid, [1, 4]);
-            footerGrid.Layout.Row = 4;
+            footerGrid.Layout.Row = 5;
             footerGrid.ColumnWidth = {'1x', 180, 180, '1x'};
             footerGrid.RowHeight = {'1x'};
             footerGrid.Padding = [0, 6, 0, 0];
@@ -370,32 +368,32 @@ classdef DataVariableConfigApp < handle
             switch columnName
                 case "NwbModule"
                     obj.setDataValue(rowIndex, "NwbModule", newValue)
-                    obj.setDataValue(rowIndex, "NeuroDataType", obj.SELECT_NEURODATA_LABEL)
+                    obj.setDataValue(rowIndex, "TargetNwbType", obj.SELECT_NEURODATA_LABEL)
                     obj.applyNeuroDataTypeOptions(rowIndex)
 
-                case "NeuroDataType"
+                case "TargetNwbType"
                     if confirmMetadataReset && obj.hasMetadata(rowIndex)
                         answer = uiconfirm(obj.Figure, ...
-                            'Changing NeuroDataType will reset metadata for this variable. Continue?', ...
+                            'Changing TargetNwbType will reset metadata for this variable. Continue?', ...
                             'Confirm Change', ...
                             'Options', {'Yes', 'No'}, ...
                             'DefaultOption', 'Yes', ...
                             'CancelOption', 'No');
 
                         if ~strcmp(answer, 'Yes')
-                            obj.Table.updateCellValue(rowIndex, obj.COLUMN_INDEX.NeuroDataType, previousValue)
+                            obj.Table.updateCellValue(rowIndex, obj.COLUMN_INDEX.TargetNwbType, previousValue)
                             return
                         end
                     end
 
-                    obj.setDataValue(rowIndex, "NeuroDataType", newValue)
-                    obj.setDataValue(rowIndex, "DefaultMetadata", struct.empty)
+                    obj.setDataValue(rowIndex, "TargetNwbType", newValue)
+                    obj.setDataValue(rowIndex, "Metadata", struct.empty)
                     obj.updateMetadataCell(rowIndex)
 
-                case "Converter"
-                    obj.setDataValue(rowIndex, "Converter", obj.resolveConverterName(newValue))
+                case "ConverterName"
+                    obj.setDataValue(rowIndex, "ConverterName", obj.resolveConverterName(newValue))
 
-                case "DefaultMetadata"
+                case "Metadata"
                     % Metadata is edited via the per-row button.
 
                 otherwise
@@ -473,11 +471,11 @@ classdef DataVariableConfigApp < handle
         end
 
         function editMetadata(obj, rowIndex)
-            neuroDataType = string(obj.getDataValue(rowIndex, "NeuroDataType"));
-            if obj.isPlaceholder(neuroDataType, "NeuroDataType")
+            neuroDataType = string(obj.getDataValue(rowIndex, "TargetNwbType"));
+            if obj.isPlaceholder(neuroDataType, "TargetNwbType")
                 uialert(obj.Figure, ...
-                    'Please select a NeuroDataType before editing metadata.', ...
-                    'NeuroDataType Not Selected', ...
+                    'Please select a TargetNwbType before editing metadata.', ...
+                    'TargetNwbType Not Selected', ...
                     'Icon', 'warning')
                 return
             end
@@ -485,7 +483,7 @@ classdef DataVariableConfigApp < handle
             nwbClassName = nansen.module.nwb.internal.lookup.getFullTypeName(char(neuroDataType));
             [metadataStruct, info] = nansen.module.nwb.internal.getTypeMetadataStruct(nwbClassName);
 
-            currentMetadata = obj.getDataValue(rowIndex, "DefaultMetadata");
+            currentMetadata = obj.getDataValue(rowIndex, "Metadata");
             if ~isempty(currentMetadata)
                 metadataStruct = currentMetadata;
             end
@@ -501,23 +499,23 @@ classdef DataVariableConfigApp < handle
 
             if ~wasAborted
                 metadataStruct = utility.struct.removeConfigFields(metadataStruct);
-                obj.setDataValue(rowIndex, "DefaultMetadata", metadataStruct)
+                obj.setDataValue(rowIndex, "Metadata", metadataStruct)
                 obj.updateMetadataCell(rowIndex)
             end
         end
 
         function applyNeuroDataTypeOptions(obj, rowIndex)
             items = obj.getNeuroDataTypeOptions(rowIndex);
-            value = string(obj.getDataValue(rowIndex, "NeuroDataType"));
+            value = string(obj.getDataValue(rowIndex, "TargetNwbType"));
             if ~any(value == items)
                 value = items(1);
-                obj.setDataValue(rowIndex, "NeuroDataType", value)
+                obj.setDataValue(rowIndex, "TargetNwbType", value)
             end
-            obj.Table.setCellOptions(rowIndex, obj.COLUMN_INDEX.NeuroDataType, items, value)
+            obj.Table.setCellOptions(rowIndex, obj.COLUMN_INDEX.TargetNwbType, items, value)
         end
 
         function updateMetadataCell(obj, rowIndex)
-            hControl = obj.Table.getCellComponent(rowIndex, obj.COLUMN_INDEX.DefaultMetadata);
+            hControl = obj.Table.getCellComponent(rowIndex, obj.COLUMN_INDEX.Metadata);
             statusLabel = findobj(hControl, 'Tag', 'MetadataStatusLabel');
             if ~isempty(statusLabel)
                 statusLabel.Text = obj.getMetadataStatus(rowIndex);
@@ -532,7 +530,7 @@ classdef DataVariableConfigApp < handle
             catch
                 % Keep the placeholder if enum metadata is unavailable.
             end
-            options = obj.appendOptionValues(options, obj.Data.PrimaryGroupName);
+            options = obj.appendOptionValues(options, obj.Data.PrimaryGroup);
         end
 
         function options = getNwbModuleOptions(obj)
@@ -551,12 +549,12 @@ classdef DataVariableConfigApp < handle
             if isa(obj.NWBConverters, 'containers.Map') && obj.NWBConverters.Count > 0
                 options = [options, string(keys(obj.NWBConverters))];
             end
-            currentNames = obj.getConverterDisplayNames(obj.Data.Converter);
+            currentNames = obj.getConverterDisplayNames(obj.Data.ConverterName);
             options = obj.appendOptionValues(options, currentNames);
         end
 
         function options = getNeuroDataTypeOptions(obj, rowIndex)
-            currentValue = string(obj.getDataValue(rowIndex, "NeuroDataType"));
+            currentValue = string(obj.getDataValue(rowIndex, "TargetNwbType"));
             moduleName = string(obj.getDataValue(rowIndex, "NwbModule"));
 
             if obj.isPlaceholder(moduleName, "NwbModule")
@@ -604,19 +602,23 @@ classdef DataVariableConfigApp < handle
 
             displayTable.VariableName = string(dataTable.VariableName);
             displayTable.NWBVariableName = string(dataTable.NWBVariableName);
-            displayTable.PrimaryGroupName = string(dataTable.PrimaryGroupName);
+            displayTable.PrimaryGroup = string(dataTable.PrimaryGroup);
             displayTable.NwbModule = string(dataTable.NwbModule);
-            displayTable.NeuroDataType = string(dataTable.NeuroDataType);
-            displayTable.Converter = obj.getConverterDisplayNames(dataTable.Converter);
+            displayTable.TargetNwbType = string(dataTable.TargetNwbType);
+            displayTable.ConverterName = obj.getConverterDisplayNames(dataTable.ConverterName);
 
             metadataStatus = strings(height(dataTable), 1);
             for iRow = 1:height(dataTable)
                 metadataStatus(iRow) = obj.getMetadataStatus(iRow, dataTable);
             end
-            displayTable.DefaultMetadata = metadataStatus;
+            displayTable.Metadata = metadataStatus;
         end
 
         function dataTable = createDataTable(obj, nwbConfigurationData)
+            if isa(nwbConfigurationData, "nansen.module.nwb.config.NwbFileConfiguration")
+                nwbConfigurationData = nwbConfigurationData.toStruct();
+            end
+
             defaultItem = nansen.module.nwb.file.getDefaultFileConfigurationItem();
 
             if isfield(nwbConfigurationData, 'DataItems')
@@ -700,10 +702,10 @@ classdef DataVariableConfigApp < handle
         function value = getDisplayValue(obj, rowIndex, columnName)
             columnName = string(columnName);
             switch columnName
-                case "DefaultMetadata"
+                case "Metadata"
                     value = obj.getMetadataStatus(rowIndex);
-                case "Converter"
-                    value = obj.getConverterDisplayNames(obj.Data.Converter(rowIndex));
+                case "ConverterName"
+                    value = obj.getConverterDisplayNames(obj.Data.ConverterName(rowIndex));
                 otherwise
                     value = string(obj.getDataValue(rowIndex, columnName));
             end
@@ -718,7 +720,7 @@ classdef DataVariableConfigApp < handle
                 dataTable = obj.Data;
             end
 
-            metadata = dataTable.DefaultMetadata{rowIndex};
+            metadata = dataTable.Metadata{rowIndex};
             if isempty(metadata)
                 status = "<Unconfigured>";
             else
@@ -727,7 +729,7 @@ classdef DataVariableConfigApp < handle
         end
 
         function tf = hasMetadata(obj, rowIndex)
-            tf = ~isempty(obj.getDataValue(rowIndex, "DefaultMetadata"));
+            tf = ~isempty(obj.getDataValue(rowIndex, "Metadata"));
         end
 
         function assertKnownVariable(obj, variableName)
@@ -755,11 +757,11 @@ classdef DataVariableConfigApp < handle
         function tf = isPlaceholder(obj, value, columnName)
             value = string(value);
             switch string(columnName)
-                case "PrimaryGroupName"
+                case "PrimaryGroup"
                     tf = value == string(obj.SELECT_GROUP_LABEL);
                 case "NwbModule"
                     tf = value == "" || value == string(obj.SELECT_MODULE_LABEL);
-                case "NeuroDataType"
+                case "TargetNwbType"
                     tf = value == "" || value == string(obj.SELECT_NEURODATA_LABEL);
                 otherwise
                     tf = value == "";
@@ -803,7 +805,8 @@ classdef DataVariableConfigApp < handle
 
         function variableNames = getAvailableVariableNames(nwbConfigurationData)
             variableNames = strings(1, 0);
-            if isfield(nwbConfigurationData, 'AllVariableNames') && ~isempty(nwbConfigurationData.AllVariableNames)
+            if isstruct(nwbConfigurationData) && isfield(nwbConfigurationData, 'AllVariableNames') && ...
+                    ~isempty(nwbConfigurationData.AllVariableNames)
                 variableNames = string(nwbConfigurationData.AllVariableNames);
                 return
             end
@@ -819,18 +822,14 @@ classdef DataVariableConfigApp < handle
         function converterMap = listConverters()
             converterMap = containers.Map('KeyType', 'char', 'ValueType', 'char');
             try
-                currentProject = nansen.getCurrentProject();
-                nwbConverters = currentProject.listMixins('nwbconverter');
+                registry = nansen.module.nwb.conversion.ConverterRegistry.instance();
+                nwbConverters = registry.names();
             catch
                 return
             end
 
-            baseNames = arrayfun( ...
-                @(name) nansen.module.nwb.gui.uifigure.DataVariableConfigApp.getSimpleClassName(name), ...
-                string(nwbConverters), 'UniformOutput', false);
-
-            for i = 1:numel(baseNames)
-                converterMap(char(baseNames{i})) = char(string(nwbConverters(i)));
+            for i = 1:numel(nwbConverters)
+                converterMap(char(nwbConverters(i))) = char(nwbConverters(i));
             end
         end
 

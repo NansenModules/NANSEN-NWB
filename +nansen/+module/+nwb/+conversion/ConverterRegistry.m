@@ -1,0 +1,224 @@
+classdef ConverterRegistry < handle
+%ConverterRegistry Registry for built-in and custom NWB converters.
+
+    properties (Access = private)
+        Descriptors
+        ConverterFolders (1,:) string = strings(1, 0)
+    end
+
+    methods
+        function obj = ConverterRegistry()
+            obj.Descriptors = containers.Map("KeyType", "char", "ValueType", "any");
+            obj.registerBuiltinConverters()
+        end
+
+        function add(obj, descriptor)
+            descriptor = nansen.module.nwb.conversion.NwbConverterDescriptor.fromAny(descriptor);
+            obj.Descriptors(char(descriptor.Name)) = descriptor;
+        end
+
+        function descriptor = get(obj, converterName)
+            converterName = string(converterName);
+            if converterName == "" || ismissing(converterName)
+                error("NansenNwb:MissingConverter", ...
+                    "A converter name must be specified.")
+            end
+
+            key = char(converterName);
+            if ~isKey(obj.Descriptors, key)
+                availableNames = string(keys(obj.Descriptors));
+                error("NansenNwb:UnknownConverter", ...
+                    "Unknown NWB converter '%s'. Available converters: %s", ...
+                    converterName, strjoin(sort(availableNames), ", "))
+            end
+
+            descriptor = obj.Descriptors(key);
+        end
+
+        function descriptors = list(obj)
+            descriptorCells = values(obj.Descriptors);
+            if isempty(descriptorCells)
+                descriptors = nansen.module.nwb.conversion.NwbConverterDescriptor.empty(0, 1);
+            else
+                descriptors = [descriptorCells{:}]';
+            end
+        end
+
+        function names = names(obj)
+            names = sort(string(keys(obj.Descriptors)));
+        end
+
+        function descriptors = findByAcceptedType(obj, dataType)
+            allDescriptors = obj.list();
+            isMatch = false(size(allDescriptors));
+            for i = 1:numel(allDescriptors)
+                isMatch(i) = obj.matchesAcceptedType(allDescriptors(i), dataType);
+            end
+            descriptors = allDescriptors(isMatch);
+        end
+
+        function descriptors = findByNwbType(obj, nwbType)
+            allDescriptors = obj.list();
+            nwbType = string(nwbType);
+            isMatch = false(size(allDescriptors));
+            for i = 1:numel(allDescriptors)
+                producedType = allDescriptors(i).ProducesNwbType;
+                isMatch(i) = producedType == "*" || producedType == nwbType;
+            end
+            descriptors = allDescriptors(isMatch);
+        end
+
+        function descriptors = findForSourceInfo(obj, sourceInfo)
+            arguments
+                obj
+                sourceInfo (1,1) struct
+            end
+
+            candidateTypes = strings(1, 0);
+            sourceFields = ["DataType", "ClassName", "Format"];
+            for i = 1:numel(sourceFields)
+                fieldName = sourceFields(i);
+                if isfield(sourceInfo, fieldName) && ~isempty(sourceInfo.(fieldName))
+                    candidateTypes(end+1) = string(sourceInfo.(fieldName)); %#ok<AGROW>
+                end
+            end
+
+            if isempty(candidateTypes)
+                descriptors = obj.list();
+                return
+            end
+
+            allDescriptors = obj.list();
+            isMatch = false(size(allDescriptors));
+            for i = 1:numel(allDescriptors)
+                for j = 1:numel(candidateTypes)
+                    isMatch(i) = isMatch(i) || ...
+                        obj.matchesAcceptedType(allDescriptors(i), candidateTypes(j));
+                end
+            end
+            descriptors = allDescriptors(isMatch);
+        end
+
+        function registerFolder(obj, folderPath)
+            arguments
+                obj
+                folderPath (1,1) string {mustBeFolder}
+            end
+
+            obj.ConverterFolders(end+1) = folderPath;
+            addpath(folderPath)
+
+            files = dir(fullfile(folderPath, "*.m"));
+            for i = 1:numel(files)
+                functionName = erase(string(files(i).name), ".m");
+                descriptor = obj.tryLoadCustomDescriptor(functionName);
+                if ~isempty(descriptor)
+                    obj.add(descriptor)
+                end
+            end
+        end
+    end
+
+    methods (Static)
+        function registry = instance(options)
+            arguments
+                options.Refresh (1,1) logical = false
+            end
+
+            persistent registryInstance
+            if options.Refresh || isempty(registryInstance) || ~isvalid(registryInstance)
+                registryInstance = nansen.module.nwb.conversion.ConverterRegistry();
+            end
+            registry = registryInstance;
+        end
+    end
+
+    methods (Access = private)
+        function registerBuiltinConverters(obj)
+            import nansen.module.nwb.conversion.NwbConverterDescriptor
+
+            obj.add(NwbConverterDescriptor( ...
+                "Name", "TimetableTimeSeries", ...
+                "Description", "Convert each timetable variable to an NWB TimeSeries.", ...
+                "AcceptedTypes", ["timetable", "matlab.timetable"], ...
+                "ProducesNwbType", "TimeSeries", ...
+                "PrimaryGroup", "Acquisition", ...
+                "Function", @nansen.module.nwb.conversion.builtin.convertTimetableToTimeSeries))
+
+            obj.add(NwbConverterDescriptor( ...
+                "Name", "GenericMatNwbType", ...
+                "Description", "Create a configured MatNWB neurodata type and place it in the configured group.", ...
+                "AcceptedTypes", "*", ...
+                "ProducesNwbType", "*", ...
+                "PrimaryGroup", "Acquisition", ...
+                "Function", @nansen.module.nwb.conversion.builtin.convertGenericMatNwbType))
+
+            obj.add(NwbConverterDescriptor( ...
+                "Name", "TwoPhotonImageStack", ...
+                "Description", "Export a NANSEN ImageStack as a two-photon image series.", ...
+                "AcceptedTypes", ["nansen.stack.ImageStack", "ImageStack", "imagestack.ImageStack"], ...
+                "ProducesNwbType", "TwoPhotonSeries", ...
+                "PrimaryGroup", "Acquisition", ...
+                "ExecutionMode", "external", ...
+                "PlacementPolicy", "converter", ...
+                "Function", @nansen.module.nwb.conversion.builtin.convertImageStackToTwoPhotonSeries))
+
+            obj.add(NwbConverterDescriptor( ...
+                "Name", "NeuroConvDataInterface", ...
+                "Source", "neuroconv", ...
+                "Description", "Run one NeuroConv data interface through MATLAB py.*.", ...
+                "AcceptedTypes", ["neuroconv", "external-file"], ...
+                "ProducesNwbType", "*", ...
+                "PrimaryGroup", "Acquisition", ...
+                "ExecutionMode", "external", ...
+                "PlacementPolicy", "converter", ...
+                "RequiresPython", true, ...
+                "NeedsData", false, ...
+                "Function", @nansen.module.nwb.conversion.builtin.convertWithNeuroconv))
+
+            obj.add(NwbConverterDescriptor( ...
+                "Name", "RoiGroupPlaneSegmentation", ...
+                "Description", "Convert an ROI group to NWB PlaneSegmentation in the ophys processing module.", ...
+                "AcceptedTypes", ["RoiGroup", "nansen.roi.RoiGroup", "suite2p.rois"], ...
+                "ProducesNwbType", "PlaneSegmentation", ...
+                "PrimaryGroup", "Processing", ...
+                "PlacementPolicy", "converter", ...
+                "Function", @nansen.module.nwb.conversion.builtin.convertRoiGroupToPlaneSegmentation))
+
+            obj.add(NwbConverterDescriptor( ...
+                "Name", "RoiSignals", ...
+                "Description", "Convert ROI signal arrays to NWB RoiResponseSeries.", ...
+                "AcceptedTypes", ["RoiSignals", "suite2p.roisignals"], ...
+                "ProducesNwbType", "RoiResponseSeries", ...
+                "PrimaryGroup", "Processing", ...
+                "PlacementPolicy", "converter", ...
+                "Function", @nansen.module.nwb.conversion.builtin.convertRoiSignals))
+        end
+
+        function descriptor = tryLoadCustomDescriptor(~, functionName)
+            descriptor = [];
+            try
+                descriptor = feval(functionName, "descriptor");
+            catch
+                try
+                    descriptor = feval(functionName);
+                catch
+                    descriptor = [];
+                end
+            end
+
+            if ~isempty(descriptor) && ...
+                    ~(isa(descriptor, "nansen.module.nwb.conversion.NwbConverterDescriptor") || isstruct(descriptor))
+                descriptor = [];
+            end
+        end
+    end
+
+    methods (Static, Access = private)
+        function tf = matchesAcceptedType(descriptor, dataType)
+            acceptedTypes = lower(string(descriptor.AcceptedTypes));
+            dataType = lower(string(dataType));
+            tf = any(acceptedTypes == "*" | acceptedTypes == dataType);
+        end
+    end
+end

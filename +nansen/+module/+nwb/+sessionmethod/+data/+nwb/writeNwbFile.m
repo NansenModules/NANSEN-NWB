@@ -1,202 +1,137 @@
 function varargout = writeNwbFile(sessionObject, varargin)
-% writeNwbFile - Write an NWB file for a session
-%
-%   This method requires an NWB Configuration File to be present. This file
-%   can be created from tools -> Configure NWB File. It is also possible to
-%   customize the NWB Configuration for individual sessions by running the
-%   session method from data -> nwb -> Customize Nwb Configuration.
-%
-%   Use the 'ConfigurationFileName' parameter to select a specific
-%   configuration file when multiple NWB configuration files are present.
+%writeNwbFile Write an NWB file for a NANSEN session.
 
-import nansen.session.SessionMethod
+    import nansen.session.SessionMethod
 
-
-% % % % % % % % % % % % CONFIGURATION CODE BLOCK % % % % % % % % % % % % 
-% Create a struct of default parameters (if applicable) and specify one or 
-% more attributes (see nansen.session.SessionMethod.setAttributes) for 
-% details. You can use the local function "getDefaultParameters" at the 
-% bottom of this file to define default parameters.
-
-    % % % Get struct of default parameters for function.
     params = getDefaultParameters();
     ATTRIBUTES = {'serial', 'queueable'};
-    
-% % % % % % % % % % % % % DEFAULT CODE BLOCK % % % % % % % % % % % % % % 
-% - - - - - - - - - - Please do not edit this part - - - - - - - - - - - 
-   
-    % % % Initialization block for a session method function.
 
     if ~nargin && nargout > 0
         fcnAttributes = SessionMethod.setAttributes(params, ATTRIBUTES{:});
-        varargout = {fcnAttributes};   return
+        varargout = {fcnAttributes};
+        return
     end
-    
-    %params.Alternative = nwbFiles{1}; % Set a default value.
 
-    % % % Parse name-value pairs from function input.
     params = utility.parsenvpairs(params, true, varargin);
-    
-    
-% % % % % % % % % % % % % % CUSTOM CODE BLOCK % % % % % % % % % % % % % % 
-% Sketch for session method
-
-    % options: 
-    % - File (if there are multiple configurations)
-    % - Mode : append, rewrite 
-
-    %% Initialize configurations
 
     currentProject = nansen.getCurrentProject();
-    projectName = string(currentProject.Name);
-
-    configurationFolderPath = currentProject.getConfigurationFolder('Subfolder', 'nwb');
+    configurationFolderPath = currentProject.getConfigurationFolder( ...
+        'Subfolder', 'nwb');
     configurationFilePath = getConfigurationFilePath( ...
         configurationFolderPath, params.ConfigurationFileName);
 
     if ismissing(configurationFilePath)
         errordlg(['NWB conversion configuration was not found. Please run ', ...
-            'the NWB Configuration under Tools -> NWB -> Configure NWB File.'])
+            'Tools -> NWB -> Configure NWB File.'])
+        if nargout > 0
+            varargout = {string(missing)};
+        end
         return
     end
 
-    S = load(configurationFilePath);
-    configurationCatalog = S.nwbConfigurationData;
+    config = nansen.module.nwb.config.loadConfiguration(configurationFilePath);
+    config = completeSessionConfiguration(config, sessionObject, currentProject);
 
-    % Todo: Load session specific NWB conversion setting
-
-    % Todo: Merge
-
-    % Create filepath
-    % Todo: nwbConfig should specify data location. For now, use default
-    % data location
-    saveFolder = sessionObject.getSessionFolder('', 'create');
-
-    % We build the filename using BIDS/DandiArchive convention.
-    % Todo: Add custom postfix via configuration
-    nwbFilename = sprintf('sub-%s_ses-%s.nwb', sessionObject.subjectID, sessionObject.sessionID);
-    nwbFilePath = fullfile(saveFolder, nwbFilename);
-    
-    if isfile(nwbFilePath); delete(nwbFilePath); end
-
-    %% Open or create NWB file depending on if file exists.
-    if isfile(nwbFilePath)
-        nwbFile = nwbRead(nwbFilePath);
-        wasInitialized = false;
-    else
-        nwbFile = NwbFile(...
-            'identifier', strjoin([projectName, string(sessionObject.subjectID), string(sessionObject.sessionID)], '_'), ...
-            'session_description', sessionObject.Description, ...
-            'session_start_time', sessionObject.Date + duration( char( sessionObject.Time ) ), ...
-            'general_session_id', sessionObject.sessionID);
-
-        wasInitialized = true;
+    warnings = nansen.module.nwb.file.validateNwbConfiguration( ...
+        dataItemsToStruct(config.DataItems));
+    if ~isempty(warnings)
+        error('NansenNwb:InvalidConfiguration', ...
+            'NWB configuration is incomplete:%s%s', newline, strjoin(warnings, newline))
     end
 
-    % Question: Is there anything against saving right away?
-    % % if wasInitialized
-    % %     nwbExport(nwbFile, nwbFilePath);
-    % % end
+    dataResolver = @(variableName) sessionObject.loadData(char(variableName));
+    converter = nansen.module.nwb.conversion.NwbFileConverter( ...
+        config, 'DataResolver', dataResolver);
+    nwbFilePath = converter.convert();
 
-    % Create a map for holding resolved metadata / neurodata types.
-    instanceMap = dictionary;
-
-    %% Todo Add general metadata like dataset info, subjects etc.:
-
-    
-    %% Loop through each variable of the NWB configuration
-    for i = 1:numel(configurationCatalog.DataItems)
-        
-        variableConfiguration = configurationCatalog.DataItems(i);
-
-        variableName = variableConfiguration.VariableName;
-        
-        nwbDataType = variableConfiguration.NeuroDataType;
-        metadata = variableConfiguration.DefaultMetadata;
-
-        metadata = utility.struct.removeConfigFields(metadata); %todo: remove
-        
-        % Load data
-        data = sessionObject.loadData(variableConfiguration.VariableName);
-
-        % Todo: Load metadata instances, resolve linked/embedded instances
-        if ~isempty(metadata)
-            [metadata, instanceMap] = ...
-                nansen.module.nwb.internal.resolveMetadata(...
-                    metadata, nwbDataType, nwbFile, instanceMap);
-        end
-        
-        % Run default or custom converter.
-        if isempty(variableConfiguration.Converter) || strcmp(variableConfiguration.Converter, "Default")
-            try
-                if isempty(metadata); metadata = struct(); end
-                neuroData = ...
-                    nansen.module.nwb.file.convertToDataType(...
-                        metadata, data, nwbDataType);
-            catch ME
-                warning('Could not add %s to nwb file: Caused by\n %s\n', variableName, ME.message);
-                continue
-            end
-        else
-            customConverterFcn = variableConfiguration.Converter;
-            feval(customConverterFcn, metadata, data, nwbFilePath);
-            nwbFile = nwbRead(nwbFilePath);
-            continue
-        end
-
-        switch variableConfiguration.PrimaryGroupName
-            case 'Acquisition'
-                if isa(neuroData, 'struct')
-                    for i = 1:numel(neuroData)
-                        nwbFile.acquisition.set(neuroData(i).name, neuroData(i).data);
-                    end
-                else
-                    nwbFile.acquisition.set(variableName, neuroData);
-                end
-
-            case 'Processing'
-                moduleName = variableConfiguration.NwbModule;
-                % Create or get processing module based on nwb module
-                processingModule = nansen.module.nwb.file.getProcessingModule(nwbFile, moduleName, 'No Description');
-                if isa(neuroData, 'struct')
-                    for j = 1:numel(neuroData)
-                        processingModule.nwbdatainterface.set(...
-                            neuroData(j).name, neuroData(j).data);
-                    end
-                else
-                    processingModule.nwbdatainterface.set(variableName, neuroData);
-                end
-                % Add to processing module
-        end
-
-        % primaryGroupName = lower(variableConfiguration.PrimaryGroupName);
-        % nwbVariableName = variableConfiguration.NWBVariableName;
-        % nwbFile.(primaryGroupName).set(nwbVariableName, nwbData);
-        
-        %nwbFile = nansen.module.nwb.convert.writeDataToFile(nwbFile, data, metadata, customConversinFcn); % anything else???
-    
-        nwbExport(nwbFile, nwbFilePath)
-    end
-    
-    %nwbExport(nwbFile, nwbFilePath)
     fprintf('Finished writing file ''%s''\n', nwbFilePath)
-
-    %% Export the file
-    if wasInitialized
-        %nwbExport(obj.NWBObject, obj.PathName);
+    if nargout > 0
+        varargout = {nwbFilePath};
     end
-
 end
 
 function params = getDefaultParameters()
-%getDefaultParameters Define the default parameters for this function
     params = struct();
     params.ConfigurationFileName = "";
 end
 
-function configurationFilePath = getConfigurationFilePath(configurationFolderPath, configurationFileName)
+function config = completeSessionConfiguration(config, sessionObject, currentProject)
+    if strlength(config.OutputPath) == 0
+        saveFolder = sessionObject.getSessionFolder('', 'create');
+        nwbFilename = sprintf('sub-%s_ses-%s.nwb', ...
+            sessionObject.subjectID, sessionObject.sessionID);
+        config.OutputPath = string(fullfile(saveFolder, nwbFilename));
+    end
 
-    defaultConfigurationFileName = "nwb_conversion_configuration.mat";
+    sessionMetadata = config.SessionMetadata;
+    sessionMetadata = setIfMissing(sessionMetadata, ...
+        'session_description', sessionObject.Description);
+    sessionMetadata = setIfMissing(sessionMetadata, ...
+        'identifier', strjoin([string(currentProject.Name), ...
+        string(sessionObject.subjectID), string(sessionObject.sessionID)], '_'));
+    sessionMetadata = setIfMissing(sessionMetadata, ...
+        'session_start_time', getSessionStartTime(sessionObject));
+    sessionMetadata = setIfMissing(sessionMetadata, ...
+        'general_session_id', sessionObject.sessionID);
+    config.SessionMetadata = sessionMetadata;
+
+    if isempty(fieldnames(config.SubjectMetadata))
+        config.SubjectMetadata = getSubjectMetadata(sessionObject);
+    end
+end
+
+function sessionStartTime = getSessionStartTime(sessionObject)
+    sessionStartTime = sessionObject.Date;
+    if isprop(sessionObject, 'Time') && ~isempty(sessionObject.Time)
+        sessionStartTime = sessionStartTime + duration(char(sessionObject.Time));
+    end
+
+    if sessionStartTime.TimeZone == ""
+        sessionStartTime.TimeZone = "UTC";
+    end
+end
+
+function subjectMetadata = getSubjectMetadata(sessionObject)
+    subjectMetadata = struct();
+
+    try
+        subjectInfo = sessionObject.getSubject();
+    catch
+        return
+    end
+
+    subjectMetadata.subject_id = subjectInfo.SubjectID;
+    subjectMetadata.description = subjectInfo.Description;
+    subjectMetadata.species = subjectInfo.Species;
+    subjectMetadata.sex = subjectInfo.BiologicalSex;
+
+    if ~isempty(subjectInfo.DateOfBirth)
+        subjectMetadata.date_of_birth = subjectInfo.DateOfBirth;
+        ageInDays = days(getSessionStartTime(sessionObject) - subjectInfo.DateOfBirth);
+        subjectMetadata.age = sprintf('P%dD', round(ageInDays));
+    end
+end
+
+function S = setIfMissing(S, fieldName, value)
+    if ~isfield(S, fieldName) || isempty(S.(fieldName))
+        S.(fieldName) = value;
+    end
+end
+
+function dataItems = dataItemsToStruct(configItems)
+    if isempty(configItems)
+        dataItems = struct.empty;
+        return
+    end
+
+    dataItems = repmat(configItems(1).toStruct(), numel(configItems), 1);
+    for i = 2:numel(configItems)
+        dataItems(i) = configItems(i).toStruct();
+    end
+end
+
+function configurationFilePath = getConfigurationFilePath(configurationFolderPath, configurationFileName)
+    defaultConfigurationFileName = "nwb_conversion_configuration.json";
     configurationFilePath = string(missing);
     configurationFileName = string(configurationFileName);
 
@@ -211,16 +146,18 @@ function configurationFilePath = getConfigurationFilePath(configurationFolderPat
         return
     end
 
-    availableFiles = dir(fullfile(configurationFolderPath, '*.mat'));
+    availableFiles = dir(fullfile(configurationFolderPath, '*.json'));
     if isempty(availableFiles)
         return
     end
 
-    defaultConfigurationFilePath = string(fullfile(configurationFolderPath, defaultConfigurationFileName));
+    defaultConfigurationFilePath = string(fullfile( ...
+        configurationFolderPath, defaultConfigurationFileName));
     if isfile(defaultConfigurationFilePath)
         configurationFilePath = defaultConfigurationFilePath;
     elseif isscalar(availableFiles)
-        configurationFilePath = string(fullfile(availableFiles(1).folder, availableFiles(1).name));
+        configurationFilePath = string(fullfile( ...
+            availableFiles(1).folder, availableFiles(1).name));
     elseif usejava('desktop')
         [selectedIndex, wasConfirmed] = listdlg( ...
             'ListString', {availableFiles.name}, ...

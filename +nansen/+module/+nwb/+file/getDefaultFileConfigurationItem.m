@@ -1,11 +1,10 @@
 function item = getDefaultFileConfigurationItem()
+%getDefaultFileConfigurationItem Create a blank data-item configuration.
 
-    item = struct();
-    item.VariableName = '';
-    item.NWBVariableName = '';
-    item.PrimaryGroupName = '<Select a group>';
+    item = nansen.module.nwb.config.NwbDataItemConfig().toStruct();
+    item.PrimaryGroup = '<Select a group>';
     item.NwbModule = '<Select an NWB module>';
-    item.NeuroDataType = '<Select a neurodata type>';
-    item.Converter = 'Default';
-    item.DefaultMetadata = struct.empty;
+    item.TargetNwbType = '<Select a neurodata type>';
+    item.ConverterName = 'Default';
+    item.Metadata = struct.empty;
 end
