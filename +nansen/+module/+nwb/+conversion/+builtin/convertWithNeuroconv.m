@@ -11,7 +11,7 @@ function result = convertWithNeuroconv(context)
             "NeuroConvDataInterface requires ConverterArgs.InterfaceClassName.")
     end
 
-    sourceArg = resolveSourceArg(context, args);
+    sourceArg = nansen.module.nwb.neuroconv.resolveSourceArg(context.DataItem, args);
 
     runArgs = {"ExecutionMode", "OutOfProcess"};
     if isfield(args, 'PythonExecutable') && ~isempty(args.PythonExecutable)
@@ -31,27 +31,6 @@ function result = convertWithNeuroconv(context)
         string(args.InterfaceClassName), sourceArg, context.FilePath, metadata, runArgs{:});
 
     result = struct("DidWriteFile", true);
-end
-
-function sourceArg = resolveSourceArg(context, args)
-    if isfield(args, 'SourceArg') && ~isempty(args.SourceArg)
-        if ~isstruct(args.SourceArg)
-            error("NansenNwb:InvalidNeuroconvSource", ...
-                "ConverterArgs.SourceArg must be a struct of NeuroConv DataInterface constructor arguments.")
-        end
-        sourceArg = args.SourceArg;
-        return
-    end
-
-    if isfield(args, 'SourceArgumentName') && ...
-            isfield(context.DataItem.SourceInfo, 'Path') && ~isempty(context.DataItem.SourceInfo.Path)
-        sourceArg = struct();
-        sourceArg.(char(args.SourceArgumentName)) = string(context.DataItem.SourceInfo.Path);
-        return
-    end
-
-    error("NansenNwb:MissingNeuroconvSource", ...
-        "NeuroConvDataInterface requires ConverterArgs.SourceArg, or ConverterArgs.SourceArgumentName plus SourceInfo.Path.")
 end
 
 function runArgs = addWriteModeArguments(runArgs, args, filePath)

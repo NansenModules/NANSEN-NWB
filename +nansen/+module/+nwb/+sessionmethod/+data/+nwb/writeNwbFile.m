@@ -78,6 +78,39 @@ function config = completeSessionConfiguration(config, sessionObject, currentPro
     if isempty(fieldnames(config.SubjectMetadata))
         config.SubjectMetadata = getSubjectMetadata(sessionObject);
     end
+
+    for i = 1:numel(config.DataItems)
+        config.DataItems(i).SourceInfo = completeDataItemSourceInfo( ...
+            config.DataItems(i).SourceInfo, sessionObject, ...
+            config.DataItems(i).VariableName);
+    end
+end
+
+function sourceInfo = completeDataItemSourceInfo(sourceInfo, sessionObject, variableName)
+    if ~isstruct(sourceInfo) || isempty(sourceInfo)
+        sourceInfo = struct();
+    end
+
+    if isfield(sourceInfo, 'Path') && ~isempty(sourceInfo.Path)
+        return
+    end
+
+    try
+        dataFilePath = sessionObject.getDataFilePath(char(variableName));
+    catch
+        return
+    end
+
+    if isempty(dataFilePath)
+        return
+    end
+
+    dataFilePath = string(dataFilePath);
+    [folderPath, ~, extension] = fileparts(dataFilePath);
+    sourceInfo.Path = dataFilePath;
+    sourceInfo.FilePath = dataFilePath;
+    sourceInfo.FolderPath = string(folderPath);
+    sourceInfo.FileExtension = string(extension);
 end
 
 function sessionStartTime = getSessionStartTime(sessionObject)

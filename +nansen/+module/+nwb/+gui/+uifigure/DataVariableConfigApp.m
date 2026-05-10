@@ -7,25 +7,37 @@ classdef DataVariableConfigApp < handle
         COLUMN_NAMES = { ...
             'VariableName', ...
             'NWBVariableName', ...
+            'ConverterName', ...
             'PrimaryGroup', ...
             'NwbModule', ...
             'TargetNwbType', ...
-            'ConverterName', ...
             'Metadata' }
+
+        DATA_FIELD_NAMES = { ...
+            'VariableName', ...
+            'NWBVariableName', ...
+            'ConverterName', ...
+            'TargetNwbType', ...
+            'PrimaryGroup', ...
+            'NwbModule', ...
+            'Metadata', ...
+            'ConverterArgs', ...
+            'SourceInfo' }
 
         COLUMN_INDEX = struct( ...
             'VariableName', 1, ...
             'NWBVariableName', 2, ...
-            'PrimaryGroup', 3, ...
-            'NwbModule', 4, ...
-            'TargetNwbType', 5, ...
-            'ConverterName', 6, ...
+            'ConverterName', 3, ...
+            'PrimaryGroup', 4, ...
+            'NwbModule', 5, ...
+            'TargetNwbType', 6, ...
             'Metadata', 7)
 
         SELECT_GROUP_LABEL = '<Select a group>'
         SELECT_MODULE_LABEL = '<Select an NWB module>'
         SELECT_NEURODATA_LABEL = '<Select a neurodata type>'
         DEFAULT_CONVERTER_LABEL = 'Default'
+        CONVERTER_CONTROLLED_TARGET_LABEL = '<Converter controlled>'
     end
 
     properties (SetAccess = private)
@@ -47,6 +59,7 @@ classdef DataVariableConfigApp < handle
         SaveCloseButton matlab.ui.control.Button
         OriginalData table
         NWBConverters
+        NWBConverterDescriptors
         VariableNames (1,:) string = strings(1, 0)
         NWBConfigurationData
     end
@@ -65,7 +78,7 @@ classdef DataVariableConfigApp < handle
             obj.NWBConfigurationData = nwbConfigurationData;
             obj.FilePath = options.FilePath;
             obj.VariableNames = obj.getAvailableVariableNames(nwbConfigurationData);
-            obj.NWBConverters = obj.listConverters();
+            [obj.NWBConverters, obj.NWBConverterDescriptors] = obj.listConverters();
             obj.Data = obj.createDataTable(nwbConfigurationData);
             obj.OriginalData = obj.Data;
 
@@ -127,8 +140,7 @@ classdef DataVariableConfigApp < handle
             obj.applyCellEdit(rowIndex, columnName, value, previousValue, false)
 
             if ~isempty(obj.Table) && ~isempty(obj.Table.Data)
-                displayValue = obj.getDisplayValue(rowIndex, columnName);
-                obj.Table.updateCellValue(rowIndex, obj.getColumnIndex(columnName), displayValue)
+                obj.refreshDisplayedRow(rowIndex)
             end
         end
 
@@ -215,19 +227,19 @@ classdef DataVariableConfigApp < handle
                 'BackgroundColor', 'white');
             obj.Table.Layout.Row = 3;
             obj.Table.ColumnNames = obj.COLUMN_NAMES;
-            obj.Table.ColumnWidth = {150, 150, 160, 180, 190, 160, 170};
-            obj.Table.MinimumColumnWidth = [120, 120, 140, 150, 160, 130, 150];
-            obj.Table.MaximumColumnWidth = [240, 240, 240, 280, 300, 240, 260];
+            obj.Table.ColumnWidth = {150, 150, 250, 140, 170, 190, 170};
+            obj.Table.MinimumColumnWidth = [120, 120, 190, 120, 140, 150, 150];
+            obj.Table.MaximumColumnWidth = [240, 240, 360, 220, 260, 300, 260];
             obj.Table.RowHeight = 32;
             obj.Table.RowSpacing = 8;
             obj.Table.CellEditedFcn = @obj.onTableCellEdited;
             obj.Table.ColumnWidget = { ...
                 @obj.createReadOnlyTextCell, ...
                 [], ...
+                @obj.createConverterDropdown, ...
                 @(parent) obj.createDropdown(parent, obj.getPrimaryGroupOptions()), ...
                 @(parent) obj.createDropdown(parent, obj.getNwbModuleOptions()), ...
                 @obj.createNeuroDataTypeDropdown, ...
-                @(parent) obj.createDropdown(parent, obj.getConverterOptions()), ...
                 @obj.createMetadataCell };
 
             footerGrid = uigridlayout(rootGrid, [1, 4]);
@@ -254,6 +266,7 @@ classdef DataVariableConfigApp < handle
                 obj.Table.Data = displayTable;
                 obj.Table.EnableAddRows = 'off';
                 for iRow = 1:height(displayTable)
+                    obj.applyConverterOptions(iRow)
                     obj.applyNeuroDataTypeOptions(iRow)
                 end
             end
@@ -369,9 +382,15 @@ classdef DataVariableConfigApp < handle
                 case "NwbModule"
                     obj.setDataValue(rowIndex, "NwbModule", newValue)
                     obj.setDataValue(rowIndex, "TargetNwbType", obj.SELECT_NEURODATA_LABEL)
+                    obj.applyConverterOptions(rowIndex)
                     obj.applyNeuroDataTypeOptions(rowIndex)
 
                 case "TargetNwbType"
+                    if obj.converterControlsTarget(rowIndex)
+                        obj.Table.updateCellValue(rowIndex, obj.COLUMN_INDEX.TargetNwbType, previousValue)
+                        return
+                    end
+
                     if confirmMetadataReset && obj.hasMetadata(rowIndex)
                         answer = uiconfirm(obj.Figure, ...
                             'Changing TargetNwbType will reset metadata for this variable. Continue?', ...
@@ -391,7 +410,9 @@ classdef DataVariableConfigApp < handle
                     obj.updateMetadataCell(rowIndex)
 
                 case "ConverterName"
-                    obj.setDataValue(rowIndex, "ConverterName", obj.resolveConverterName(newValue))
+                    converterName = obj.resolveConverterName(newValue);
+                    obj.setDataValue(rowIndex, "ConverterName", converterName)
+                    obj.applyConverterDefaults(rowIndex, converterName)
 
                 case "Metadata"
                     % Metadata is edited via the per-row button.
@@ -399,6 +420,8 @@ classdef DataVariableConfigApp < handle
                 otherwise
                     obj.setDataValue(rowIndex, columnName, newValue)
             end
+
+            obj.refreshDisplayedRow(rowIndex)
         end
 
         function saveAndNotify(obj, doClose)
@@ -444,6 +467,12 @@ classdef DataVariableConfigApp < handle
                 'Items', cellstr(obj.getNeuroDataTypeOptions(rowIndex)));
         end
 
+        function hControl = createConverterDropdown(obj, parent)
+            rowIndex = parent.Layout.Row;
+            hControl = uidropdown(parent, ...
+                'Items', cellstr(obj.getConverterOptions(rowIndex)));
+        end
+
         function hControl = createMetadataCell(obj, parent)
             rowIndex = parent.Layout.Row;
 
@@ -471,6 +500,12 @@ classdef DataVariableConfigApp < handle
         end
 
         function editMetadata(obj, rowIndex)
+            descriptor = obj.getRowConverterDescriptor(rowIndex);
+            if ~isempty(descriptor) && descriptor.Source == "neuroconv"
+                obj.editNeuroconvMetadata(rowIndex, descriptor)
+                return
+            end
+
             neuroDataType = string(obj.getDataValue(rowIndex, "TargetNwbType"));
             if obj.isPlaceholder(neuroDataType, "TargetNwbType")
                 uialert(obj.Figure, ...
@@ -504,7 +539,35 @@ classdef DataVariableConfigApp < handle
             end
         end
 
+        function editNeuroconvMetadata(obj, rowIndex, descriptor)
+            metadataStruct = obj.getDataValue(rowIndex, "Metadata");
+            if isempty(metadataStruct)
+                metadataStruct = struct();
+            end
+
+            variableName = obj.getDataValue(rowIndex, "VariableName");
+            [metadataStruct, wasAborted] = tools.editStruct( ...
+                metadataStruct, 'all', 'Edit NeuroConv Metadata', ...
+                'Prompt', sprintf('Edit metadata for %s (%s)', ...
+                variableName, descriptor.DisplayName));
+
+            if ~wasAborted
+                metadataStruct = utility.struct.removeConfigFields(metadataStruct);
+                obj.setDataValue(rowIndex, "Metadata", metadataStruct)
+                obj.updateMetadataCell(rowIndex)
+            end
+        end
+
         function applyNeuroDataTypeOptions(obj, rowIndex)
+            if obj.converterControlsTarget(rowIndex)
+                value = obj.getTargetDisplayValue(rowIndex);
+                obj.Table.setCellOptions(rowIndex, obj.COLUMN_INDEX.TargetNwbType, value, value)
+                hControl = obj.Table.getCellComponent(rowIndex, obj.COLUMN_INDEX.TargetNwbType);
+                hControl.Enable = 'off';
+                hControl.Tooltip = 'The selected converter controls the NWB type and placement.';
+                return
+            end
+
             items = obj.getNeuroDataTypeOptions(rowIndex);
             value = string(obj.getDataValue(rowIndex, "TargetNwbType"));
             if ~any(value == items)
@@ -512,6 +575,18 @@ classdef DataVariableConfigApp < handle
                 obj.setDataValue(rowIndex, "TargetNwbType", value)
             end
             obj.Table.setCellOptions(rowIndex, obj.COLUMN_INDEX.TargetNwbType, items, value)
+            hControl = obj.Table.getCellComponent(rowIndex, obj.COLUMN_INDEX.TargetNwbType);
+            hControl.Enable = 'on';
+            hControl.Tooltip = '';
+        end
+
+        function applyConverterOptions(obj, rowIndex)
+            items = obj.getConverterOptions(rowIndex);
+            value = obj.getDisplayValue(rowIndex, "ConverterName");
+            if ~any(value == items)
+                items = [items, value];
+            end
+            obj.Table.setCellOptions(rowIndex, obj.COLUMN_INDEX.ConverterName, items, value)
         end
 
         function updateMetadataCell(obj, rowIndex)
@@ -544,12 +619,15 @@ classdef DataVariableConfigApp < handle
             options = obj.appendOptionValues(options, obj.Data.NwbModule);
         end
 
-        function options = getConverterOptions(obj)
+        function options = getConverterOptions(obj, rowIndex)
             options = string(obj.DEFAULT_CONVERTER_LABEL);
-            if isa(obj.NWBConverters, 'containers.Map') && obj.NWBConverters.Count > 0
-                options = [options, string(keys(obj.NWBConverters))];
+            if isa(obj.NWBConverterDescriptors, 'containers.Map') && obj.NWBConverterDescriptors.Count > 0
+                descriptors = obj.getConverterDescriptorsForRow(rowIndex);
+                if ~isempty(descriptors)
+                    options = [options, string({descriptors.DisplayName})];
+                end
             end
-            currentNames = obj.getConverterDisplayNames(obj.Data.ConverterName);
+            currentNames = obj.getConverterDisplayNames(obj.Data.ConverterName(rowIndex));
             options = obj.appendOptionValues(options, currentNames);
         end
 
@@ -581,6 +659,124 @@ classdef DataVariableConfigApp < handle
             end
         end
 
+        function descriptors = getConverterDescriptorsForRow(obj, rowIndex)
+            descriptorCells = values(obj.NWBConverterDescriptors);
+            if isempty(descriptorCells)
+                descriptors = nansen.module.nwb.conversion.NwbConverterDescriptor.empty(0, 1);
+                return
+            end
+
+            descriptors = [descriptorCells{:}];
+            moduleName = string(obj.getDataValue(rowIndex, "NwbModule"));
+            if obj.isPlaceholder(moduleName, "NwbModule")
+                return
+            end
+
+            isMatch = false(size(descriptors));
+            for i = 1:numel(descriptors)
+                isMatch(i) = obj.matchesNwbModule(descriptors(i), moduleName);
+            end
+            descriptors = descriptors(isMatch);
+        end
+
+        function tf = matchesNwbModule(obj, descriptor, moduleName)
+            moduleName = lower(string(moduleName));
+            tags = lower(string(descriptor.NwbModuleTags));
+            tf = isempty(tags) || any(tags == "*" | tags == moduleName);
+        end
+
+        function descriptor = getRowConverterDescriptor(obj, rowIndex)
+            converterName = string(obj.getDataValue(rowIndex, "ConverterName"));
+            descriptor = obj.getConverterDescriptor(converterName);
+        end
+
+        function descriptor = getConverterDescriptor(obj, converterName)
+            descriptor = [];
+            converterName = string(converterName);
+            if converterName == "" || converterName == string(obj.DEFAULT_CONVERTER_LABEL)
+                return
+            end
+
+            if isa(obj.NWBConverterDescriptors, 'containers.Map') && ...
+                    isKey(obj.NWBConverterDescriptors, char(converterName))
+                descriptor = obj.NWBConverterDescriptors(char(converterName));
+            end
+        end
+
+        function tf = converterControlsTarget(obj, rowIndex)
+            descriptor = obj.getRowConverterDescriptor(rowIndex);
+            tf = ~isempty(descriptor) && descriptor.PlacementPolicy == "converter" && ...
+                ~descriptor.AllowsPlacementOverride;
+        end
+
+        function value = getTargetDisplayValue(obj, rowIndex, dataTable)
+            if nargin < 3
+                dataTable = obj.Data;
+            end
+
+            converterName = string(dataTable.ConverterName{rowIndex});
+            descriptor = obj.getConverterDescriptor(converterName);
+            if ~isempty(descriptor) && descriptor.PlacementPolicy == "converter" && ...
+                    ~descriptor.AllowsPlacementOverride
+                value = string(descriptor.ProducesNwbType);
+                if value == "" || value == "*"
+                    value = string(obj.CONVERTER_CONTROLLED_TARGET_LABEL);
+                end
+                return
+            end
+
+            value = string(dataTable.TargetNwbType{rowIndex});
+        end
+
+        function applyConverterDefaults(obj, rowIndex, converterName)
+            descriptor = obj.getConverterDescriptor(converterName);
+            if isempty(descriptor)
+                obj.setDataValue(rowIndex, "ConverterArgs", struct())
+                return
+            end
+
+            obj.setDataValue(rowIndex, "ConverterArgs", descriptor.DefaultConverterArgs)
+
+            if descriptor.PlacementPolicy == "converter" && ~descriptor.AllowsPlacementOverride
+                obj.setDataValue(rowIndex, "PrimaryGroup", descriptor.PrimaryGroup)
+
+                producedType = string(descriptor.ProducesNwbType);
+                if producedType == "*"
+                    producedType = "";
+                end
+                obj.setDataValue(rowIndex, "TargetNwbType", producedType)
+            elseif descriptor.ProducesNwbType ~= "*" && descriptor.ProducesNwbType ~= "" && ...
+                    obj.isPlaceholder(obj.getDataValue(rowIndex, "TargetNwbType"), "TargetNwbType")
+                obj.setDataValue(rowIndex, "TargetNwbType", descriptor.ProducesNwbType)
+            end
+
+            tags = string(descriptor.NwbModuleTags);
+            tags = tags(tags ~= "" & tags ~= "*");
+            if isscalar(tags) && obj.isPlaceholder(obj.getDataValue(rowIndex, "NwbModule"), "NwbModule")
+                obj.setDataValue(rowIndex, "NwbModule", tags)
+            end
+        end
+
+        function refreshDisplayedRow(obj, rowIndex)
+            if isempty(obj.Table) || isempty(obj.Table.Data)
+                return
+            end
+
+            obj.applyConverterOptions(rowIndex)
+            obj.applyNeuroDataTypeOptions(rowIndex)
+
+            for iColumn = 1:numel(obj.COLUMN_NAMES)
+                columnName = string(obj.COLUMN_NAMES{iColumn});
+                if columnName == "ConverterName" || columnName == "TargetNwbType" || ...
+                        columnName == "Metadata"
+                    continue
+                end
+                obj.Table.updateCellValue(rowIndex, iColumn, ...
+                    obj.getDisplayValue(rowIndex, columnName))
+            end
+            obj.updateMetadataCell(rowIndex)
+        end
+
         function options = appendOptionValues(~, options, values)
             values = string(values);
             values = strtrim(values(:)');
@@ -602,10 +798,13 @@ classdef DataVariableConfigApp < handle
 
             displayTable.VariableName = string(dataTable.VariableName);
             displayTable.NWBVariableName = string(dataTable.NWBVariableName);
+            displayTable.ConverterName = obj.getConverterDisplayNames(dataTable.ConverterName);
             displayTable.PrimaryGroup = string(dataTable.PrimaryGroup);
             displayTable.NwbModule = string(dataTable.NwbModule);
-            displayTable.TargetNwbType = string(dataTable.TargetNwbType);
-            displayTable.ConverterName = obj.getConverterDisplayNames(dataTable.ConverterName);
+            displayTable.TargetNwbType = strings(height(dataTable), 1);
+            for iRow = 1:height(dataTable)
+                displayTable.TargetNwbType(iRow) = obj.getTargetDisplayValue(iRow, dataTable);
+            end
 
             metadataStatus = strings(height(dataTable), 1);
             for iRow = 1:height(dataTable)
@@ -634,28 +833,28 @@ classdef DataVariableConfigApp < handle
 
             dataItems = obj.fillMissingDataItemFields(dataItems, defaultItem);
             numRows = numel(dataItems);
-            columns = cell(1, numel(obj.COLUMN_NAMES));
+            columns = cell(1, numel(obj.DATA_FIELD_NAMES));
 
-            for iColumn = 1:numel(obj.COLUMN_NAMES)
-                columnName = obj.COLUMN_NAMES{iColumn};
+            for iColumn = 1:numel(obj.DATA_FIELD_NAMES)
+                columnName = obj.DATA_FIELD_NAMES{iColumn};
                 columns{iColumn} = cell(numRows, 1);
                 for iRow = 1:numRows
                     columns{iColumn}{iRow} = dataItems(iRow).(columnName);
                 end
             end
 
-            dataTable = table(columns{:}, 'VariableNames', obj.COLUMN_NAMES);
+            dataTable = table(columns{:}, 'VariableNames', obj.DATA_FIELD_NAMES);
         end
 
         function dataTable = createEmptyDataTable(obj)
-            columns = repmat({cell(0, 1)}, 1, numel(obj.COLUMN_NAMES));
-            dataTable = table(columns{:}, 'VariableNames', obj.COLUMN_NAMES);
+            columns = repmat({cell(0, 1)}, 1, numel(obj.DATA_FIELD_NAMES));
+            dataTable = table(columns{:}, 'VariableNames', obj.DATA_FIELD_NAMES);
         end
 
         function dataItems = fillMissingDataItemFields(obj, dataItems, defaultItem)
             for i = 1:numel(dataItems)
-                for iColumn = 1:numel(obj.COLUMN_NAMES)
-                    columnName = obj.COLUMN_NAMES{iColumn};
+                for iColumn = 1:numel(obj.DATA_FIELD_NAMES)
+                    columnName = obj.DATA_FIELD_NAMES{iColumn};
                     if ~isfield(dataItems, columnName) || isempty(dataItems(i).(columnName))
                         dataItems(i).(columnName) = defaultItem.(columnName);
                     end
@@ -670,7 +869,12 @@ classdef DataVariableConfigApp < handle
                 if converterName == "" || converterName == string(obj.DEFAULT_CONVERTER_LABEL)
                     names(i) = string(obj.DEFAULT_CONVERTER_LABEL);
                 else
-                    names(i) = obj.getSimpleClassName(converterName);
+                    descriptor = obj.getConverterDescriptor(converterName);
+                    if ~isempty(descriptor)
+                        names(i) = descriptor.DisplayName;
+                    else
+                        names(i) = obj.getSimpleClassName(converterName);
+                    end
                 end
             end
         end
@@ -706,6 +910,8 @@ classdef DataVariableConfigApp < handle
                     value = obj.getMetadataStatus(rowIndex);
                 case "ConverterName"
                     value = obj.getConverterDisplayNames(obj.Data.ConverterName(rowIndex));
+                case "TargetNwbType"
+                    value = obj.getTargetDisplayValue(rowIndex);
                 otherwise
                     value = string(obj.getDataValue(rowIndex, columnName));
             end
@@ -819,17 +1025,19 @@ classdef DataVariableConfigApp < handle
             end
         end
 
-        function converterMap = listConverters()
+        function [converterMap, descriptorMap] = listConverters()
             converterMap = containers.Map('KeyType', 'char', 'ValueType', 'char');
+            descriptorMap = containers.Map('KeyType', 'char', 'ValueType', 'any');
             try
                 registry = nansen.module.nwb.conversion.ConverterRegistry.instance();
-                nwbConverters = registry.names();
+                descriptors = registry.list();
             catch
                 return
             end
 
-            for i = 1:numel(nwbConverters)
-                converterMap(char(nwbConverters(i))) = char(nwbConverters(i));
+            for i = 1:numel(descriptors)
+                converterMap(char(descriptors(i).DisplayName)) = char(descriptors(i).Name);
+                descriptorMap(char(descriptors(i).Name)) = descriptors(i);
             end
         end
 

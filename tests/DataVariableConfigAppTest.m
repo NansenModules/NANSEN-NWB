@@ -56,6 +56,65 @@ classdef DataVariableConfigAppTest < matlab.unittest.TestCase
             testCase.verifyEqual(string(savedData.GeneralMetadata.institution), "Vervaeke Lab")
             testCase.verifyFalse(app.IsDirty)
         end
+
+        function selectingNeuroconvConverterAppliesHiddenDefaults(testCase)
+            testCase.assumeCanRunModernUi()
+
+            app = nansen.module.nwb.gui.uifigure.DataVariableConfigApp( ...
+                testCase.createConfiguration(), ...
+                'Visible', 'off');
+            cleanupObj = onCleanup(@() delete(app)); %#ok<NASGU>
+
+            app.addVariable("WheelData")
+            rowIndex = height(app.Data);
+            app.setCellValue(rowIndex, "ConverterName", ...
+                "NeuroConv: Suite2p segmentation")
+
+            converterArgs = app.Data.ConverterArgs{rowIndex};
+
+            testCase.verifyEqual(app.Data.ConverterName{rowIndex}, ...
+                'NeuroConvSuite2pSegmentationInterface')
+            testCase.verifyEqual(string(app.Data.PrimaryGroup{rowIndex}), "Processing")
+            testCase.verifyEqual(string(app.Data.NwbModule{rowIndex}), "ophys")
+            testCase.verifyEqual(string(app.Data.TargetNwbType{rowIndex}), "PlaneSegmentation")
+            testCase.verifyEqual(string(converterArgs.InterfaceClassName), ...
+                "Suite2pSegmentationInterface")
+            testCase.verifyEqual(string(converterArgs.SourceArgumentName), "folder_path")
+            testCase.verifyEqual(string(converterArgs.SourcePathMode), "parentFolder")
+        end
+
+        function savePreservesHiddenNeuroconvArgs(testCase)
+            testCase.assumeCanRunModernUi()
+
+            fixture = testCase.applyFixture( ...
+                matlab.unittest.fixtures.TemporaryFolderFixture);
+            configFilePath = fullfile(fixture.Folder, 'nwb-config.json');
+
+            nwbConfigurationData = testCase.createConfiguration();
+            nansen.module.nwb.config.saveConfiguration( ...
+                nansen.module.nwb.config.NwbFileConfiguration.fromStruct(nwbConfigurationData), ...
+                string(configFilePath))
+
+            app = nansen.module.nwb.gui.uifigure.DataVariableConfigApp( ...
+                nwbConfigurationData, ...
+                'FilePath', string(configFilePath), ...
+                'Visible', 'off');
+            cleanupObj = onCleanup(@() delete(app)); %#ok<NASGU>
+
+            app.addVariable("WheelData")
+            rowIndex = height(app.Data);
+            app.setCellValue(rowIndex, "ConverterName", ...
+                "NeuroConv: Suite2p segmentation")
+            app.saveNwbConfigurationData()
+
+            savedData = nansen.module.nwb.config.loadConfiguration(string(configFilePath));
+            converterArgs = savedData.DataItems(rowIndex).ConverterArgs;
+
+            testCase.verifyEqual(string(converterArgs.InterfaceClassName), ...
+                "Suite2pSegmentationInterface")
+            testCase.verifyEqual(string(converterArgs.SourceArgumentName), "folder_path")
+            testCase.verifyEqual(string(converterArgs.SourcePathMode), "parentFolder")
+        end
     end
 
     methods

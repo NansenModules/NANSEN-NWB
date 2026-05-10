@@ -69,6 +69,8 @@ classdef NwbFileConverter < handle
         function convertDataItem(obj, dataItem)
             descriptor = obj.resolveDescriptor(dataItem);
             nwbFile = obj.readNwbFileForConverter(descriptor);
+            converterArgs = obj.mergeConverterArgs(descriptor.DefaultConverterArgs, ...
+                dataItem.ConverterArgs);
 
             data = [];
             if descriptor.NeedsData
@@ -83,7 +85,7 @@ classdef NwbFileConverter < handle
                 "FilePath", obj.Config.OutputPath, ...
                 "Data", data, ...
                 "Metadata", dataItem.Metadata, ...
-                "ConverterArgs", dataItem.ConverterArgs, ...
+                "ConverterArgs", converterArgs, ...
                 "Placement", obj.createPlacement(dataItem, descriptor));
 
             try
@@ -164,6 +166,19 @@ classdef NwbFileConverter < handle
             else
                 error("NansenNwb:InvalidDataResolver", ...
                     "DataResolver must be a function handle, containers.Map, or struct.")
+            end
+        end
+
+        function converterArgs = mergeConverterArgs(~, defaultArgs, itemArgs)
+            converterArgs = defaultArgs;
+            if isempty(itemArgs)
+                return
+            end
+
+            fieldNames = fieldnames(itemArgs);
+            for i = 1:numel(fieldNames)
+                fieldName = fieldNames{i};
+                converterArgs.(fieldName) = itemArgs.(fieldName);
             end
         end
 

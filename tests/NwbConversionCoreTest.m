@@ -122,6 +122,101 @@ classdef NwbConversionCoreTest < matlab.unittest.TestCase
 
             testCase.verifyEmpty(warnings)
         end
+
+        function registryExposesConcreteNeuroconvInterfaces(testCase)
+            testCase.applyFixture( ...
+                matlab.unittest.fixtures.PathFixture(testCase.getRepoRoot()))
+
+            registry = nansen.module.nwb.conversion.ConverterRegistry.instance("Refresh", true);
+            descriptor = registry.get("NeuroConvSuite2pSegmentationInterface");
+
+            testCase.verifyEqual(descriptor.DisplayName, "NeuroConv: Suite2p segmentation")
+            testCase.verifyEqual(descriptor.Source, "neuroconv")
+            testCase.verifyEqual(descriptor.PrimaryGroup, "Processing")
+            testCase.verifyEqual(string(descriptor.DefaultConverterArgs.InterfaceClassName), ...
+                "Suite2pSegmentationInterface")
+            testCase.verifyEqual(string(descriptor.DefaultConverterArgs.SourceArgumentName), ...
+                "folder_path")
+            testCase.verifyEqual(string(descriptor.DefaultConverterArgs.SourcePathMode), ...
+                "parentFolder")
+
+            ophysDescriptors = registry.findByNwbModule("ophys");
+            ophysNames = string({ophysDescriptors.Name});
+
+            testCase.verifyContains(ophysNames, "NeuroConvSuite2pSegmentationInterface")
+            testCase.verifyFalse(any(ophysNames == "NeuroConvDeepLabCutInterface"))
+        end
+
+        function neuroconvSourceArgResolvesParentFolder(testCase)
+            testCase.applyFixture( ...
+                matlab.unittest.fixtures.PathFixture(testCase.getRepoRoot()))
+
+            sourceFilePath = fullfile(tempdir, "suite2p", "plane0", "F.npy");
+            dataItem = nansen.module.nwb.config.NwbDataItemConfig( ...
+                "VariableName", "Suite2pRois", ...
+                "SourceInfo", struct("Path", sourceFilePath));
+            converterArgs = struct( ...
+                "SourceArgumentName", "folder_path", ...
+                "SourcePathMode", "parentFolder");
+
+            sourceArg = nansen.module.nwb.neuroconv.resolveSourceArg( ...
+                dataItem, converterArgs);
+
+            testCase.verifyEqual(sourceArg.folder_path, string(fileparts(sourceFilePath)))
+        end
+
+        function neuroconvSourceArgSupportsFileLists(testCase)
+            testCase.applyFixture( ...
+                matlab.unittest.fixtures.PathFixture(testCase.getRepoRoot()))
+
+            sourceFilePath = fullfile(tempdir, "images", "image001.tif");
+            dataItem = nansen.module.nwb.config.NwbDataItemConfig( ...
+                "VariableName", "ImageFile", ...
+                "SourceInfo", struct("Path", sourceFilePath));
+            converterArgs = struct( ...
+                "SourceArgumentName", "file_paths", ...
+                "SourcePathMode", "fileList");
+
+            sourceArg = nansen.module.nwb.neuroconv.resolveSourceArg( ...
+                dataItem, converterArgs);
+
+            testCase.verifyEqual(sourceArg.file_paths, {char(sourceFilePath)})
+        end
+
+        function descriptorDefaultArgsMergeIntoConverterContext(testCase)
+            testCase.applyFixture( ...
+                matlab.unittest.fixtures.PathFixture(testCase.getRepoRoot()))
+            fixture = testCase.applyFixture( ...
+                matlab.unittest.fixtures.TemporaryFolderFixture);
+
+            descriptor = nansen.module.nwb.conversion.NwbConverterDescriptor( ...
+                "Name", "DefaultArgsExternalWriter", ...
+                "AcceptedTypes", "dummy", ...
+                "ProducesNwbType", "*", ...
+                "ExecutionMode", "external", ...
+                "PlacementPolicy", "converter", ...
+                "NeedsData", false, ...
+                "DefaultConverterArgs", struct("A", 1, "B", 2), ...
+                "Function", @writeDefaultArgsExternalFile);
+            registry = nansen.module.nwb.conversion.ConverterRegistry();
+            registry.add(descriptor)
+
+            dataItem = nansen.module.nwb.config.NwbDataItemConfig( ...
+                "VariableName", "external_file", ...
+                "ConverterName", "DefaultArgsExternalWriter", ...
+                "ConverterArgs", struct("B", 3));
+            outputPath = fullfile(fixture.Folder, "default-args.nwb");
+            config = nansen.module.nwb.config.NwbFileConfiguration( ...
+                "OutputPath", outputPath, ...
+                "SessionMetadata", testCase.createSessionMetadata(), ...
+                "DataItems", dataItem);
+
+            converter = nansen.module.nwb.conversion.NwbFileConverter( ...
+                config, "Registry", registry);
+            filePath = converter.convert();
+
+            testCase.verifyTrue(isfile(filePath))
+        end
     end
 
     methods (Static)
@@ -148,5 +243,14 @@ function result = writeDummyExternalFile(context)
     fileId = fopen(context.FilePath, "w");
     cleanupObj = onCleanup(@() fclose(fileId)); %#ok<NASGU>
     fwrite(fileId, 'external writer smoke');
+    result = struct("DidWriteFile", true, "FilePath", context.FilePath);
+end
+
+function result = writeDefaultArgsExternalFile(context)
+    assert(context.ConverterArgs.A == 1)
+    assert(context.ConverterArgs.B == 3)
+    fileId = fopen(context.FilePath, "w");
+    cleanupObj = onCleanup(@() fclose(fileId)); %#ok<NASGU>
+    fwrite(fileId, 'default args smoke');
     result = struct("DidWriteFile", true, "FilePath", context.FilePath);
 end
