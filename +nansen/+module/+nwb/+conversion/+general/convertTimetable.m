@@ -1,5 +1,5 @@
 function timeseriesSet = convertTimetable(TT, options)
-% convertTimetable - Convert a time table into a set of NWB Timeseries objects
+%convertTimetable - Convert a time table into a set of NWB Timeseries objects
 %
 % Syntax:
 %   convertedData = convertTimetable(TT, options)

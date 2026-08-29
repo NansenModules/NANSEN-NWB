@@ -1,4 +1,23 @@
 classdef NWBVideoExporter < nansen.stack.ImageStackProcessor
+%NWBVideoExporter - Export an image stack to an NWB file
+%   OBJ = NWBVideoExporter(sourceStack) exports the given image stack,
+%   writing it into an NWB file as a neurodata type. Called without an
+%   output argument the export runs immediately.
+%
+%   OBJ = NWBVideoExporter(...,Name=VALUE) also specifies options.
+%   getDefaultOptions lists them; they cover the target file, its
+%   compression and chunking, and the imaging metadata to record.
+%
+%   NWBVideoExporter functions:
+%       getDefaultOptions - Get the default export options
+%
+%   NWBVideoExporter properties:
+%       SemanticDataType - Whether the stack is acquired or corrected
+%
+%   The other public properties are constants declaring this method's
+%   attributes to NANSEN.
+%
+%   See also nansen.stack.ImageStackProcessor
 
     properties (Constant) % Attributes inherited from nansen.DataMethod
         MethodName = 'NWB ImageStack Exporter'
@@ -19,7 +38,7 @@ classdef NWBVideoExporter < nansen.stack.ImageStackProcessor
 
     properties
         SemanticDataType (1,1) string ...
-            {mustBeMember(SemanticDataType, {'Acquired', 'MotionCorrected'})} = "Acquired"
+            {mustBeMember(SemanticDataType, {'Acquired', 'MotionCorrected'})} = "Acquired" % Whether the stack is acquired or corrected
     end
 
     properties (Constant)
@@ -41,7 +60,10 @@ classdef NWBVideoExporter < nansen.stack.ImageStackProcessor
     methods (Static)
     
         function S = getDefaultOptions()
-            % Get default options for the deep interpolation denoiser.
+        %getDefaultOptions - Get the default export options
+        %   S = getDefaultOptions() returns the export and metadata options
+        %   this exporter accepts, combined with the options of its
+        %   superclasses.
             S.NWBExporter.NWBFilePath = '';
             S.NWBExporter.CompressionLevel = 3;
             S.NWBExporter.ChunkSize = nan;

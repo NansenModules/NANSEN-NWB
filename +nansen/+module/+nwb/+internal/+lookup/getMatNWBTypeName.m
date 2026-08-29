@@ -1,5 +1,5 @@
 function qualifiedName = getMatNWBTypeName(namespace, typeName)
-% getMatNWBTypeName - Get fully qualified NWB type name
+%getMatNWBTypeName - Get fully qualified NWB type name
 %
 %   qualifiedName = getMatNWBTypeName(namespace, typeName) returns the
 %   fully qualified NWB type name for the given namespace and class name.

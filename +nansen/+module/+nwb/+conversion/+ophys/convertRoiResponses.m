@@ -1,5 +1,5 @@
 function rrs = convertRoiResponses(signalArray)
-% convertRoiResponses - Converts the provided signal array into a RoiResponseSeries object.
+%convertRoiResponses - Converts the provided signal array into a RoiResponseSeries object.
 %
 % Syntax:
 %   roiResponseSeries = convertRoiResponses(signalArray) converts a signal

@@ -1,5 +1,5 @@
 function warnings = checkNWBConfiguration(dataItems)
-% checkNWBConfiguration - Report problems in NWB configuration data items
+%checkNWBConfiguration - Report problems in NWB configuration data items
 %
 %   warnings = checkNWBConfiguration(dataItems) checks an array of NWB
 %   configuration item structs and returns a cell array of warning strings

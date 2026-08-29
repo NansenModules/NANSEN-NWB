@@ -1,5 +1,5 @@
 function [neuroDataTypes, descriptions] = getTypesForModule(moduleName)
-% getTypesForModule - Retrieve neurodata types and descriptions for a module
+%getTypesForModule - Retrieve neurodata types and descriptions for a module
 %
 %   Syntax:
 %     [neuroDataTypes, descriptions] = getTypesForModule(moduleName)

@@ -1,5 +1,5 @@
 classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mixin.HasUserData
-% UIDynamicTable - General UI for the dynamic table type of NWB.
+%UIDynamicTable - General UI for the dynamic table type of NWB.
 %
 %   Key features
 %     - Add rows and columns on demand.

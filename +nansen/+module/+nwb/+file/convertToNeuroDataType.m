@@ -1,5 +1,5 @@
 function neuroData = convertToNeuroDataType(metadata, data, neuroDataType)
-% convertToNeuroDataType - Create an NWB "data" object
+%convertToNeuroDataType - Create an NWB "data" object
 %
 %   Create an NWB "data" object given metadata, data and the name of the
 %   neurodata type.
