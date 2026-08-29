@@ -7,9 +7,10 @@ function result = convertWithNeuroconv(context)
 %
 %   The runner creates the NWB file and writes the session, subject and
 %   general metadata into it before any converter runs, so this converter
-%   always appends and passes only the item's own metadata. NeuroConv
-%   drops the required-field constraints on its NWBFile metadata section
-%   when appending, which is what makes that split work.
+%   always appends and passes only the item's own metadata. Appending
+%   drops the fields NeuroConv would otherwise require inside its NWBFile
+%   metadata section, which is what makes that split work; the section
+%   itself is still required, so it is sent empty.
 %
 %   Converter arguments:
 %       InterfaceClassName - NeuroConv interface to run, for example
@@ -73,16 +74,22 @@ function result = convertWithNeuroconv(context)
 end
 
 function metadata = itemMetadata(context)
-%itemMetadata - Metadata for this item, without the file-level sections
+%itemMetadata - Metadata for this item, with the session left to the runner
 %
 %   The runner already wrote NWBFile, Subject and the general metadata
-%   into the file. Sending them again would either be ignored or, if the
-%   values disagreed with what the runner wrote, describe the session
-%   twice.
+%   into the file. Sending them again would describe the session twice,
+%   and disagree with what the runner wrote if the two ever diverged.
+%
+%   NeuroConv still requires an NWBFile section to be present: appending
+%   drops the fields required inside it, not the section itself. So it is
+%   emptied rather than removed, and Subject, which is not required, is
+%   dropped.
 
     metadata = context.Metadata;
 
-    fileLevelSections = ["NWBFile", "Subject"];
-    metadata = rmfield(metadata, ...
-        intersect(fileLevelSections, string(fieldnames(metadata))));
+    if isfield(metadata, "Subject")
+        metadata = rmfield(metadata, "Subject");
+    end
+
+    metadata.NWBFile = struct();
 end
