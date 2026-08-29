@@ -15,7 +15,7 @@ function [S, info, isRequired] = getTypeMetadataStruct(typeName)
         customPropertyMap = nansen.module.nwb.internal.customPropertyLookupMap();
     end
 
-    %typeName = 'types.core.RoiResponseSeries';
+    % typeName = 'types.core.RoiResponseSeries';
 
     mc = meta.class.fromName(typeName);
     typeShortName = utility.string.getSimpleClassName(typeName);
@@ -111,7 +111,7 @@ function [S, info, isRequired] = getTypeMetadataStruct(typeName)
     % separate function (As it is adding configuration fields, this needs
     % to happen also for instances that already exist and are loaded from
     % file)
-    %S = postprocessStruct(S);
+    % S = postprocessStruct(S);
 end
 
 function S = postprocessStruct(S)
@@ -123,7 +123,7 @@ function S = postprocessStruct(S)
 
         switch class(thisPropertyValue)
             case 'categorical'
-                configPropertyName = sprintf('%s_', thisPropertyName); 
+                configPropertyName = sprintf('%s_', thisPropertyName);
                 S.(thisPropertyName) = char(thisPropertyValue);
                 S.(configPropertyName) = categories(thisPropertyValue)';
         end

@@ -1,5 +1,5 @@
 function planeSegmentation = convertRoiGroup(roiGroup, isCell, metadata, options)
-% convertRoiGroup - Convert roig group to plane segmentation neurodata type    
+% convertRoiGroup - Convert roig group to plane segmentation neurodata type
     
     % Todo: Loop over channels and planes of RoiGroup?
 
@@ -41,7 +41,7 @@ function plane_segmentation = createPixelMaskPlaneSegmentation(roiArray)
     pixel_mask_struct = struct();
     pixel_mask_struct.x = uint32( cat(1, xInd{:}) ); % Add x coordinates to struct field x
     pixel_mask_struct.y = uint32( cat(1, yInd{:}) ); % Add y coordinates to struct field y
-    pixel_mask_struct.weight = single( cat(1, w{:}) ); 
+    pixel_mask_struct.weight = single( cat(1, w{:}) );
     
     % Create pixel mask vector data
     pixel_mask = types.hdmf_common.VectorData(...
@@ -56,7 +56,7 @@ function plane_segmentation = createPixelMaskPlaneSegmentation(roiArray)
         numPixelsPerRoi(iRoi) = numel(roiArray(iRoi).pixelweights);
     end
 
-    pixelMaskIndex = uint32(cumsum(numPixelsPerRoi)); % Note: Use an integer 
+    pixelMaskIndex = uint32(cumsum(numPixelsPerRoi)); % Note: Use an integer
     % type that can accommodate the maximum value of the cumulative sum
 
     % Create pixel_mask_index vector

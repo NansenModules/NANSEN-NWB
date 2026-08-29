@@ -3,8 +3,8 @@ function [itemName, itemData] = createNewNwbInstance(items, nwbNodeStack, option
     % Todo. Add onValue changed callback and popup error dialog if provided
     % name already exists when a new item is created (but no if edited...)
 
-    % Todo: 
-    % Express function as 
+    % Todo:
+    % Express function as
     % [itemName, itemData] = createNewNwbInstance(itemNames, itemData, nwbDataType)
      
     arguments
@@ -20,13 +20,11 @@ function [itemName, itemData] = createNewNwbInstance(items, nwbNodeStack, option
 
     nwbDataType = nwbNodeStack(end).PropertyTypeFullName;
     nwbShortName = nwbNodeStack(end).PropertyType;
-    %ancestorType = nwbNodeStack(end).DefiningType;
-
+    % ancestorType = nwbNodeStack(end).DefiningType;
 
     % The figure on top of the stack should be the reference figure.
     f = findall(0, 'type','figure'); f = f(1);
     referencePosition = f.Position + [40,-40,0,0];
-
 
     % % Should be separate method (initializeNwbInstanceForm)
     % Get the defaults for the current item
@@ -61,7 +59,7 @@ function [itemName, itemData] = createNewNwbInstance(items, nwbNodeStack, option
         % Note: The data is initialized as a cell array with an empty
         % numeric. This is a customization which is necessary for the
         % structeditor. Having it as a cell array will render this field
-        % ans an input where values are entered asa space separated list. 
+        % ans an input where values are entered asa space separated list.
         % The data needs to be converted to a numeric vector when creating
         % the DynamicTableRegion neurodata type.
     end

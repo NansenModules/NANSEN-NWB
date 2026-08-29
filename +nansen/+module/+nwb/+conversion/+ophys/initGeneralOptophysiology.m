@@ -22,7 +22,7 @@ function initGeneralOptophysiology(nwbFile, options)
 
         channelMetadata = loadMetadata("OpticalChannel", "Name", channelName);
 
-        % Add optical channel 
+        % Add optical channel
         opticalChannel = types.core.OpticalChannel(channelMetadata{:});
 
         for iPlane = 1:options.NumPlanes

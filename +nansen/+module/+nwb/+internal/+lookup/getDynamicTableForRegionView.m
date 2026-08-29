@@ -21,4 +21,3 @@ function dynamicTableName = getDynamicTableForRegionView(type, datasetName)
     key = strjoin({char(type), char(datasetName)}, '.');
     dynamicTableName = map(key);
 end
-

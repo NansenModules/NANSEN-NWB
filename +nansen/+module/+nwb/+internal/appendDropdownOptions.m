@@ -7,7 +7,7 @@ function S = appendDropdownOptions(S, nwbNodeStack)
 
     import nansen.module.nwb.internal.getMetadataInstances
     import nansen.module.nwb.internal.createNewNwbInstance
-    import nansen.module.nwb.internal.lookup.getDynamicTableForRegionView    
+    import nansen.module.nwb.internal.lookup.getDynamicTableForRegionView
     
     % Get the full package-prefixed name for the neurodata type on the top
     % of the stack
@@ -26,10 +26,10 @@ function S = appendDropdownOptions(S, nwbNodeStack)
             nansen.module.nwb.internal.createNewNwbInstance(item, nwbNodeStack, varargin{:}), ...
         'ItemName', propertyType );
 
-    % Prepend the dropdown configuration to the list of instances. 
+    % Prepend the dropdown configuration to the list of instances.
     % The structeditor will expect this config as the first cell of the
     % cell array.
-    metadataInstances = [{dropdownConfig}, metadataInstances]; 
+    metadataInstances = [{dropdownConfig}, metadataInstances];
 
     if isfield(S, propertyName)
         % Add _ to the end of the link name to create the "config" name

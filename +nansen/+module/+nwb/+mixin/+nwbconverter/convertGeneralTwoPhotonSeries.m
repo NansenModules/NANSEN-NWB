@@ -12,9 +12,7 @@ function convertGeneralTwoPhotonSeries(~, data, nwbFilePath)
 
     S.Run.numFramesPerPart = 10000;
 
-
     S.NWBExporter.NWBFilePath = nwbFilePath;
 
     nansen.stack.processor.NWBExporter(data, S)
-
 end

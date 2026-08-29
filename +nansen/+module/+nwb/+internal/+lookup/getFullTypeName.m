@@ -12,7 +12,7 @@ function fullName = getFullTypeName(shortName)
         packagePrefixedNames = utility.path.abspath2funcname(filePaths);
         shortNames = utility.string.getSimpleClassName(packagePrefixedNames);
 
-        typeMap = dictionary( string(shortNames), string(packagePrefixedNames)); 
+        typeMap = dictionary( string(shortNames), string(packagePrefixedNames));
     end
 
     fullName = typeMap(shortName);

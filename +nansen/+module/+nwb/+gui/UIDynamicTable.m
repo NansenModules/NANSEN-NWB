@@ -13,7 +13,6 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
     %   This could be as simple as popping up a button, instructing users
     %   to select rows and then press the button when finished
 
-
     % Todo:
     %  [ ] Column descriptions available from tooltips
     %  [ ] Context menu on column header
@@ -72,7 +71,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
 
             obj.DynamicTable = dynamicTable;
         
-            %obj.UITable.ColumnName = app.UITable.Data.Properties.VariableNames;
+            % obj.UITable.ColumnName = app.UITable.Data.Properties.VariableNames;
         end
     end
 
@@ -193,7 +192,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
         
         function onTableCellEdited(obj, ~, evt)
             rowNumber = evt.Indices(1);
-            colNumber = evt.Indices(2);  
+            colNumber = evt.Indices(2);
             newValue = evt.NewValue;
             
             if strcmp(obj.UITable.ColumnFormat{colNumber}, 'popup')
@@ -326,7 +325,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             else
                 obj.Figure.Name = "Dynamic Table";
             end
-            %obj.Figure.CloseRequestFcn = @(s, e) obj.delete;
+            % obj.Figure.CloseRequestFcn = @(s, e) obj.delete;
         end
 
         function createLayout(obj)
@@ -355,7 +354,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
                         'Units', 'normalized', ...
                         'Position', [0,0,1,1], ...
                         'SelectionMode', obj.SelectionMode);
-                         %'Position', [0.05,0.025,0.9,0.95]);
+                         % 'Position', [0.05,0.025,0.9,0.95]);
             
             obj.UITable.CellEditCallback = @obj.onTableCellEdited;
             obj.UITable.MouseClickedCallback = @obj.onTableCellClicked;
@@ -380,7 +379,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             mitem = uimenu(obj.UITableContextMenu, 'Text', sprintf('Add %s Below', rowName));
             mitem.Callback = @(s,e) obj.onAddNewRowMenuItemClicked(s,e,'below');
 
-            %mitem.Callback = @obj.onRemoveTaskMenuItemClicked;
+            % mitem.Callback = @obj.onRemoveTaskMenuItemClicked;
             uimenu(obj.UITableContextMenu, 'Text', 'Add Column Before');
             uimenu(obj.UITableContextMenu, 'Text', 'Add Column After');
 
@@ -392,7 +391,6 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             mitem = uimenu(obj.UITableContextMenu, 'Text', 'Delete Row', 'Separator', 'on');
             mitem.Callback = @obj.onDeleteRowMenuItemClicked;
             uimenu(obj.UITableContextMenu, 'Text', 'Delete Column');
-
         end
 
         function updateComponentLayout(~)
@@ -416,7 +414,6 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
         end
 
         function updateTableColumnAttributes(obj)
-            
             
             columnNames = obj.DynamicTable.Properties.VariableNames;
             columnFormat = cellfun(@(c) class( obj.DynamicTable.(c) ), columnNames, 'UniformOutput', false );
@@ -451,17 +448,16 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             end
             
             % Update the column formatting properties
-            %obj.UITable.ColumnFormat = {'char', 'char', 'popup', 'popup', 'popup', 'popup', 'char'};
+            % obj.UITable.ColumnFormat = {'char', 'char', 'popup', 'popup', 'popup', 'popup', 'char'};
 
-            %nwbModules = obj.NWB_MODULES;
-            %[~, neuroDataTypes] = enumeration( 'nansen.module.nwb.enum.NeuroDataType' );
-            %[~, groupNames] = enumeration( 'nansen.module.nwb.enum.PrimaryGroupName' );
+            % nwbModules = obj.NWB_MODULES;
+            % [~, neuroDataTypes] = enumeration( 'nansen.module.nwb.enum.NeuroDataType' );
+            % [~, groupNames] = enumeration( 'nansen.module.nwb.enum.PrimaryGroupName' );
 
+            % obj.UITable.ColumnFormatData = colFormatData;
 
-            %obj.UITable.ColumnFormatData = colFormatData;
-
-            %columnNames = obj.DynamicTable.Properties.VariableNames;
-            %numColumns = numel(columnNames);
+            % columnNames = obj.DynamicTable.Properties.VariableNames;
+            % numColumns = numel(columnNames);
 
             % % isEditable = true(1, numColumns);
             % % isEditable( strcmp(columnNames, 'VariableName') ) = false;
@@ -553,7 +549,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
                
         function updateDependentColumn(obj, rowNumber, colNumber, newItemName)
             % This is some ad hoc code to place the name to the correct
-            % columns. Todo: Still remains to be seen if this will be a 
+            % columns. Todo: Still remains to be seen if this will be a
             % general pattern for dynamic tables.
             dependentColumnName = obj.getDependentColumnName(colNumber);
             if ~ismissing(dependentColumnName)

@@ -11,19 +11,18 @@ function varargout = writeNwbFile(sessionObject, varargin)
 
 import nansen.session.SessionMethod
 
-
-% % % % % % % % % % % % CONFIGURATION CODE BLOCK % % % % % % % % % % % % 
-% Create a struct of default parameters (if applicable) and specify one or 
-% more attributes (see nansen.session.SessionMethod.setAttributes) for 
-% details. You can use the local function "getDefaultParameters" at the 
+% % % % % % % % % % % % CONFIGURATION CODE BLOCK % % % % % % % % % % % %
+% Create a struct of default parameters (if applicable) and specify one or
+% more attributes (see nansen.session.SessionMethod.setAttributes) for
+% details. You can use the local function "getDefaultParameters" at the
 % bottom of this file to define default parameters.
 
     % % % Get struct of default parameters for function.
     params = getDefaultParameters();
     ATTRIBUTES = {'serial', 'queueable'};
     
-% % % % % % % % % % % % % DEFAULT CODE BLOCK % % % % % % % % % % % % % % 
-% - - - - - - - - - - Please do not edit this part - - - - - - - - - - - 
+% % % % % % % % % % % % % DEFAULT CODE BLOCK % % % % % % % % % % % % % %
+% - - - - - - - - - - Please do not edit this part - - - - - - - - - - -
    
     % % % Initialization block for a session method function.
 
@@ -32,18 +31,17 @@ import nansen.session.SessionMethod
         varargout = {fcnAttributes};   return
     end
     
-    %params.Alternative = nwbFiles{1}; % Set a default value.
+    % params.Alternative = nwbFiles{1}; % Set a default value.
 
     % % % Parse name-value pairs from function input.
     params = utility.parsenvpairs(params, true, varargin);
     
-    
-% % % % % % % % % % % % % % CUSTOM CODE BLOCK % % % % % % % % % % % % % % 
+% % % % % % % % % % % % % % CUSTOM CODE BLOCK % % % % % % % % % % % % % %
 % Sketch for session method
 
-    % options: 
+    % options:
     % - File (if there are multiple configurations)
-    % - Mode : append, rewrite 
+    % - Mode : append, rewrite
 
     %% Initialize configurations
 
@@ -102,7 +100,6 @@ import nansen.session.SessionMethod
     instanceMap = dictionary;
 
     %% Todo Add general metadata like dataset info, subjects etc.:
-
     
     %% Loop through each variable of the NWB configuration
     for i = 1:numel(configurationCatalog.DataItems)
@@ -173,19 +170,18 @@ import nansen.session.SessionMethod
         % nwbVariableName = variableConfiguration.NWBVariableName;
         % nwbFile.(primaryGroupName).set(nwbVariableName, nwbData);
         
-        %nwbFile = nansen.module.nwb.convert.writeDataToFile(nwbFile, data, metadata, customConversinFcn); % anything else???
+        % nwbFile = nansen.module.nwb.convert.writeDataToFile(nwbFile, data, metadata, customConversinFcn); % anything else???
     
         nwbExport(nwbFile, nwbFilePath)
     end
     
-    %nwbExport(nwbFile, nwbFilePath)
+    % nwbExport(nwbFile, nwbFilePath)
     fprintf('Finished writing file ''%s''\n', nwbFilePath)
 
     %% Export the file
     if wasInitialized
-        %nwbExport(obj.NWBObject, obj.PathName);
+        % nwbExport(obj.NWBObject, obj.PathName);
     end
-
 end
 
 function params = getDefaultParameters()

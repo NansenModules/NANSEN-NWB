@@ -4,7 +4,7 @@ function rowInd = uiSelectTableRegion(S, nwbNodes)
 %   This function initializes the GUI for selecting a region (i.e rows) of
 %   a dynamic table.
 
-%   Currently only works for a predefined tables. Should be generalized to 
+%   Currently only works for a predefined tables. Should be generalized to
 %   load any dynamic table from a dynamic table catalog.
     
     arguments
@@ -21,7 +21,7 @@ function rowInd = uiSelectTableRegion(S, nwbNodes)
 
     % The struct S should contain a field, "table" with information about
     % which table should be selected...
-    % Todo: Get table name from S and open the correct table... 
+    % Todo: Get table name from S and open the correct table...
             
     catalog = nansen.module.nwb.internal.getMetadataCatalog(linkedTableName);
 

@@ -9,4 +9,3 @@ function catalog = getMetadataCatalog(neuroDataType)
     catalog = PersistentCatalog('SaveFolder', instanceFileName);
     catalog.NameField = 'name';
 end
-

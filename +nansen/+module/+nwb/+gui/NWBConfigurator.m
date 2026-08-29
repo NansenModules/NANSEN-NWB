@@ -1,7 +1,7 @@
 classdef NWBConfigurator < applify.MultiPageApp
 
 % Todo:
-% 
+%
 %   [x] Load/save NWB configuration data from this class.
 %   [ ] Set/get relevant pieces of configuration data to subcomponents
 %   [ ] How to increase margins?
@@ -41,8 +41,8 @@ classdef NWBConfigurator < applify.MultiPageApp
         function obj = NWBConfigurator(nwbConfigurationData, options)
             arguments
                 nwbConfigurationData
-                %options.?nansen.module.nwb.gui.NWBConfigurator
-                options.FilePath (1,1) string = missing 
+                % options.?nansen.module.nwb.gui.NWBConfigurator
+                options.FilePath (1,1) string = missing
             end
 
             % Assign input to properties
@@ -59,7 +59,6 @@ classdef NWBConfigurator < applify.MultiPageApp
 
             if ~nargout; clear obj; end
         end
-        
     end
 
     methods (Access = protected) % Layout overrides
@@ -255,11 +254,9 @@ classdef NWBConfigurator < applify.MultiPageApp
             warndlg(message, 'NWB Configuration Warnings', 'modal')
         end
     end
-    
 end
 
-
-function subs = getSubsFromKey(key)                
+function subs = getSubsFromKey(key)
     nestedFieldNames = strsplit(key, '_');
     subs = struct('type', '.', 'subs', cellstr(nestedFieldNames));
 end

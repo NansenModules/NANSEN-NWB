@@ -33,9 +33,9 @@ classdef NWBVideoExporter < nansen.stack.ImageStackProcessor
         ImagingPlanes cell % Cell array (numPlanes x numChannels) of objects.
         DataPipeObject cell % Cell array (numPlanes x numChannels) of objects.
     
-        %Device
-        %OpticalChannel
-        %ImagingPlane
+        % Device
+        % OpticalChannel
+        % ImagingPlane
     end
 
     methods (Static)
@@ -104,9 +104,9 @@ classdef NWBVideoExporter < nansen.stack.ImageStackProcessor
             % Todo: Check if datapipe/dataset for writing already exists
             obj.initializeDataPipes()
 
-            %if wasInitialized
+            % if wasInitialized
             nwbExport(obj.NWBObject, obj.PathName);
-            %end
+            % end
         end
     end
 
@@ -152,15 +152,15 @@ classdef NWBVideoExporter < nansen.stack.ImageStackProcessor
 
         function initializeDataPipes(obj)
 
-            %compressionLevel = obj.Options.NWBExporter.CompressionLevel;
-            %chunkSize = obj.Options.NWBExporter.ChunkSize;
-            %obj.Options.NWBExporter.LongDimension = 'T';
+            % compressionLevel = obj.Options.NWBExporter.CompressionLevel;
+            % chunkSize = obj.Options.NWBExporter.ChunkSize;
+            % obj.Options.NWBExporter.LongDimension = 'T';
 
             import types.untyped.datapipe.properties.DynamicFilter
             import types.untyped.datapipe.dynamic.Filter
             import types.untyped.datapipe.properties.Shuffle
 
-            zstdProperty = DynamicFilter(Filter.ZStandard);            
+            zstdProperty = DynamicFilter(Filter.ZStandard);
             zstdProperty.parameters = 4; % compression level.
             ShuffleProperty = Shuffle();
             dynamicProperties = [ShuffleProperty zstdProperty];

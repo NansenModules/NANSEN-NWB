@@ -1,13 +1,13 @@
 function addMetadataObject(nwbFile, name, nwbObject)
 % addMetadataObject - Add metadata-like neurodata types to NWB file
 %
-%   This will add a metadata-like neurodata types to the correct location in an 
+%   This will add a metadata-like neurodata types to the correct location in an
 %   NWB file, typically in the general group. Some metadata types, like
 %   Device, ImagingPlane or ElectrodeGroup should be placed in a specific
 %   location of an NWB file. This is a utility function that adds a type to
 %   it's default location in the NWB file.
-%   
-%   Note: In MatNWB, all the groups and subgroups of an NwbFile object are 
+%
+%   Note: In MatNWB, all the groups and subgroups of an NwbFile object are
 %   flattened and names are concatenated using underscores.
 %
 %   Input arguments:
@@ -17,12 +17,12 @@ function addMetadataObject(nwbFile, name, nwbObject)
 %       nwbObject : An NWB object (i.e metadata type) to add to the NWB
 %                   file.
 
-%   Todo: 
-%       [ ] Programmatically generate a mapping from type to general based on 
+%   Todo:
+%       [ ] Programmatically generate a mapping from type to general based on
 %           file schema
 %
-%   Notes: 
-%       1) nwbFile.{prop}.set() will output the created set, so remember 
+%   Notes:
+%       1) nwbFile.{prop}.set() will output the created set, so remember
 %          to add a semicolon.
 %       2) Name for ElectrodesTable should be reconsidered, this is
 %          currently hardcoded throughout
@@ -42,7 +42,6 @@ function addMetadataObject(nwbFile, name, nwbObject)
                     "types.core.LabMetaData", "general", ...
         "types.core.OptogeneticStimulusSite", "general_optogenetics" ...
         );
-    
 
     if isKey(D, class(nwbObject))
         propertyName = D(class(nwbObject));
