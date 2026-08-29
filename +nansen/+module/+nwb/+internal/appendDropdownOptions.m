@@ -29,7 +29,7 @@ function S = appendDropdownOptions(S, nwbNodeStack)
     % Prepend the dropdown configuration to the list of instances. 
     % The structeditor will expect this config as the first cell of the
     % cell array.
-    metadataInstances = [{dropdownConfig}, metadataInstances]; %#ok<AGROW>
+    metadataInstances = [{dropdownConfig}, metadataInstances]; 
 
     if isfield(S, propertyName)
         % Add _ to the end of the link name to create the "config" name

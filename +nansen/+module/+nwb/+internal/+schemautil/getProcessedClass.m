@@ -99,7 +99,7 @@ function mergedDatasets = mergeDatasets(datasets)
             
             mergedDatasets(isSame) = thisDataset;
         else
-            mergedDatasets(end+1) = thisDataset; %#ok<AGROW>
+            mergedDatasets(end+1) = thisDataset; 
         end
     end
 
