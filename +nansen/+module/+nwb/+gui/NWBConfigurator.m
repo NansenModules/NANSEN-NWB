@@ -101,7 +101,7 @@ classdef NWBConfigurator < applify.MultiPageApp
                 'String', 'Save Configuration', ...
                 'FontSize', 14, ...
                 'Tooltip', 'Save NWB configuration', ...
-                'Callback', @(s,e) obj.saveNwbConfigurationData());
+                'Callback', @(s,e) obj.saveNWBConfigurationData());
             obj.SaveAndCloseButton = uicontrol( ...
                 'Parent', obj.hLayout.MainPanel, ...
                 'Style', 'pushbutton', ...
@@ -125,8 +125,8 @@ classdef NWBConfigurator < applify.MultiPageApp
 
     methods
 
-        function saveNwbConfigurationData(obj)
-        % saveNwbConfigurationData - Save NWB configuration to file
+        function saveNWBConfigurationData(obj)
+        % saveNWBConfigurationData - Save NWB configuration to file
 
             nwbConfigurationData = obj.NWBConfigurationData;
 
@@ -174,7 +174,7 @@ classdef NWBConfigurator < applify.MultiPageApp
     methods (Access = private) % Internal callbacks
 
         function onSaveAndCloseButtonPushed(obj)
-            obj.saveNwbConfigurationData()
+            obj.saveNWBConfigurationData()
             delete(obj.Figure)
         end
 
@@ -198,7 +198,7 @@ classdef NWBConfigurator < applify.MultiPageApp
                             return
                         end
 
-                        obj.saveNwbConfigurationData()
+                        obj.saveNWBConfigurationData()
                         obj.DynamicTableConfigurator.deactivate()
                     case 'No'
                         % discard changes
@@ -236,7 +236,7 @@ classdef NWBConfigurator < applify.MultiPageApp
                 return
             end
 
-            warnings = nansen.module.nwb.file.checkNwbConfiguration(dataItems);
+            warnings = nansen.module.nwb.file.checkNWBConfiguration(dataItems);
 
             if isempty(warnings)
                 return

@@ -191,7 +191,7 @@ classdef NWBVideoExporter < nansen.stack.ImageStackProcessor
                     'device', obj.Device);
                 
                 name = sprintf('whisker');
-                obj.addImageSeriesToNwb(name, imageSeries)
+                obj.addImageSeriesToNWB(name, imageSeries)
             end
         end
         
@@ -211,7 +211,7 @@ classdef NWBVideoExporter < nansen.stack.ImageStackProcessor
             end
         end
         
-        function addImageSeriesToNwb(obj, name, twoPhotonSeries)
+        function addImageSeriesToNWB(obj, name, twoPhotonSeries)
             
             % Add the two photon series to the acquisition group.
             name = sprintf('original_%s', name);

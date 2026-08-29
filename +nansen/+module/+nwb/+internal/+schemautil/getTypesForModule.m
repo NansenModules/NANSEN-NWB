@@ -17,7 +17,7 @@ function [neuroDataTypes, descriptions] = getTypesForModule(moduleName)
 %   that value is accepted and answered with empties rather than treated as
 %   a module name.
 %
-%   See also: nansen.module.nwb.internal.schemautil.getNwbModules
+%   See also: nansen.module.nwb.internal.schemautil.getNWBModules
 
     import nansen.module.nwb.internal.schemautil.convertCachedMapsToDictionary
 

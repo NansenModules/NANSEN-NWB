@@ -8,7 +8,7 @@ function [itemName, itemData] = createNewDynamicTable(items, nwbNodeStack, optio
 
     arguments
         items (1,:) string % Currently not used.
-        nwbNodeStack (1,:) nansen.module.nwb.internal.NwbNode
+        nwbNodeStack (1,:) nansen.module.nwb.internal.NWBNode
         options.Edit (1,1) logical = false
     end
 
@@ -49,7 +49,7 @@ function [itemName, itemData] = createNewDynamicTable(items, nwbNodeStack, optio
     uiwait(h)
 
     % Preallocate an empty item
-    nwbDataType = nansen.module.nwb.internal.lookup.getMatNwbTypeName('hdmf_common', 'DynamicTable');
+    nwbDataType = nansen.module.nwb.internal.lookup.getMatNWBTypeName('hdmf_common', 'DynamicTable');
     itemName = ''; itemData = feval(sprintf('%s.empty', nwbDataType));
 
     if isKey(data, 'State')

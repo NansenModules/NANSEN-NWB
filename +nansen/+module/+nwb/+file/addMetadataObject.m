@@ -47,7 +47,7 @@ function addMetadataObject(nwbFile, name, nwbObject)
         propertyName = D(class(nwbObject));
         nwbFile.(propertyName).set(name, nwbObject);
     else
-        if isa(nwbObject, nansen.module.nwb.internal.lookup.getMatNwbTypeName('hdmf_common', 'DynamicTable'))
+        if isa(nwbObject, nansen.module.nwb.internal.lookup.getMatNWBTypeName('hdmf_common', 'DynamicTable'))
             switch name
                 case "ElectrodesTable"
                     nwbFile.general_extracellular_ephys_electrodes = nwbObject;

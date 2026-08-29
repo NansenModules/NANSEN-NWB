@@ -1,4 +1,4 @@
-function keptModules = getNwbModules()
+function keptModules = getNWBModules()
 
     folderPath = fullfile(misc.getMatnwbDir(), 'namespaces');
     S = load(fullfile(folderPath, "core.mat") );

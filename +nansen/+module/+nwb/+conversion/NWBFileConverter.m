@@ -1,4 +1,4 @@
-classdef NwbFileConverter < handle
+classdef NWBFileConverter < handle
 
     properties
         NwbFile (1,1) NwbFile
@@ -8,8 +8,8 @@ classdef NwbFileConverter < handle
     end
     
     methods % Constructor
-        function obj = NwbFileConverter(sessionObject, targetFolder, options)
-        % NwbFileConverter - Create a NWbConverter object
+        function obj = NWBFileConverter(sessionObject, targetFolder, options)
+        % NWBFileConverter - Create a converter that writes a session to NWB
         %
         % Input Arguments:
         %   sessionObject - An object representing the session information.
@@ -23,11 +23,11 @@ classdef NwbFileConverter < handle
                 options.FilenameSuffix (1,:) string = string.empty
             end
             
-            obj.NwbFile = nansen.module.nwb.conversion.initNwbFile(sessionObject);
+            obj.NwbFile = nansen.module.nwb.conversion.initNWBFile(sessionObject);
     
             subjectInfo = sessionObject.getSubject();
 
-            obj.FilePath = createNwbFilePath(targetFolder, ...
+            obj.FilePath = createNWBFilePath(targetFolder, ...
                 "SubjectID", subjectInfo.SubjectID, ...
                 "SessionID", sessionObject.sessionID, ...
                 "FilenameSuffix", options.FilenameSuffix);
@@ -235,12 +235,12 @@ classdef NwbFileConverter < handle
     end
 end
 
-function nwbFilePath = createNwbFilePath(targetFolder, options)
-% createNwbFilePath - Creates a file path for the NWB file based on
+function nwbFilePath = createNWBFilePath(targetFolder, options)
+% createNWBFilePath - Creates a file path for the NWB file based on
 % the specified folder and options.
 %
 % Syntax:
-%   nwbFilePath = createNwbFilePath(targetFolder, options)
+%   nwbFilePath = createNWBFilePath(targetFolder, options)
 %
 % Input Arguments:
 %   targetFolder - The folder path where the NWB file will be saved.

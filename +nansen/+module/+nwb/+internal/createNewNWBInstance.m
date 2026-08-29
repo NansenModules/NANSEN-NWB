@@ -1,15 +1,15 @@
-function [itemName, itemData] = createNewNwbInstance(items, nwbNodeStack, options)
+function [itemName, itemData] = createNewNWBInstance(items, nwbNodeStack, options)
 
     % Todo. Add onValue changed callback and popup error dialog if provided
     % name already exists when a new item is created (but no if edited...)
 
     % Todo:
     % Express function as
-    % [itemName, itemData] = createNewNwbInstance(itemNames, itemData, nwbDataType)
+    % [itemName, itemData] = createNewNWBInstance(itemNames, itemData, nwbDataType)
      
     arguments
         items (1,:) string %??
-        nwbNodeStack (1,:) nansen.module.nwb.internal.NwbNode
+        nwbNodeStack (1,:) nansen.module.nwb.internal.NWBNode
         options.IsEditing (1,1) logical = false
     end
 
@@ -26,7 +26,7 @@ function [itemName, itemData] = createNewNwbInstance(items, nwbNodeStack, option
     f = findall(0, 'type','figure'); f = f(1);
     referencePosition = f.Position + [40,-40,0,0];
 
-    % % Should be separate method (initializeNwbInstanceForm)
+    % % Should be separate method (initializeNWBInstanceForm)
     % Get the defaults for the current item
     [SOrig, info, ~] = nansen.module.nwb.internal.getTypeMetadataStruct(nwbDataType);
     SOrig.name = '';
@@ -50,8 +50,8 @@ function [itemName, itemData] = createNewNwbInstance(items, nwbNodeStack, option
     SOrig = nansen.module.nwb.internal.addLinkedTypeInstances(SOrig, nwbDataType, nwbNodeStack);
 
     % This is so custom that it is added manually
-    if strcmp(nwbDataType, nansen.module.nwb.internal.lookup.getMatNwbTypeName('hdmf_common', 'DynamicTableRegion'))
-        nwbNode = nansen.module.nwb.internal.NwbNode(...
+    if strcmp(nwbDataType, nansen.module.nwb.internal.lookup.getMatNWBTypeName('hdmf_common', 'DynamicTableRegion'))
+        nwbNode = nansen.module.nwb.internal.NWBNode(...
                 'table', 'ObjectView', nwbDataType);
         SOrig = appendTableDropdownOptions(SOrig, [nwbNodeStack, nwbNode]);
         if isempty(SOrig.data);SOrig.data={[]}; end

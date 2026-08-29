@@ -9,7 +9,7 @@ function rowInd = uiSelectTableRegion(S, nwbNodes)
     
     arguments
         S (1,1) struct
-        nwbNodes (1,:) nansen.module.nwb.internal.NwbNode
+        nwbNodes (1,:) nansen.module.nwb.internal.NWBNode
     end
 
     import nansen.module.nwb.internal.lookup.getDynamicTableForRegionView

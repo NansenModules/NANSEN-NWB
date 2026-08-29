@@ -6,11 +6,11 @@ function S = appendTableDropdownOptions(S, nwbNodeStack)
 
     arguments
         S (1,1) struct
-        nwbNodeStack (1,:) nansen.module.nwb.internal.NwbNode
+        nwbNodeStack (1,:) nansen.module.nwb.internal.NWBNode
     end
 
     import nansen.module.nwb.internal.getMetadataInstanceNames
-    import nansen.module.nwb.internal.createNewNwbInstance
+    import nansen.module.nwb.internal.createNewNWBInstance
     import nansen.module.nwb.internal.lookup.getDynamicTableForRegionView
 
 % Create OBJECT VIEW:

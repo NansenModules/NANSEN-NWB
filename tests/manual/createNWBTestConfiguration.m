@@ -1,4 +1,4 @@
-function S = createNwbTestConfiguration()
+function S = createNWBTestConfiguration()
 
     S = struct;
     S.Name = "Processed"; % Use for differentiating different NWB files, i.e raw data for internal use, processed data for sharing

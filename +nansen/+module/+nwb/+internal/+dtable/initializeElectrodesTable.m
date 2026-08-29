@@ -70,7 +70,7 @@ function typeName = matlabTypeForColumn(dtype)
     if isa(dtype, 'containers.Map')
         % An object reference. The column holds instances of the target
         % type, for example ElectrodeGroup for the "group" column.
-        typeName = nansen.module.nwb.internal.lookup.getMatNwbTypeName( ...
+        typeName = nansen.module.nwb.internal.lookup.getMatNWBTypeName( ...
             'core', dtype('target_type'));
     elseif strcmp(dtype, 'char')
         % Text columns are edited as strings rather than character arrays.
