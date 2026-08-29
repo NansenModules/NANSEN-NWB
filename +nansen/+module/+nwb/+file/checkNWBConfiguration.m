@@ -29,6 +29,8 @@ function warnings = checkNWBConfiguration(dataItems)
     import nansen.module.nwb.internal.lookup.getFullTypeName
     import nansen.module.nwb.internal.dataPropertyNamesForType
 
+    placeholders = nansen.module.nwb.internal.getUnsetPlaceholders();
+
     warnings = {};
 
     for i = 1:numel(dataItems)
@@ -36,15 +38,15 @@ function warnings = checkNWBConfiguration(dataItems)
         varName = item.VariableName;
 
         % --- 1. Check required table columns ---
-        if isUnset(item.PrimaryGroupName)
+        if isUnset(item.PrimaryGroupName, placeholders.PrimaryGroupName)
             warnings{end+1} = sprintf('"%s": Primary group is not set.', varName); %#ok<AGROW>
         end
 
-        if isUnset(item.NwbModule)
+        if isUnset(item.NwbModule, placeholders.NwbModule)
             warnings{end+1} = sprintf('"%s": NWB module is not set.', varName); %#ok<AGROW>
         end
 
-        if isUnset(item.NeuroDataType)
+        if isUnset(item.NeuroDataType, placeholders.NeuroDataType)
             warnings{end+1} = sprintf('"%s": Neurodata type is not set.', varName); %#ok<AGROW>
             continue  % Cannot check metadata without a type
         end
@@ -82,12 +84,12 @@ function warnings = checkNWBConfiguration(dataItems)
     end
 end
 
-function tf = isUnset(value)
-% isUnset - True if value is empty or a placeholder string (starts with '<')
+function tf = isUnset(value, placeholder)
+% isUnset - True if a column is empty or still shows its placeholder label
     if isempty(value)
         tf = true;
     elseif ischar(value) || isstring(value)
-        tf = startsWith(strtrim(value), '<');
+        tf = isscalar(string(value)) && strcmp(strtrim(string(value)), placeholder);
     else
         tf = false;
     end
