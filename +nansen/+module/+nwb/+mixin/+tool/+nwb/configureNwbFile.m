@@ -1,6 +1,6 @@
 function configureNwbFile()
 
-    import nansen.module.nwb.file.initializeNwbFileConfiguration
+    import nansen.module.nwb.file.initializeNWBFileConfiguration
 
     currentProject = nansen.getCurrentProject();
     configurationFolderPath = currentProject.getConfigurationFolder('Subfolder', 'nwb');
@@ -10,7 +10,7 @@ function configureNwbFile()
     if isempty(L)
         % Todo: Open dialog for entering file name and description plus
         % other options.
-        configurationCatalog = initializeNwbFileConfiguration();
+        configurationCatalog = initializeNWBFileConfiguration();
         if isempty(configurationCatalog)
             errordlg(['This project does not contain any data variables.', ...
                 'Please configure data variables before configuring an NWB conversion.'])

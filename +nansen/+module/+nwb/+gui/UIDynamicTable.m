@@ -173,9 +173,9 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             % vectordata nwb type has a dependent column...
             columnNames = obj.DynamicTable.Properties.VariableNames;
             columnFormat = cellfun(@(c) class( obj.DynamicTable.(c) ), columnNames, 'UniformOutput', false );
-            isNwbType = startsWith(columnFormat, 'types.core');
+            isNWBType = startsWith(columnFormat, 'types.core');
 
-            nwbTypeInd = find(isNwbType);
+            nwbTypeInd = find(isNWBType);
             for idx = nwbTypeInd
                 dependentColumnName = obj.getDependentColumnName(idx);
                 if ismissing(dependentColumnName); continue; end
@@ -202,8 +202,8 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
                 end
             end
 
-            if obj.isNwbType(colNumber)
-                nwbDataType = obj.getNwbType(colNumber);
+            if obj.isNWBType(colNumber)
+                nwbDataType = obj.getNWBType(colNumber);
                 % Get the corresponding item for the catalog.
                 catalog = nansen.module.nwb.internal.getMetadataCatalog(nwbDataType);
                 
@@ -427,13 +427,13 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             columnFormat(strcmp(columnFormat, 'single'))={'numeric'};
             columnFormat(strcmp(columnFormat, 'string'))={'char'};
 
-            isNwbType = startsWith(columnFormat, 'types.core');
+            isNWBType = startsWith(columnFormat, 'types.core');
 
-            for i = find(isNwbType)
-                colFormatData{i} = obj.getNwbTypeOptionsForDropdown( columnFormat{i} );
+            for i = find(isNWBType)
+                colFormatData{i} = obj.getNWBTypeOptionsForDropdown( columnFormat{i} );
             end
 
-            columnFormat(isNwbType)={'popup'};
+            columnFormat(isNWBType)={'popup'};
 
             % Configure column widths
             columnWidth(strcmp(columnFormat, 'numeric')) = 60;
@@ -470,7 +470,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             obj.UITable.ColumnPreferredWidth = columnWidth;
         end
         
-        function options = getNwbTypeOptionsForDropdown(~, neurodataType)
+        function options = getNWBTypeOptionsForDropdown(~, neurodataType)
             
             instanceCatalog = nansen.module.nwb.internal.getMetadataCatalog(neurodataType);
             typeShortName = utility.string.getSimpleClassName(neurodataType);
@@ -496,9 +496,9 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
 
             currentSelection = obj.DynamicTable{rowNumber, dependentColumnName};
 
-            nwbNode = nansen.module.nwb.internal.NwbNode('', fullLinkedTypeName);
+            nwbNode = nansen.module.nwb.internal.NWBNode('', fullLinkedTypeName);
 
-            [newItemName, newItem] = nansen.module.nwb.internal.createNewNwbInstance(existingNames, nwbNode);
+            [newItemName, newItem] = nansen.module.nwb.internal.createNewNWBInstance(existingNames, nwbNode);
             if isempty(newItemName)
                 obj.DynamicTable{rowNumber, dependentColumnName} = currentSelection;
                 return
@@ -536,13 +536,13 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             columnName = obj.DynamicTable.Properties.CustomProperties.ColumnDependency(columnNumber);
         end
 
-        function tf = isNwbType(obj, columnNumber)
+        function tf = isNWBType(obj, columnNumber)
             columnNames = obj.DynamicTable.Properties.VariableNames(columnNumber);
             columnFormat = cellfun(@(c) class( obj.DynamicTable.(c) ), columnNames, 'UniformOutput', false );
             tf = startsWith(columnFormat, 'types.core');
         end
 
-        function nwbType = getNwbType(obj, columnNumber)
+        function nwbType = getNWBType(obj, columnNumber)
             columnName = obj.getColumnName(columnNumber);
             nwbType = class( obj.DynamicTable.(columnName) );
         end

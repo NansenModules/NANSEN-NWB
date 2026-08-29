@@ -29,7 +29,7 @@ function S = addLinkedTypeInstances(S, neuroDataType, nwbNodeStack)
     arguments
         S (1,1) struct
         neuroDataType (1,1) string
-        nwbNodeStack (1,:) nansen.module.nwb.internal.NwbNode = nansen.module.nwb.internal.NwbNode.empty
+        nwbNodeStack (1,:) nansen.module.nwb.internal.NWBNode = nansen.module.nwb.internal.NWBNode.empty
     end
 
     import nansen.module.nwb.internal.appendDropdownOptions
@@ -44,7 +44,7 @@ function S = addLinkedTypeInstances(S, neuroDataType, nwbNodeStack)
         
         linkName = links(i).name;
         linkType = links(i).type; % Note: comes without namespace name, i.e types.core
-        nwbNode = nansen.module.nwb.internal.NwbNode(linkName, linkType);
+        nwbNode = nansen.module.nwb.internal.NWBNode(linkName, linkType);
         S = appendDropdownOptions(S, [nwbNodeStack, nwbNode]);
     end
 
@@ -53,7 +53,7 @@ function S = addLinkedTypeInstances(S, neuroDataType, nwbNodeStack)
     for i = 1:numel(subgroups)
         isMatch = strcmpi(allFields, subgroups(i).type);
         if any(isMatch)
-            nwbNode = nansen.module.nwb.internal.NwbNode(...
+            nwbNode = nansen.module.nwb.internal.NWBNode(...
                 lower(subgroups(i).type), subgroups(i).type);
 
             S = appendDropdownOptions(S, [nwbNodeStack, nwbNode]);
@@ -73,7 +73,7 @@ function S = addLinkedTypeInstances(S, neuroDataType, nwbNodeStack)
         typedDatasets = classInfo.datasets(isTyped);
         
         for i = 1:numel(typedDatasets)
-            nwbNode = nansen.module.nwb.internal.NwbNode(...
+            nwbNode = nansen.module.nwb.internal.NWBNode(...
                 typedDatasets(i).name, typedDatasets(i).type, neuroDataType);
 
             S = appendDropdownOptions(S, [nwbNodeStack, nwbNode]);
@@ -91,7 +91,7 @@ function S = addLinkedTypeInstances(S, neuroDataType, nwbNodeStack)
             
             dataType = typedAttributes(i).dtype('target_type');
                        
-            nwbNode = nansen.module.nwb.internal.NwbNode(...
+            nwbNode = nansen.module.nwb.internal.NWBNode(...
                 typedAttributes(i).name, dataType, neuroDataType);
 
             S = appendDropdownOptions(S, [nwbNodeStack, nwbNode]);

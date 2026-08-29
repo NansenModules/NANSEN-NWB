@@ -2,11 +2,11 @@ function S = appendDropdownOptions(S, nwbNodeStack)
 
     arguments
         S (1,1) struct
-        nwbNodeStack (1,:) nansen.module.nwb.internal.NwbNode
+        nwbNodeStack (1,:) nansen.module.nwb.internal.NWBNode
     end
 
     import nansen.module.nwb.internal.getMetadataInstanceNames
-    import nansen.module.nwb.internal.createNewNwbInstance
+    import nansen.module.nwb.internal.createNewNWBInstance
     import nansen.module.nwb.internal.lookup.getDynamicTableForRegionView
     
     % Get the full package-prefixed name for the neurodata type on the top
@@ -23,7 +23,7 @@ function S = appendDropdownOptions(S, nwbNodeStack)
     dropdownConfig = struct(...
         'AllowNoSelection', true, ...
         'CreateNewItemFcn', @(item, nwbNodes, varargin)...
-            nansen.module.nwb.internal.createNewNwbInstance(item, nwbNodeStack, varargin{:}), ...
+            nansen.module.nwb.internal.createNewNWBInstance(item, nwbNodeStack, varargin{:}), ...
         'ItemName', propertyType );
 
     % Prepend the dropdown configuration to the list of instances.

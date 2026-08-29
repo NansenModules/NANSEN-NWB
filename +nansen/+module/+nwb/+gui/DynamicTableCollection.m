@@ -45,7 +45,7 @@ classdef DynamicTableCollection < handle
     end
 
     properties (Constant, Access=private)
-        NWB_MODULES = nansen.module.nwb.internal.schemautil.getNwbModules()
+        NWB_MODULES = nansen.module.nwb.internal.schemautil.getNWBModules()
     end
     
     methods % Constructor

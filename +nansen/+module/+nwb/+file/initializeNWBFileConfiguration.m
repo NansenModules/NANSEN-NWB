@@ -1,4 +1,4 @@
-function S = initializeNwbFileConfiguration(currentProject)
+function S = initializeNWBFileConfiguration(currentProject)
 
     import nansen.module.nwb.file.getDefaultFileConfigurationItem
     

@@ -4,7 +4,7 @@ function varargout = writeNwbFile(sessionObject, varargin)
 %   This method requires an NWB Configuration File to be present. This file
 %   can be created from tools -> Configure NWB File. It is also possible to
 %   customize the NWB Configuration for individual sessions by running the
-%   session method from data -> nwb -> Customize Nwb Configuration.
+%   session method from data -> nwb -> Customize NWB Configuration.
 %
 %   Use the 'ConfigurationFileName' parameter to select a specific
 %   configuration file when multiple NWB configuration files are present.

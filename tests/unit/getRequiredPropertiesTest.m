@@ -82,7 +82,7 @@ classdef getRequiredPropertiesTest < matlab.unittest.TestCase
     methods (Test) % Return value contract
 
         function returnsCellArrayOfCharacterVectors(testCase)
-        % checkNwbConfiguration indexes the result with braces and
+        % checkNWBConfiguration indexes the result with braces and
         % passes the elements to isfield, so the cell-of-char shape is
         % part of the contract rather than an incidental detail.
 
@@ -138,7 +138,7 @@ classdef getRequiredPropertiesTest < matlab.unittest.TestCase
         % An unresolvable type name must raise rather than return empty,
         % because callers cannot otherwise distinguish "no required
         % properties" from "type does not exist". The identifier is part
-        % of the contract: checkNwbConfiguration needs it to tell an
+        % of the contract: checkNWBConfiguration needs it to tell an
         % unknown type from an unexpected failure.
 
             testCase.verifyError( ...

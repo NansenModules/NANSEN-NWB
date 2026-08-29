@@ -1,4 +1,4 @@
-function [nwbType, name] = structToNwbType(metadataStruct, nwbClassName)
+function [nwbType, name] = structToNWBType(metadataStruct, nwbClassName)
 
     name = metadataStruct.name;
     metadataStruct = rmfield(metadataStruct, 'name');

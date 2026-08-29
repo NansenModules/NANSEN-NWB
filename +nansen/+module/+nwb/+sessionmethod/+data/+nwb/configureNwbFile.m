@@ -19,7 +19,7 @@ import nansen.session.SessionMethod
     ATTRIBUTES = {'serial', 'queueable'};
     
     % Todo: Provide each of the configured NWB files as alternatives
-    % nwbFiles = getNwbFileNames();
+    % nwbFiles = getNWBFileNames();
     % ATTRIBUTES = [ATTRIBUTES, {'Alternatives', nwbFiles}];
 
 % % % % % % % % % % % % % DEFAULT CODE BLOCK % % % % % % % % % % % % % %

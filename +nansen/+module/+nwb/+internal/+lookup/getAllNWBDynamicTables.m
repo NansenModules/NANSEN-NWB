@@ -1,4 +1,4 @@
-function getAllNwbDynamicTables()
+function getAllNWBDynamicTables()
 
     import nansen.module.nwb.internal.schemautil.getProcessedClass
 

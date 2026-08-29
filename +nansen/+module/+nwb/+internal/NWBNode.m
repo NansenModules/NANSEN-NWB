@@ -1,5 +1,5 @@
-classdef NwbNode < handle
-% NwbNode - Represent type information for a node in the NWB file/data hierarchy
+classdef NWBNode < handle
+% NWBNode - Represent type information for a node in the NWB file/data hierarchy
 %
 %   Note: This is a utility class which is used for convenience in the gui
 %   components, and it is not an accurate re-representation of the NWB
@@ -13,7 +13,7 @@ classdef NwbNode < handle
     end
 
     methods
-        function obj = NwbNode(propertyName, propertyType, definingType)
+        function obj = NWBNode(propertyName, propertyType, definingType)
             arguments
                 propertyName (1,1) string
                 propertyType (1,1) string
