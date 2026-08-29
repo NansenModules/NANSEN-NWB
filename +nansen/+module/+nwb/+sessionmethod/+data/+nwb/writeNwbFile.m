@@ -147,8 +147,8 @@ import nansen.session.SessionMethod
         switch variableConfiguration.PrimaryGroupName
             case 'Acquisition'
                 if isa(neuroData, 'struct')
-                    for i = 1:numel(neuroData)
-                        nwbFile.acquisition.set(neuroData(i).name, neuroData(i).data);
+                    for j = 1:numel(neuroData)
+                        nwbFile.acquisition.set(neuroData(j).name, neuroData(j).data);
                     end
                 else
                     nwbFile.acquisition.set(variableName, neuroData);

@@ -194,7 +194,7 @@ classdef NWBConfigurator < applify.MultiPageApp
                         if ismissing(obj.FilePath)
                             error('Filepath is not set')
                             % Todo:
-                            [filename, folder] = uigetfile('.m') %#ok<NASGU,ASGLU>
+                            [filename, folder] = uigetfile('.m')
                         else
                             obj.saveNwbConfigurationData()
                             obj.DynamicTableConfigurator.deactivate()
@@ -209,7 +209,7 @@ classdef NWBConfigurator < applify.MultiPageApp
             delete(obj.Figure)
         end
 
-        function warnIfConfigurationIssues(obj, dataItems)
+        function warnIfConfigurationIssues(~, dataItems)
         % warnIfConfigurationIssues - Show a warning dialog for any issues
         %   found in the configuration. The save is not blocked — this is
         %   informational only.
@@ -224,7 +224,7 @@ classdef NWBConfigurator < applify.MultiPageApp
                 return
             end
 
-            % Build message: one bullet per warning, wrapped to 80 chars
+            % Build message: one bullet per warning
             bulletLines = strjoin( cellfun(@(w) sprintf('  \x2022 %s', w), ...
                 warnings, 'UniformOutput', false), newline );
 
