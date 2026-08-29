@@ -41,21 +41,21 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
                 'Message', "Neurodata type is not set"))
 
         % Ways a required property can be present but unusable. Each case
-        % is a TimeSeries, whose required properties are data and
-        % data_unit.
+        % is a TimeSeries, whose only configurable required property is
+        % data_unit; data is supplied at conversion time, not configured.
         incompleteMetadata = struct( ...
             'absentProperty', struct( ...
-                'Metadata', struct("data", [1 2 3]), ...
+                'Metadata', struct("description", "EEG signal"), ...
                 'ReportedProperty', "data_unit"), ...
             'blankString', struct( ...
-                'Metadata', struct("data", [1 2 3], "data_unit", "   "), ...
+                'Metadata', struct("data_unit", "   "), ...
                 'ReportedProperty', "data_unit"), ...
             'zeroLengthString', struct( ...
-                'Metadata', struct("data", [1 2 3], "data_unit", ""), ...
+                'Metadata', struct("data_unit", ""), ...
                 'ReportedProperty', "data_unit"), ...
-            'emptyNumeric', struct( ...
-                'Metadata', struct("data", [], "data_unit", "volts"), ...
-                'ReportedProperty', "data"))
+            'emptyValue', struct( ...
+                'Metadata', struct("data_unit", []), ...
+                'ReportedProperty', "data_unit"))
     end
 
     methods (TestClassSetup)
@@ -174,7 +174,8 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
 
         function emptyMetadataReportsEveryRequiredProperty(testCase)
         % Saved configurations carry '' rather than a struct until
-        % metadata has been entered.
+        % metadata has been entered. Only data_unit is reported, because
+        % TimeSeries.data holds data rather than metadata.
 
             testCase.assumeSchemaLookupIsAvailable()
 
@@ -182,12 +183,54 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
 
             warnings = validateConfiguration(item);
 
-            testCase.verifyNumElements(warnings, 2)
-            testCase.verifySubstring(strjoin(warnings, newline), """data""")
-            testCase.verifySubstring(strjoin(warnings, newline), """data_unit""")
+            testCase.verifyNumElements(warnings, 1)
+            testCase.verifySubstring(warnings{1}, """data_unit""")
         end
 
         function warningNamesTheNeuroDataType(testCase)
+            testCase.assumeSchemaLookupIsAvailable()
+
+            item = createConfigurationItem( ...
+                NeuroDataType="ElectricalSeries", DefaultMetadata='');
+
+            warnings = validateConfiguration(item);
+
+            testCase.verifySubstring(warnings{1}, "ElectricalSeries")
+        end
+
+        function dataCarryingPropertiesAreNotReported(testCase)
+        % convertToNeuroDataType supplies data and timestamps from the
+        % session data, and getTypeMetadataStruct hides them from the
+        % metadata editor, so a configuration can never set them. Reporting
+        % them would flag every correctly configured item.
+
+            testCase.assumeSchemaLookupIsAvailable()
+
+            warnings = validateConfiguration(createConfigurationItem());
+
+            testCase.verifyEmpty(warnings)
+        end
+
+        function dataCarryingPropertiesOfSuperclassAreNotReported(testCase)
+        % RoiResponseSeries declares only "rois" as data-carrying; "data"
+        % and "timestamps" are declared by TimeSeries, which it extends.
+        % Resolving them needs the class hierarchy walked.
+
+            testCase.assumeSchemaLookupIsAvailable()
+
+            item = createConfigurationItem( ...
+                NeuroDataType="RoiResponseSeries", ...
+                DefaultMetadata=struct("data_unit", "lumens"));
+
+            warnings = validateConfiguration(item);
+
+            testCase.verifyEmpty(warnings)
+        end
+
+        function typeWithOnlyDataRequirementsReturnsNoWarnings(testCase)
+        % SpatialSeries requires only data, which is not configured, so
+        % there is nothing left for the user to fill in.
+
             testCase.assumeSchemaLookupIsAvailable()
 
             item = createConfigurationItem( ...
@@ -195,7 +238,7 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
 
             warnings = validateConfiguration(item);
 
-            testCase.verifySubstring(warnings{1}, "SpatialSeries")
+            testCase.verifyEmpty(warnings)
         end
 
         function typeWithoutRequiredPropertiesReturnsNoWarnings(testCase)
@@ -216,7 +259,7 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
 
             item = createConfigurationItem( ...
                 PrimaryGroupName="<Select group>", ...
-                DefaultMetadata=struct("data", [1 2 3]));
+                DefaultMetadata=struct("description", "EEG signal"));
 
             warnings = validateConfiguration(item);
 
@@ -255,7 +298,7 @@ function item = createConfigurationItem(options)
         options.PrimaryGroupName = "Acquisition"
         options.NwbModule = "ecephys"
         options.NeuroDataType = "TimeSeries"
-        options.DefaultMetadata = struct("data", [1 2 3], "data_unit", "volts")
+        options.DefaultMetadata = struct("data_unit", "volts")
     end
 
     item = options;
