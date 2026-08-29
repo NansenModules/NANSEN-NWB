@@ -32,7 +32,7 @@ function saveConfiguration(config, filePath)
             ['Could not open ''%s'' for writing. Check that the folder ', ...
              'exists and is writable.'], filePath)
     end
-    cleanupObj = onCleanup(@() fclose(fid)); %#ok<NASGU> closes on exit
+    cleanupObj = onCleanup(@() fclose(fid));
 
     fwrite(fid, jsonText, "char");
     fwrite(fid, newline, "char");

@@ -1,299 +1,651 @@
 classdef NWBFileConverter < handle
-%NWBFileConverter - Build an NWB file for a session, piece by piece
-%   OBJ = NWBFileConverter(sessionObject,targetFolder) creates a
-%   converter holding a new NWB file for the session, to be written
-%   into the given folder. Add content with the methods below, then
-%   call export.
+%NWBFileConverter - Write an NWB file from a conversion configuration
+%   OBJ = NWBFileConverter(CONFIG) creates a converter for the
+%   NWBFileConfiguration CONFIG. CONFIG names the output file, the
+%   file-level metadata, and the data items to convert.
 %
-%   OBJ = NWBFileConverter(...,FilenameSuffix=VALUE) also appends a
-%   suffix to the file name, to tell several files for one session
-%   apart.
+%   OBJ = NWBFileConverter(...,DataResolver=RESOLVER) also supplies the
+%   data. RESOLVER is a function handle taking a variable name and
+%   returning its data, a containers.Map, or a struct of variables. A
+%   NANSEN session passes @(name) sessionObject.loadData(name); anyone
+%   else passes their own. Converters that read their source file
+%   directly need no resolver.
+%
+%   OBJ = NWBFileConverter(...,Registry=REGISTRY) also uses a specific
+%   converter registry rather than the shared one.
+%
+%   OBJ = NWBFileConverter(...,OnItemError=MODE) also says what to do
+%   when one item fails. MODE must be:
+%       "stop"     - (default) Raise, leaving the file as it was
+%       "continue" - Warn, convert the rest, and report at the end
+%
+%   The converter has no NANSEN dependency: it takes a configuration and
+%   a way to get data, and produces an NWB file.
 %
 %   NWBFileConverter functions:
-%       addTrials             - Add a trial table
-%       addRois               - Add a segmentation of a ROI group
-%       addRoiSignals         - Add the signals extracted from ROIs
-%       addFovProjectionImage - Add a projection image of the field
-%       addProcessingModule   - Add a processing module
-%       addToAcquisition      - Add data to the acquisition group
-%       export                - Write the file to disk
+%       convert - Write the NWB file and return its path
 %
 %   NWBFileConverter properties:
-%       NwbFile  - The NWB file being built
-%       FilePath - Where export will write it
+%       Config       - The configuration being converted
+%       Registry     - Registry the converters are looked up in
+%       DataResolver - How the runner obtains data for a variable
+%       OnItemError  - What to do when one data item fails
 %
-%   See also nansen.module.nwb.conversion.initNWBFile
+%   Example: Convert one timetable without a NANSEN session
+%       config = nansen.module.nwb.config.NWBFileConfiguration( ...
+%           OutputPath="/data/test.nwb", ...
+%           SessionMetadata=struct("session_description", "demo", ...
+%               "identifier", "demo-01", ...
+%               "session_start_time", datetime("now", TimeZone="local")), ...
+%           DataItems=nansen.module.nwb.config.NWBDataItemConfig( ...
+%               VariableName="trials", ConverterName="TimetableTimeSeries"));
+%       converter = nansen.module.nwb.conversion.NWBFileConverter( ...
+%           config, DataResolver=@(name) myTrialsTimetable);
+%       filePath = converter.convert();
+%
+%   See also nansen.module.nwb.config.NWBFileConfiguration,
+%   nansen.module.nwb.conversion.ConverterRegistry
+
+    properties (SetAccess = private)
+        Config (1,1) nansen.module.nwb.config.NWBFileConfiguration % The configuration being converted
+        Registry (1,1) nansen.module.nwb.conversion.ConverterRegistry % Registry the converters are looked up in
+    end
 
     properties
-        NwbFile (1,1) NwbFile % The NWB file being built
-    end
-    properties (SetAccess = private)
-        FilePath (1,1) string % Where export will write it
-    end
-    
-    methods % Constructor
-        function obj = NWBFileConverter(sessionObject, targetFolder, options)
-
-            arguments
-                sessionObject
-                targetFolder (1,1) string {mustBeFolder}
-                options.FilenameSuffix (1,:) string = string.empty
-            end
-            
-            obj.NwbFile = nansen.module.nwb.conversion.initNWBFile(sessionObject);
-    
-            subjectInfo = sessionObject.getSubject();
-
-            obj.FilePath = createNWBFilePath(targetFolder, ...
-                "SubjectID", subjectInfo.SubjectID, ...
-                "SessionID", sessionObject.sessionID, ...
-                "FilenameSuffix", options.FilenameSuffix);
-        end
+        DataResolver = []                   % How the runner obtains data for a variable
+        OnItemError (1,1) string ...
+            {mustBeMember(OnItemError, ["stop", "continue"])} = "stop" % What to do when one data item fails
     end
 
-    methods % Exporter
-        function export(obj)
-            nwbExport(obj.NwbFile, obj.FilePath)
-            fprintf ('Exported file to "%s"\n', obj.FilePath)
-        end
+    properties (Access = private)
+        %WorkingNwbFile - In-memory file, empty when it must be read from disk
+        WorkingNwbFile = []
+
+        %HasUnexportedChanges - Whether memory is ahead of the file on disk
+        HasUnexportedChanges (1,1) logical = false
+
+        %FailedItems - Items that failed while OnItemError was "continue"
+        FailedItems (1,:) string = strings(1, 0)
     end
 
     methods
-        function addTrials(obj, data)
-            % Todo: Generalize this with converter
-            if height(data)==0
-                return
-            end
-
-            trials_table = types.core.TimeIntervals(...
-                'colnames', {'start_time', 'stop_time', 'trial_type', 'trial_description'}, ...
-                'description', 'Start and stop time for each trial type (Plus, Neutral, Negative)', ...
-                'start_time', types.hdmf_common.VectorData(...
-                    'data', seconds( data.TrialStartTime ), ...
-                    'description', 'Start time of trial, in seconds.'), ...
-                'stop_time', types.hdmf_common.VectorData(...
-                    'data', seconds( data.TrialEndTime ), ...
-                    'description', 'Stop time of trial, in seconds.'), ...
-                'trial_type', types.hdmf_common.VectorData(...
-                    'data', cellstr(data.TrialType), ...
-                    'description', 'Type of trial (Plus, Neutral, Negative).'), ...
-                'trial_description', types.hdmf_common.VectorData(...
-                    'data', cellstr(data.TrialDescription), ...
-                    'description', 'Description of each trial (cue used)'), ...
-                'id', types.hdmf_common.ElementIdentifiers(...
-                    'data', (1:height(data))' ));
-            obj.NwbFile.intervals.set('Trials', trials_table);
-        end
-
-        function addRois(obj, roiGroup, isCell, converter)
+        function obj = NWBFileConverter(config, options)
             arguments
-                obj
-                roiGroup
-                isCell
-                converter function_handle = ...
-                    @nansen.module.nwb.conversion.ophys.convertRoiGroup
+                config
+                options.DataResolver = []
+                options.Registry (1,1) nansen.module.nwb.conversion.ConverterRegistry = ...
+                    nansen.module.nwb.conversion.ConverterRegistry.instance()
+                options.OnItemError (1,1) string ...
+                    {mustBeMember(options.OnItemError, ["stop", "continue"])} = "stop"
             end
-            
-            import nansen.module.nwb.conversion.ophys.utility.getOphysTypeName
-            
-            % Todo: Channels and planes....
 
-            params = struct();
-            params.ChannelNumber = 1;
-            params.PlaneNumber = 1;
-            params.NumPlanes = 1;
-            params.NumChannels = 1;
-            nvPairs = namedargs2cell(params);
-
-            planeName = getOphysTypeName("ImagingPlane", nvPairs{:});
-            planeNames = obj.NwbFile.general_optophysiology.keys();
-            isMatch = strcmp(planeNames, planeName);
-            thisPlane = obj.NwbFile.general_optophysiology.get(planeNames{isMatch});
-            
-            planeSegmentation = converter(roiGroup, isCell);
-            planeSegmentation.imaging_plane = thisPlane;
-        
-            imageSegmentation = types.core.ImageSegmentation();
-            planeSegmentationName = getOphysTypeName("PlaneSegmentation", nvPairs{:});
-            imageSegmentation.planesegmentation.set(planeSegmentationName, planeSegmentation);
-            
-            if ~isKey(obj.NwbFile.processing, 'ophys')
-                obj.addProcessingModule('ophys');
-            end
-            ophysModule = obj.NwbFile.processing.get('ophys');
-            imageSegmentationName = getOphysTypeName("ImageSegmentation", nvPairs{:});
-            ophysModule.nwbdatainterface.set(imageSegmentationName, imageSegmentation);
+            obj.Config = nansen.module.nwb.config.NWBFileConfiguration.fromAny(config);
+            obj.DataResolver = options.DataResolver;
+            obj.Registry = options.Registry;
+            obj.OnItemError = options.OnItemError;
         end
 
-        function addRoiSignals(obj, signalArray, name, type, isCell, converter)
-            arguments
-                obj
-                signalArray
-                name
-                type (1,1) string {mustBeMember(type, ["Fluorescence", "DeltaFOverF"])} = "Fluorescence"
-                isCell (:,1) logical = logical.empty
-                converter function_handle = ...
-                    @nansen.module.nwb.conversion.ophys.convertRoiResponses
-            end
-            
-            params = struct();
-            params.ChannelNumber = 1;
-            params.PlaneNumber = 1;
-            params.NumPlanes = 1;
-            params.NumChannels = 1;
-            nvPairs = namedargs2cell(params);
+        function filePath = convert(obj)
+            %convert - Write the NWB file and return its path
+            %   filePath = convert(OBJ) creates the NWB file, converts
+            %   every data item into it, and returns where it was written.
+            %
+            %   The file is created first, from the session, subject and
+            %   general metadata, so every converter has a file to add to
+            %   and only one of them writes the file-level metadata.
+            %
+            %   Items are ordered so that converters producing a type run
+            %   before converters requiring it, whatever order the
+            %   configuration lists them in.
+            %
+            %   Errors:
+            %     nansen:nwb:converterFailed - a data item failed to
+            %                     convert and OnItemError is "stop".
+            %     nansen:nwb:itemsFailed - one or more items failed while
+            %                     OnItemError was "continue".
 
-            roiResponseSeries = converter(signalArray);
-            nRois = size(roiResponseSeries.data, 1);
+            obj.validateConfig()
 
-            % Find rois
-            planeSegmentationNames = obj.NwbFile.processing.get('ophys').nwbdatainterface.get('ImageSegmentation').planesegmentation.keys();
-            % Find matches based on plane and channel
-            isMatch = 1;
-            planeSegmentation = obj.NwbFile.processing.get('ophys').nwbdatainterface.get('ImageSegmentation').planesegmentation.get(planeSegmentationNames{isMatch});
-            
-            % Todo: What if multiple plane segmentations exist, for multi
-            % channel /plane
-            roiTableRegion = types.hdmf_common.DynamicTableRegion( ...
-                'table', types.untyped.ObjectView(planeSegmentation), ...
-                'description', 'all_rois', ...
-                'data', (0:nRois-1)');
+            obj.WorkingNwbFile = [];
+            obj.HasUnexportedChanges = false;
+            obj.FailedItems = strings(1, 0);
 
-            roiResponseSeries.rois = roiTableRegion;
+            obj.createOutputFile()
 
-            switch type
-                case 'Fluorescence'
-                    wrapper = @types.core.Fluorescence;
-                case 'DeltaFOverF'
-                    wrapper = @types.core.DfOverF;
+            dataItems = obj.orderDataItems(obj.Config.DataItems);
+            for i = 1:numel(dataItems)
+                obj.convertDataItem(dataItems(i))
             end
 
-            F = wrapper('RoiResponseSeries', roiResponseSeries);
+            obj.flushToDisk()
 
-            if ~isKey(obj.NwbFile.processing, 'ophys')
-                obj.addProcessingModule('ophys');
-            end
-            ophysModule = obj.NwbFile.processing.get('ophys');
-            ophysModule.nwbdatainterface.set(name, F);
-        end
-        
-        function addFovProjectionImage(obj, image, name)
-            neurodata = types.core.GrayscaleImage(...
-                'data', image.getFrameSet(1) );
-
-            % Todo: get or create image collection...
-            imageCollectionName = "FovProjectionImages";
-
-            % searchFor and isa take the type as text, so the name is built
-            % through the lookup rather than spelled out. Constructor calls
-            % below stay as direct class references, which stay checkable.
-            imagesType = nansen.module.nwb.internal.lookup.getMatNWBTypeName('core', 'Images');
-
-            result = obj.NwbFile.searchFor(imagesType, 'Name', imageCollectionName);
-            if result.Count == 1
-                imageCollection = result.values;
-                imageCollection = imageCollection{1};
-                assert(isa(imageCollection, imagesType))
-            else
-                assert(result.Count == 0, 'Expected there to be 0 result')
-                imageCollection = types.core.Images( ...
-                    'description', 'A collection of FOV projection images.'...
-                );
-                obj.addToProcessing("ophys", imageCollection, imageCollectionName)
+            if ~isempty(obj.FailedItems)
+                error("nansen:nwb:itemsFailed", ...
+                    ['%d of %d data items could not be converted: %s. The ', ...
+                     'file ''%s'' holds everything that did convert.'], ...
+                    numel(obj.FailedItems), numel(dataItems), ...
+                    strjoin(obj.FailedItems, ", "), obj.Config.OutputPath)
             end
 
-            name = sprintf('%sImage', name);
-
-            % NWB 2.9 renamed the Images collection's member property from
-            % image to baseimage. The module does not pin a matnwb version,
-            % so pick whichever the installed schema defines.
-            if isprop(imageCollection, 'baseimage')
-                imageCollection.baseimage.set(name, neurodata);
-            else
-                imageCollection.image.set(name, neurodata);
-            end
-        end
-
-        function addProcessingModule(obj, name, description)
-            arguments
-                obj
-                name (1,1) string
-                description (1,1) string = missing
-            end
-            nansen.module.nwb.conversion.addProcessingModule(obj.NwbFile, name, description)
-        end
-
-        function addToAcquisition(obj, data, converter)
-            arguments
-                obj
-                data
-                converter function_handle = ...
-                    @nansen.module.nwb.conversion.general.convertTimetable
-                    % Todo: mustBeSetConverter?
-            end
-
-            converted = converter(data);
-            names = converted.keys();
-
-            for i = 1:numel(names)
-                obj.NwbFile.acquisition.set(names{i}, converted.get(names{i}));
-            end
+            filePath = obj.Config.OutputPath;
         end
     end
 
     methods (Access = private)
+        function validateConfig(obj)
+            %validateConfig - Reject a configuration nothing can be done with
 
-        function addToProcessing(obj, moduleName, data, name)
-            if ~isKey(obj.NwbFile.processing, moduleName)
-                obj.addProcessingModule(moduleName);
+            if strlength(strtrim(obj.Config.OutputPath)) == 0
+                error("nansen:nwb:missingOutputPath", ...
+                    ['The configuration names no output file. Set ', ...
+                     'OutputPath on the configuration.'])
             end
-            processingModule = obj.NwbFile.processing.get(moduleName);
-            if isa(data, nansen.module.nwb.internal.lookup.getMatNWBTypeName('hdmf_common', 'DynamicTable'))
-                processingModule.dynamictable.set(name, data);
+
+            if isempty(obj.Config.DataItems)
+                error("nansen:nwb:missingDataItems", ...
+                    ['The configuration for ''%s'' holds no data items, so ', ...
+                     'there is nothing to convert. Add items in the ', ...
+                     'configurator.'], obj.Config.OutputPath)
+            end
+        end
+
+        function createOutputFile(obj)
+            %createOutputFile - Initialize the output NWB file in memory
+            %
+            %   The runner owns file creation. Converters that write the
+            %   file themselves, NeuroConv-backed ones in particular,
+            %   append to what this wrote, so the session and subject
+            %   metadata is written exactly once and by one writer.
+            %
+            %   The file only reaches disk when something needs it there:
+            %   before an external converter runs, or at the end. A run
+            %   that fails before then leaves no half-written file behind.
+
+            filePath = obj.Config.OutputPath;
+
+            parentFolder = fileparts(filePath);
+            if parentFolder ~= "" && ~isfolder(parentFolder)
+                mkdir(parentFolder)
+            end
+
+            if obj.Config.WriteMode == "overwrite" && isfile(filePath)
+                delete(filePath)
+            end
+
+            % In append mode the file already carries its own file-level
+            % metadata, and the first converter that needs it reads it.
+            if isfile(filePath)
+                return
+            end
+
+            obj.WorkingNwbFile = obj.buildNwbFile();
+            obj.HasUnexportedChanges = true;
+        end
+
+        function nwbFile = buildNwbFile(obj)
+            %buildNwbFile - Build the NwbFile from the file-level metadata
+
+            metadata = obj.Config.SessionMetadata;
+            obj.assertRequiredSessionMetadata(metadata)
+            metadata.session_start_time = ...
+                obj.normalizeSessionStartTime(metadata.session_start_time);
+
+            sessionArgs = obj.structToNameValuePairs(metadata);
+            nwbFile = NwbFile(sessionArgs{:});
+
+            if ~isempty(fieldnames(obj.Config.SubjectMetadata))
+                subjectArgs = obj.structToNameValuePairs(obj.Config.SubjectMetadata);
+                nwbFile.general_subject = types.core.Subject(subjectArgs{:});
+            end
+
+            obj.applyGeneralMetadata(nwbFile, obj.Config.GeneralMetadata)
+        end
+
+        function convertDataItem(obj, dataItem)
+            %convertDataItem - Run one data item through its converter
+
+            descriptor = obj.resolveDescriptor(dataItem);
+
+            try
+                obj.runConverter(dataItem, descriptor)
+            catch cause
+                if obj.OnItemError == "continue"
+                    warning("nansen:nwb:converterFailed", ...
+                        "Skipping ''%s'': %s", dataItem.VariableName, cause.message)
+                    obj.FailedItems(end+1) = dataItem.VariableName;
+                    return
+                end
+
+                exception = MException("nansen:nwb:converterFailed", ...
+                    ['The converter ''%s'' failed on data item ''%s''. The ', ...
+                     'underlying error is attached below.'], ...
+                    descriptor.Name, dataItem.VariableName);
+                throw(addCause(exception, cause))
+            end
+        end
+
+        function runConverter(obj, dataItem, descriptor)
+            %runConverter - Invoke one converter and take up its result
+
+            converterArgs = obj.mergeConverterArgs( ...
+                descriptor.DefaultConverterArgs, dataItem.ConverterArgs);
+
+            data = [];
+            if descriptor.NeedsData
+                data = obj.resolveData(dataItem.VariableName);
+            end
+
+            isExternalWriter = descriptor.ExecutionMode == "external";
+
+            if isExternalWriter
+                % An external converter reads and writes the file on disk,
+                % so anything still only in memory has to be written first
+                % or it would be lost when the file is read back.
+                obj.flushToDisk()
             else
-                processingModule.nwbdatainterface.set(name, data);
+                obj.ensureNwbFileLoaded()
+            end
+
+            context = struct( ...
+                "Config", obj.Config, ...
+                "DataItem", dataItem, ...
+                "Descriptor", descriptor, ...
+                "NwbFile", obj.WorkingNwbFile, ...
+                "FilePath", obj.Config.OutputPath, ...
+                "Data", data, ...
+                "Metadata", dataItem.Metadata, ...
+                "ConverterArgs", converterArgs, ...
+                "Placement", obj.createPlacement(dataItem, descriptor));
+
+            result = obj.callConverter(descriptor, context);
+
+            if isExternalWriter
+                obj.assertExternalConverterWroteFile(result, descriptor)
+                % The file on disk moved on without us; read it again
+                % before the next converter mutates it.
+                obj.WorkingNwbFile = [];
+                obj.HasUnexportedChanges = false;
+            else
+                obj.WorkingNwbFile = obj.takeReturnedNwbFile(result, context);
+                obj.HasUnexportedChanges = true;
+            end
+        end
+
+        function result = callConverter(~, descriptor, context)
+            %callConverter - Invoke a converter, whether or not it returns
+            %
+            %   An NwbFile is a handle, so a converter can do its work by
+            %   mutating the one in the context and return nothing.
+            %   Demanding an output from such a converter would fail with
+            %   an error about output arguments rather than anything its
+            %   author could act on.
+
+            try
+                declaredOutputs = nargout(descriptor.Function);
+            catch
+                % An anonymous handle, or one whose function is not on the
+                % path. Ask for an output and let the call report it.
+                declaredOutputs = 1;
+            end
+
+            if declaredOutputs == 0
+                descriptor.Function(context);
+                result = [];
+            else
+                result = descriptor.Function(context);
+            end
+        end
+
+        function ensureNwbFileLoaded(obj)
+            %ensureNwbFileLoaded - Read the file when it is not in memory
+
+            if ~isempty(obj.WorkingNwbFile)
+                return
+            end
+
+            obj.WorkingNwbFile = nwbRead(obj.Config.OutputPath);
+            obj.HasUnexportedChanges = false;
+        end
+
+        function flushToDisk(obj)
+            %flushToDisk - Write pending changes, if there are any
+            %
+            %   NwbFile.export appends an entry to file_create_date every
+            %   time it is called and rewrites the whole file, so the
+            %   runner exports as rarely as correctness allows.
+
+            if ~obj.HasUnexportedChanges || isempty(obj.WorkingNwbFile)
+                return
+            end
+
+            nwbExport(obj.WorkingNwbFile, obj.Config.OutputPath)
+            obj.HasUnexportedChanges = false;
+        end
+
+        function dataItems = orderDataItems(obj, dataItems)
+            %orderDataItems - Put producers before the items requiring them
+
+            descriptors = arrayfun(@(item) obj.resolveDescriptor(item), ...
+                dataItems, "UniformOutput", false);
+            producedTypes = cellfun(@(d) d.ProducesNWBType, descriptors);
+
+            % Appending to a file that already exists may satisfy a
+            % requirement no item in this run produces.
+            isAppending = obj.Config.WriteMode == "append";
+
+            ordered = false(numel(dataItems), 1);
+            order = zeros(numel(dataItems), 1);
+
+            for position = 1:numel(dataItems)
+                nextIndex = 0;
+                for i = 1:numel(dataItems)
+                    if ordered(i)
+                        continue
+                    end
+                    if obj.areRequirementsMet(descriptors{i}, producedTypes(ordered), ...
+                            producedTypes, isAppending)
+                        nextIndex = i;
+                        break
+                    end
+                end
+
+                if nextIndex == 0
+                    obj.failOnUnmetRequirements(dataItems, descriptors, ordered)
+                end
+
+                ordered(nextIndex) = true;
+                order(position) = nextIndex;
+            end
+
+            dataItems = dataItems(order);
+        end
+
+        function tf = areRequirementsMet(~, descriptor, satisfiedTypes, allProducedTypes, isAppending)
+            %areRequirementsMet - Whether a converter can run at this point
+
+            required = descriptor.RequiresNWBTypes;
+            if isempty(required)
+                tf = true;
+                return
+            end
+
+            for i = 1:numel(required)
+                if any(satisfiedTypes == required(i))
+                    continue
+                end
+
+                % Nothing in this run produces it. When appending, the
+                % file may already hold it, and the converter checks that
+                % for itself; otherwise the requirement cannot be met.
+                if isAppending && ~any(allProducedTypes == required(i))
+                    continue
+                end
+
+                tf = false;
+                return
+            end
+
+            tf = true;
+        end
+
+        function failOnUnmetRequirements(~, dataItems, descriptors, ordered)
+            %failOnUnmetRequirements - Report what is missing and for whom
+
+            blockedIndices = find(~ordered);
+            firstBlocked = blockedIndices(1);
+            descriptor = descriptors{firstBlocked};
+
+            error("nansen:nwb:unmetRequirement", ...
+                ['''%s'' needs %s to exist in the file before it can be ', ...
+                 'converted, and no data item produces that. Add an item ', ...
+                 'that produces it, or append to a file that already has ', ...
+                 'it.'], dataItems(firstBlocked).VariableName, ...
+                strjoin(descriptor.RequiresNWBTypes, " and "))
+        end
+
+        function descriptor = resolveDescriptor(obj, dataItem)
+            %resolveDescriptor - Decide which converter handles an item
+
+            converterName = dataItem.ConverterName;
+            if strlength(converterName) > 0 && converterName ~= "Default"
+                descriptor = obj.Registry.get(converterName);
+                return
+            end
+
+            % Without a named converter, the source evidence has to
+            % identify one on its own. Only an unambiguous match will do:
+            % guessing between two plausible converters would silently
+            % write the wrong thing.
+            [candidates, ranks] = obj.Registry.findForSourceInfo(dataItem.SourceInfo);
+            isSpecific = ranks > 1;
+            candidates = candidates(isSpecific);
+
+            if isscalar(candidates)
+                descriptor = candidates;
+                return
+            end
+
+            % A named target type is enough for the generic converter.
+            if ~obj.isUnsetText(dataItem.TargetNWBType)
+                descriptor = obj.Registry.get("GenericNeurodataType");
+                return
+            end
+
+            if isempty(candidates)
+                error("nansen:nwb:unresolvedConverter", ...
+                    ['No converter matches ''%s''. Set ConverterName on the ', ...
+                     'data item, or set TargetNWBType to build a neurodata ', ...
+                     'type generically.'], dataItem.VariableName)
+            end
+
+            error("nansen:nwb:unresolvedConverter", ...
+                ['Several converters match ''%s'': %s. Set ConverterName on ', ...
+                 'the data item to choose one.'], dataItem.VariableName, ...
+                strjoin([candidates.Name], ", "))
+        end
+
+        function placement = createPlacement(~, dataItem, descriptor)
+            %createPlacement - Work out where this item's output belongs
+
+            configuredName = dataItem.NWBVariableName;
+            if strlength(configuredName) == 0
+                configuredName = dataItem.VariableName;
+            end
+
+            % Placement is the configuration's to decide, except where the
+            % converter declared that it owns placement.
+            if descriptor.PlacementPolicy == "converter" && ~descriptor.AllowsPlacementOverride
+                primaryGroup = descriptor.PrimaryGroup;
+            else
+                primaryGroup = dataItem.PrimaryGroup;
+            end
+
+            placement = struct( ...
+                "Name", configuredName, ...
+                "PrimaryGroup", primaryGroup, ...
+                "NWBModule", dataItem.NWBModule);
+        end
+
+        function data = resolveData(obj, variableName)
+            %resolveData - Obtain the data for one variable
+            %
+            %   What comes back is whatever the resolver returns, which
+            %   for large data is a lazy object rather than an array. A
+            %   converter must not force the whole thing into memory
+            %   unless it declared that it does.
+
+            if isempty(obj.DataResolver)
+                error("nansen:nwb:missingDataResolver", ...
+                    ['''%s'' needs its data loaded, but the converter was ', ...
+                     'created without a DataResolver. Pass DataResolver as ', ...
+                     'a function of the variable name.'], variableName)
+            end
+
+            if isa(obj.DataResolver, "function_handle")
+                data = obj.DataResolver(variableName);
+            elseif isa(obj.DataResolver, "containers.Map")
+                data = obj.DataResolver(char(variableName));
+            elseif isstruct(obj.DataResolver) && isfield(obj.DataResolver, variableName)
+                data = obj.DataResolver.(variableName);
+            else
+                error("nansen:nwb:invalidDataResolver", ...
+                    ['DataResolver must be a function handle, a ', ...
+                     'containers.Map, or a struct with a field named after ', ...
+                     'each variable. ''%s'' could not be resolved from a ', ...
+                     '%s.'], variableName, class(obj.DataResolver))
+            end
+        end
+
+        function converterArgs = mergeConverterArgs(~, defaultArgs, itemArgs)
+            %mergeConverterArgs - Lay per-item arguments over the defaults
+
+            converterArgs = defaultArgs;
+
+            fieldNames = fieldnames(itemArgs);
+            for i = 1:numel(fieldNames)
+                converterArgs.(fieldNames{i}) = itemArgs.(fieldNames{i});
+            end
+        end
+
+        function nwbFile = takeReturnedNwbFile(~, result, context)
+            %takeReturnedNwbFile - Read the file back out of a result
+            %
+            %   A converter may return the mutated file, or hand back a
+            %   neurodata object for the runner to place.
+
+            import nansen.module.nwb.conversion.resolvePlacement
+            import nansen.module.nwb.conversion.placeNeurodata
+
+            if isa(result, "NwbFile")
+                nwbFile = result;
+                return
+            end
+
+            if ~isstruct(result)
+                nwbFile = context.NwbFile;
+                return
+            end
+
+            if isfield(result, "NwbFile") && isa(result.NwbFile, "NwbFile")
+                nwbFile = result.NwbFile;
+                return
+            end
+
+            if isfield(result, "NeuroData") && ~isempty(result.NeuroData)
+                placement = resolvePlacement(context.Placement, result, context.Descriptor);
+                nwbFile = placeNeurodata(context.NwbFile, result.NeuroData, ...
+                    placement, context.Placement.Name);
+                return
+            end
+
+            nwbFile = context.NwbFile;
+        end
+
+        function applyGeneralMetadata(obj, nwbFile, metadata)
+            %applyGeneralMetadata - Set the general_ properties on the file
+
+            fieldNames = string(fieldnames(metadata));
+            for i = 1:numel(fieldNames)
+                fieldName = fieldNames(i);
+
+                if startsWith(fieldName, "general_")
+                    propertyName = fieldName;
+                else
+                    propertyName = "general_" + fieldName;
+                end
+
+                if ~isprop(nwbFile, propertyName)
+                    error("nansen:nwb:invalidGeneralMetadata", ...
+                        ['An NWB file has no general metadata field named ', ...
+                         '''%s''. Check the spelling in GeneralMetadata.'], ...
+                        fieldName)
+                end
+
+                nwbFile.(propertyName) = obj.normalizeScalarString(metadata.(fieldName));
             end
         end
     end
-end
 
-function nwbFilePath = createNWBFilePath(targetFolder, options)
-% createNWBFilePath - Creates a file path for the NWB file based on
-% the specified folder and options.
-%
-% Syntax:
-%   nwbFilePath = createNWBFilePath(targetFolder, options)
-%
-% Input Arguments:
-%   targetFolder - The folder path where the NWB file will be saved.
-%   options - A structure containing options for file naming.
-%     options.SessionID - The session identifier.
-%     options.SubjectID - The subject identifier.
-%     options.FilenameSuffix - Optional string suffix for the file name.
-%
-% Output Arguments:
-%   nwbFilePath - The constructed path for the NWB file.
+    methods (Static, Access = private)
+        function assertRequiredSessionMetadata(metadata)
+            %assertRequiredSessionMetadata - Require what NWB requires
 
-    arguments
-        targetFolder
-        options.SessionID
-        options.SubjectID
-        options.FilenameSuffix (1,:) string = string.empty
-    end
+            requiredFields = ["session_description", "identifier", "session_start_time"];
+            missingFields = requiredFields(arrayfun(@(name) ...
+                ~isfield(metadata, name) || isempty(metadata.(name)), requiredFields));
 
-    subjectId = options.SubjectID;
-    if startsWith(options.SessionID, subjectId)
-        sessionId = replace(options.SessionID, options.SubjectID, '');
-        if startsWith(sessionId, '_')
-            sessionId = sessionId(2:end);
+            if ~isempty(missingFields)
+                error("nansen:nwb:missingSessionMetadata", ...
+                    ['An NWB file needs %s. Set SessionMetadata on the ', ...
+                     'configuration, or export from a session that records ', ...
+                     'them.'], strjoin(missingFields, ", "))
+            end
         end
-    else
-        sessionId = options.SessionID;
-    end
-    
-    subjectPart = sprintf("sub-%s", subjectId);
-    sessionPart = sprintf("ses-%s", sessionId);
 
-    fileName = join([subjectPart, sessionPart, options.FilenameSuffix], "_");
-    nwbFilePath = fullfile(targetFolder, fileName+".nwb");
+        function value = normalizeSessionStartTime(value)
+            %normalizeSessionStartTime - Require a zoned session start time
+
+            if isstring(value) || ischar(value)
+                value = datetime(string(value));
+            end
+
+            if ~isdatetime(value) || ~isscalar(value)
+                error("nansen:nwb:invalidSessionStartTime", ...
+                    ['session_start_time must be a datetime, or text a ', ...
+                     'datetime can be read from, but was %s.'], class(value))
+            end
+
+            % A time without a zone is ambiguous to every later reader of
+            % the file, and NWB requires it to be resolvable.
+            if value.TimeZone == ""
+                error("nansen:nwb:missingTimeZone", ...
+                    ['session_start_time has no time zone. Set one, for ', ...
+                     'example datetime(t, TimeZone="local").'])
+            end
+        end
+
+        function assertExternalConverterWroteFile(result, descriptor)
+            %assertExternalConverterWroteFile - Hold an external converter to its contract
+
+            didWrite = isstruct(result) && isfield(result, "DidWriteFile") && ...
+                isscalar(result.DidWriteFile) && result.DidWriteFile;
+
+            if ~didWrite
+                error("nansen:nwb:externalConverterDidNotWrite", ...
+                    ['The converter ''%s'' writes the NWB file itself, but ', ...
+                     'did not report doing so. It must return a struct with ', ...
+                     'DidWriteFile set to true.'], descriptor.Name)
+            end
+        end
+
+        function nvPairs = structToNameValuePairs(S)
+            %structToNameValuePairs - Flatten a struct for a constructor call
+
+            import nansen.module.nwb.conversion.NWBFileConverter
+
+            fieldNames = fieldnames(S);
+            nvPairs = cell(1, 2*numel(fieldNames));
+            for i = 1:numel(fieldNames)
+                nvPairs{2*i - 1} = fieldNames{i};
+                nvPairs{2*i} = NWBFileConverter.normalizeScalarString(S.(fieldNames{i}));
+            end
+        end
+
+        function value = normalizeScalarString(value)
+            %normalizeScalarString - Give matnwb the text shape it expects
+
+            if isstring(value) && isscalar(value)
+                value = char(value);
+            elseif isstring(value)
+                value = cellstr(value);
+            end
+        end
+
+        function tf = isUnsetText(value)
+            %isUnsetText - True for blank text or a configurator placeholder
+
+            value = strtrim(string(value));
+            tf = ismissing(value) || value == "" || startsWith(value, "<");
+        end
+    end
 end
