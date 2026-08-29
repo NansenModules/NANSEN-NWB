@@ -137,20 +137,42 @@ classdef getRequiredPropertiesTest < matlab.unittest.TestCase
         function unknownTypeNameThrows(testCase)
         % An unresolvable type name must raise rather than return empty,
         % because callers cannot otherwise distinguish "no required
-        % properties" from "type does not exist".
-        %
-        % The error currently surfaces from the type lookup and has no
-        % identifier of its own, so only the fact that it throws is
-        % asserted here.
+        % properties" from "type does not exist". The identifier is part
+        % of the contract: validateNwbConfiguration needs it to tell an
+        % unknown type from an unexpected failure.
 
             testCase.verifyError( ...
-                @() requiredPropertiesFor("NotARealNeurodataType"), ?MException)
+                @() requiredPropertiesFor("NotARealNeurodataType"), ...
+                'nansen:nwb:unknownNeurodataType')
+        end
+
+        function unknownTypeNameIsNamedInTheError(testCase)
+        % The message reaches the user through a dialog, so it has to say
+        % which type was rejected.
+
+            thrownError = catchError( ...
+                @() requiredPropertiesFor("NotARealNeurodataType"));
+
+            testCase.verifyNotEmpty(thrownError)
+            testCase.verifySubstring(thrownError.message, "NotARealNeurodataType")
         end
     end
 end
 
 function props = requiredPropertiesFor(typeName)
     props = nansen.module.nwb.internal.schemautil.getRequiredProperties(typeName);
+end
+
+function thrownError = catchError(functionHandle)
+% catchError - Return the exception raised by functionHandle, or an empty
+%   MException if it did not raise. Kept out of the test methods so they
+%   stay free of control flow.
+
+    try
+        functionHandle();
+        thrownError = MException.empty;
+    catch thrownError
+    end
 end
 
 function folderPath = repositoryRoot()
