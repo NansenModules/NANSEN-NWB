@@ -197,7 +197,7 @@ function [dynamicTable, instanceMap] = convertElectrodeGroups(dynamicTable, nwbF
         [iElectrodeGroup, ~] = utility.struct.popfield(iElectrodeGroup, 'name', false);    
 
         nvPairs = namedargs2cell(iElectrodeGroup);
-        iElectrodeGroup = feval(nwbType, nvPairs{:}); %#ok<FVAL>
+        iElectrodeGroup = feval(nwbType, nvPairs{:});
 
         nwbFile.general_extracellular_ephys.set(iGroupName, iElectrodeGroup);
         %nansen.module.nwb.file.addMetadataObject(nwbFile, iGroupName, iElectrodeGroup);
