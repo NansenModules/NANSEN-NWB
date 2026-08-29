@@ -19,6 +19,11 @@ classdef NWBFileConverter < handle
 %       "stop"     - (default) Raise, leaving the file as it was
 %       "continue" - Warn, convert the rest, and report at the end
 %
+%   OBJ = NWBFileConverter(...,Validate=true) also checks the finished
+%   file against NWB Best Practices and warns about what it finds. This
+%   needs NWB Inspector in the Python MATLAB is configured to use, so it
+%   is off by default and the core stays free of Python.
+%
 %   The converter has no NANSEN dependency: it takes a configuration and
 %   a way to get data, and produces an NWB file.
 %
@@ -30,6 +35,7 @@ classdef NWBFileConverter < handle
 %       Registry     - Registry the converters are looked up in
 %       DataResolver - How the runner obtains data for a variable
 %       OnItemError  - What to do when one data item fails
+%       Validate     - Whether to check the file against NWB Best Practices
 %
 %   Example: Convert one timetable without a NANSEN session
 %       config = nansen.module.nwb.config.NWBFileConfiguration( ...
@@ -55,6 +61,7 @@ classdef NWBFileConverter < handle
         DataResolver = []                   % How the runner obtains data for a variable
         OnItemError (1,1) string ...
             {mustBeMember(OnItemError, ["stop", "continue"])} = "stop" % What to do when one data item fails
+        Validate (1,1) logical = false      % Whether to check the file against NWB Best Practices
     end
 
     properties (Access = private)
@@ -77,12 +84,14 @@ classdef NWBFileConverter < handle
                     nansen.module.nwb.conversion.ConverterRegistry.instance()
                 options.OnItemError (1,1) string ...
                     {mustBeMember(options.OnItemError, ["stop", "continue"])} = "stop"
+                options.Validate (1,1) logical = false
             end
 
             obj.Config = nansen.module.nwb.config.NWBFileConfiguration.fromAny(config);
             obj.DataResolver = options.DataResolver;
             obj.Registry = options.Registry;
             obj.OnItemError = options.OnItemError;
+            obj.Validate = options.Validate;
         end
 
         function filePath = convert(obj)
@@ -118,6 +127,10 @@ classdef NWBFileConverter < handle
             end
 
             obj.flushToDisk()
+
+            if obj.Validate
+                obj.reportBestPracticeFindings()
+            end
 
             if ~isempty(obj.FailedItems)
                 error("nansen:nwb:itemsFailed", ...
@@ -294,6 +307,36 @@ classdef NWBFileConverter < handle
             else
                 result = descriptor.Function(context);
             end
+        end
+
+        function reportBestPracticeFindings(obj)
+            %reportBestPracticeFindings - Warn about what NWB Inspector found
+            %
+            %   A file can be written successfully and still be unusable
+            %   to a repository, most often because metadata nobody
+            %   supplied is missing. The check is a warning rather than an
+            %   error: the data is written, and what to do about a
+            %   finding is the user's call.
+
+            try
+                findings = nansen.module.nwb.neuroconv.inspectFile( ...
+                    obj.Config.OutputPath, ...
+                    MinimumImportance="BEST_PRACTICE_VIOLATION");
+            catch cause
+                warning("nansen:nwb:validationSkipped", ...
+                    "The converted file was not checked: %s", cause.message)
+                return
+            end
+
+            if isempty(findings)
+                return
+            end
+
+            summary = compose("  [%s] %s: %s", findings.Importance, ...
+                findings.Check, findings.Message);
+            warning("nansen:nwb:bestPracticeFindings", ...
+                "NWB Inspector reported %d issue(s) with ''%s'':\n%s", ...
+                height(findings), obj.Config.OutputPath, strjoin(summary, newline))
         end
 
         function ensureNwbFileLoaded(obj)

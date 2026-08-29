@@ -183,6 +183,32 @@ classdef neuroconvBridgeTest < matlab.unittest.TestCase
             end
         end
 
+        function reportsWhatNwbInspectorFindsInAFile(testCase)
+            % A file can be written successfully and still be unusable to
+            % a repository. A subject with no age is the common case, and
+            % NWB Inspector rates it critical.
+            testCase.assumePythonIsAvailable()
+            testCase.assumeNwbInspectorIsAvailable()
+
+            filePath = testCase.fileWithNoSubjectAge();
+
+            findings = nansen.module.nwb.neuroconv.inspectFile(filePath, ...
+                MinimumImportance="BEST_PRACTICE_VIOLATION");
+
+            testCase.verifyThat(findings.Check, ...
+                matlab.unittest.constraints.IsSupersetOf("check_subject_age"))
+            testCase.verifyEqual(findings.Importance(1), "CRITICAL", ...
+                "The worst finding has to come first.")
+        end
+
+        function warnsAboutBestPracticeFindingsAfterConverting(testCase)
+            testCase.assumePythonIsAvailable()
+            testCase.assumeNwbInspectorIsAvailable()
+
+            testCase.verifyWarning(@() testCase.convertWithValidation(), ...
+                "nansen:nwb:bestPracticeFindings")
+        end
+
         function refusesToOverwriteAndAppendAtOnce(testCase)
             testCase.assumePythonIsAvailable()
 
@@ -202,6 +228,53 @@ classdef neuroconvBridgeTest < matlab.unittest.TestCase
             environment = pyenv();
             testCase.assumeNotEmpty(char(environment.Executable), ...
                 "MATLAB has no Python interpreter configured.")
+        end
+
+        function assumeNwbInspectorIsAvailable(testCase)
+            %assumeNwbInspectorIsAvailable - Skip without NWB Inspector
+
+            try
+                py.importlib.import_module("nwbinspector");
+            catch
+                testCase.assumeFail("NWB Inspector is not installed.")
+            end
+        end
+
+        function filePath = fileWithNoSubjectAge(testCase)
+            %fileWithNoSubjectAge - Write a file NWB Inspector will fault
+
+            filePath = testCase.convertWithValidation(Validate=false);
+        end
+
+        function filePath = convertWithValidation(testCase, options)
+            %convertWithValidation - Convert a file whose subject has no age
+
+            arguments
+                testCase
+                options.Validate (1,1) logical = true
+            end
+
+            fixture = testCase.applyFixture( ...
+                matlab.unittest.fixtures.TemporaryFolderFixture);
+
+            config = nansen.module.nwb.config.NWBFileConfiguration( ...
+                OutputPath=fullfile(fixture.Folder, "inspected.nwb"), ...
+                SessionMetadata=struct( ...
+                    "session_description", "inspection test", ...
+                    "identifier", "inspect-001", ...
+                    "session_start_time", datetime(2026, 5, 10, TimeZone="UTC")), ...
+                SubjectMetadata=struct("subject_id", "mouse01", ...
+                    "species", "Mus musculus", "sex", "M"), ...
+                DataItems=nansen.module.nwb.config.NWBDataItemConfig( ...
+                    VariableName="speed", NWBVariableName="Speed", ...
+                    ConverterName="TimetableTimeSeries"));
+
+            converter = nansen.module.nwb.conversion.NWBFileConverter(config, ...
+                DataResolver=@(name) timetable(seconds((0:9)'), (1:10)', ...
+                    VariableNames="speed"), ...
+                Validate=options.Validate);
+
+            filePath = converter.convert();
         end
     end
 end

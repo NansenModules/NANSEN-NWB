@@ -64,8 +64,12 @@ import nansen.session.SessionMethod
         WriteMode=lower(string(params.WriteMode)), ...
         ProjectName=string(currentProject.Name));
 
+    % Checking the file is worth the Python round trip here: a session
+    % export that is missing metadata a repository requires should say so
+    % while the user is still looking at it.
     converter = nansen.module.nwb.conversion.NWBFileConverter(config, ...
-        DataResolver=@(variableName) sessionObject.loadData(char(variableName)));
+        DataResolver=@(variableName) sessionObject.loadData(char(variableName)), ...
+        Validate=params.Validate);
 
     nwbFilePath = converter.convert();
 
@@ -82,6 +86,7 @@ function params = getDefaultParameters()
     params.ConfigurationFileName = "";
     params.TimeZone = "local";
     params.WriteMode = 'Overwrite'; % 'Overwrite' | 'Append'
+    params.Validate = true; % Check the written file against NWB Best Practices
 end
 
 function dataItems = loadConfiguredDataItems(configurationFilePath)
