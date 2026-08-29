@@ -25,30 +25,7 @@ function S = initializeNwbFileConfiguration(currentProject)
     S.Description = "Processed Data for Sharing";
 
     S.DataItems = configItems;
-    S.General.ExtracellularEphys.Electrodes = initializeElectrodesTable();
+    S.General.ExtracellularEphys.Electrodes = ...
+        nansen.module.nwb.internal.dtable.initializeElectrodesTable();
     S.AllVariableNames = {variableItems.VariableName};
-end
-
-function electrodeTable = initializeElectrodesTable()
-% Todo: Add ID.
-    import nansen.module.nwb.internal.lookup.getMatNwbTypeName
-
-    electrodeGroup = nansen.module.nwb.internal.schemautil.getElectrodesTableGroup();
-
-    dynamicTableColumns = electrodeGroup.datasets;
-
-    columnNames = {dynamicTableColumns.name};
-    columnDescriptions = {dynamicTableColumns.doc};
-    numColumns = numel(columnNames);
-
-    variableTypes = {dynamicTableColumns.dtype};
-    variableTypes{7} = getMatNwbTypeName('core', 'ElectrodeGroup');
-    variableTypes = string(variableTypes);
-    variableTypes(variableTypes=="char")="string";
-
-    electrodeTable = table('Size', [0,numColumns], 'VariableTypes', variableTypes);
-
-    electrodeTable.Properties.Description = electrodeGroup.doc;
-    electrodeTable.Properties.VariableNames = columnNames;
-    electrodeTable.Properties.VariableDescriptions = columnDescriptions;
 end
