@@ -1,5 +1,5 @@
 function rowInd = uiSelectTableRegion(S, nwbNodes)
-% uiSelectTableRegion - "Callback" function for selecting DynamicTableRegion
+%uiSelectTableRegion - "Callback" function for selecting DynamicTableRegion
 %
 %   This function initializes the GUI for selecting a region (i.e rows) of
 %   a dynamic table.

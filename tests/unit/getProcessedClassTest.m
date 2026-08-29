@@ -1,5 +1,5 @@
 classdef getProcessedClassTest < matlab.unittest.TestCase
-% getProcessedClassTest - Tests for getProcessedClass
+%getProcessedClassTest - Tests for getProcessedClass
 %
 %   Tests nansen.module.nwb.internal.schemautil.getProcessedClass, which
 %   flattens a neurodata type's schema hierarchy into one struct of

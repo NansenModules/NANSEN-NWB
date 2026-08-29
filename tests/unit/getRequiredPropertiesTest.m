@@ -1,5 +1,5 @@
 classdef getRequiredPropertiesTest < matlab.unittest.TestCase
-% getRequiredPropertiesTest - Tests for getRequiredProperties
+%getRequiredPropertiesTest - Tests for getRequiredProperties
 %
 %   Tests nansen.module.nwb.internal.schemautil.getRequiredProperties,
 %   which resolves the schema-required property names for an NWB neurodata

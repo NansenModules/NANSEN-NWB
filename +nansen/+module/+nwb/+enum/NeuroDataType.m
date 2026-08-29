@@ -1,6 +1,15 @@
 classdef NeuroDataType < handle
-    % Todo: Maybe better to make a function to retrieve all these from nwb
-    % and make a categorical
+    %NeuroDataType - Enumeration of the NWB neurodata types
+    %   NeuroDataType lists the neurodata types a data variable can be
+    %   converted to. The configuration table offers these as the choices
+    %   in its neurodata type column.
+    %
+    %   The list is maintained by hand and mirrors the NWB core schema. It
+    %   is not read from the loaded schema, so a type added upstream does
+    %   not appear until it is added here.
+    %
+    %   See also PrimaryGroupName, ProcessingModule
+
     enumeration
         AbstractFeatureSeries
         AnnotationSeries

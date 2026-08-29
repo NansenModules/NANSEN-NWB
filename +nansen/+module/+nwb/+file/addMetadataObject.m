@@ -1,5 +1,5 @@
 function addMetadataObject(nwbFile, name, nwbObject)
-% addMetadataObject - Add metadata-like neurodata types to NWB file
+%addMetadataObject - Add metadata-like neurodata types to NWB file
 %
 %   This will add a metadata-like neurodata types to the correct location in an
 %   NWB file, typically in the general group. Some metadata types, like

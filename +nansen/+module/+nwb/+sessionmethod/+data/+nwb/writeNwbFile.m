@@ -1,5 +1,5 @@
 function varargout = writeNwbFile(sessionObject, varargin)
-% writeNwbFile - Write an NWB file for a session
+%writeNwbFile - Write an NWB file for a session
 %
 %   This method requires an NWB Configuration File to be present. This file
 %   can be created from tools -> Configure NWB File. It is also possible to

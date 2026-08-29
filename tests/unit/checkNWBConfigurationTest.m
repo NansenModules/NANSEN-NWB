@@ -1,5 +1,5 @@
 classdef checkNWBConfigurationTest < matlab.unittest.TestCase
-% checkNWBConfigurationTest - Tests for checkNWBConfiguration
+%checkNWBConfigurationTest - Tests for checkNWBConfiguration
 %
 %   Tests nansen.module.nwb.file.checkNWBConfiguration, which reports
 %   unfilled configuration columns and missing required NWB metadata

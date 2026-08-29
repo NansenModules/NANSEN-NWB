@@ -1,5 +1,5 @@
 function processingModule = getProcessingModule(nwbFile, name, description)
-% getProcessingModule - Get (or create) a processing module on an NWB file
+%getProcessingModule - Get (or create) a processing module on an NWB file
 %
 %   Syntax:
 %     processingModule = nansen.module.nwb.file.getProcessingModule(nwbFile, name)

@@ -1,5 +1,5 @@
 function defaults = customPropertyDefaults()
-% customPropertyDefaults - Default values that override the schema default
+%customPropertyDefaults - Default values that override the schema default
 %
 %   defaults = customPropertyDefaults() returns a struct whose fields are
 %   neurodata type names and whose values are structs of property defaults.

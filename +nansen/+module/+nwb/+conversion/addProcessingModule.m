@@ -1,5 +1,5 @@
 function addProcessingModule(nwbFile, name, description)
-% addProcessingModule - Adds a processing module to the NWB file.
+%addProcessingModule - Adds a processing module to the NWB file.
 %
 % Syntax:
 %   addProcessingModule(nwbFile, name, description)

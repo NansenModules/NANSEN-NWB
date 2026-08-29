@@ -1,5 +1,5 @@
 function metadataStruct = getMetadataInstance(instanceName, nwbType)
-% getMetadataInstance - Get nwb instance from catalog by name
+%getMetadataInstance - Get nwb instance from catalog by name
     
     if isempty(instanceName); metadataStruct = struct.empty; return; end
 

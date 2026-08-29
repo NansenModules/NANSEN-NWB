@@ -1,5 +1,5 @@
 function names = getMetadataClassNames()
-% getMetadataClassNames - Get name of metadata classes.
+%getMetadataClassNames - Get name of metadata classes.
     
     names = [...
         "Device"

@@ -1,5 +1,5 @@
 function planeSegmentation = convertRoiGroup(roiGroup, isCell, metadata, options)
-% convertRoiGroup - Convert roig group to plane segmentation neurodata type
+%convertRoiGroup - Convert roig group to plane segmentation neurodata type
     
     % Todo: Loop over channels and planes of RoiGroup?
 

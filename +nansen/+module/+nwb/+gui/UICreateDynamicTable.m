@@ -1,5 +1,5 @@
 classdef UICreateDynamicTable < uiw.abstract.AppWindow
-% UICreateDynamicTable - A dialog app for selecting a region of a
+%UICreateDynamicTable - A dialog app for selecting a region of a
 % dynamic table.
 
 %   Note: This was originally duplicated from the UIDynamicTableRegionSelector

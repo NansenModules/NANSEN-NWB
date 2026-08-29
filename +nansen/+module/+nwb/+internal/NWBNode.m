@@ -1,5 +1,5 @@
 classdef NWBNode < handle
-% NWBNode - Represent type information for a node in the NWB file/data hierarchy
+%NWBNode - Represent type information for a node in the NWB file/data hierarchy
 %
 %   Note: This is a utility class which is used for convenience in the gui
 %   components, and it is not an accurate re-representation of the NWB

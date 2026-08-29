@@ -1,5 +1,5 @@
 function propertyNames = dataPropertyNames()
-% dataPropertyNames - Properties that hold data rather than metadata
+%dataPropertyNames - Properties that hold data rather than metadata
 %
 %   propertyNames = dataPropertyNames() returns a struct whose fields are
 %   neurodata type names and whose values are the properties of that type

@@ -1,5 +1,5 @@
 classdef getTypesForModuleTest < matlab.unittest.TestCase
-% getTypesForModuleTest - Tests for getTypesForModule
+%getTypesForModuleTest - Tests for getTypesForModule
 %
 %   Tests nansen.module.nwb.internal.schemautil.getTypesForModule, which
 %   lists the neurodata types a given NWB module defines.

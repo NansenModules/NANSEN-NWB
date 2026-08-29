@@ -1,5 +1,5 @@
 function [S, info, isRequired] = getTypeMetadataStruct(typeName)
-% getTypeMetadataStruct - Get a struct of metadata for a neurodata type
+%getTypeMetadataStruct - Get a struct of metadata for a neurodata type
 %
 %   This class removes non-settable properties and data-properties from the
 %   list of properties associated with a neurodata type, returning only

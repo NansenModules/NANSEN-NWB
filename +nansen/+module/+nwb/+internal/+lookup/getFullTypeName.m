@@ -1,5 +1,5 @@
 function fullName = getFullTypeName(shortName)
-% getFullTypeName - Get package-prefixed name from short name
+%getFullTypeName - Get package-prefixed name from short name
 
     persistent typeMap
     if isempty(typeMap)

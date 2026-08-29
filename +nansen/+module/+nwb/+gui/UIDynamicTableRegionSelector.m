@@ -1,5 +1,5 @@
 classdef UIDynamicTableRegionSelector < uiw.abstract.AppWindow
-% UIDynamicTableRegionSelector - A dialog app for selecting a region of a
+%UIDynamicTableRegionSelector - A dialog app for selecting a region of a
 % dynamic table.
 
 %   Todo:

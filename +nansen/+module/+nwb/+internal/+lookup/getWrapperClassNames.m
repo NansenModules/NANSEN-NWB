@@ -1,5 +1,5 @@
 function names = getWrapperClassNames()
-% getWrapperClassNames - Get name of data wrapper classes.
+%getWrapperClassNames - Get name of data wrapper classes.
 %   Names for a set of classes that just wraps various timeseries objects/types
     
     names = [...
