@@ -1,23 +1,23 @@
 classdef NWBVideoExporter < nansen.stack.ImageStackProcessor
-    %NWBVideoExporter - Export an image stack to an NWB file
-    %   OBJ = NWBVideoExporter(sourceStack) exports the given image stack,
-    %   writing it into an NWB file as a neurodata type. Called without an
-    %   output argument the export runs immediately.
-    %
-    %   OBJ = NWBVideoExporter(...,Name=VALUE) also specifies options.
-    %   getDefaultOptions lists them; they cover the target file, its
-    %   compression and chunking, and the imaging metadata to record.
-    %
-    %   NWBVideoExporter functions:
-    %       getDefaultOptions - Get the default export options
-    %
-    %   NWBVideoExporter properties:
-    %       SemanticDataType - Whether the stack is acquired or corrected
-    %
-    %   The other public properties are constants declaring this method's
-    %   attributes to NANSEN.
-    %
-    %   See also nansen.stack.ImageStackProcessor
+%NWBVideoExporter - Export an image stack to an NWB file
+%   OBJ = NWBVideoExporter(sourceStack) exports the given image stack,
+%   writing it into an NWB file as a neurodata type. Called without an
+%   output argument the export runs immediately.
+%
+%   OBJ = NWBVideoExporter(...,Name=VALUE) also specifies options.
+%   getDefaultOptions lists them; they cover the target file, its
+%   compression and chunking, and the imaging metadata to record.
+%
+%   NWBVideoExporter functions:
+%       getDefaultOptions - Get the default export options
+%
+%   NWBVideoExporter properties:
+%       SemanticDataType - Whether the stack is acquired or corrected
+%
+%   The other public properties are constants declaring this method's
+%   attributes to NANSEN.
+%
+%   See also nansen.stack.ImageStackProcessor
 
     properties (Constant) % Attributes inherited from nansen.DataMethod
         MethodName = 'NWB ImageStack Exporter'
