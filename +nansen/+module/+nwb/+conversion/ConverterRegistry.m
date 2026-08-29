@@ -251,16 +251,34 @@ classdef ConverterRegistry < handle
             %
             %   REGISTRY = instance(Refresh=true) discards the shared
             %   registry and builds a new one, picking up converter files
-            %   that changed during this MATLAB session.
+            %   that changed during this MATLAB session. Folders that were
+            %   registered are registered again on the new registry, so a
+            %   refresh does not quietly remove a lab's own converters.
 
             arguments
                 options.Refresh (1,1) logical = false
             end
 
             persistent registryInstance
-            if options.Refresh || isempty(registryInstance) || ~isvalid(registryInstance)
-                registryInstance = nansen.module.nwb.conversion.ConverterRegistry();
+
+            needsBuilding = isempty(registryInstance) || ~isvalid(registryInstance);
+            if ~options.Refresh && ~needsBuilding
+                registry = registryInstance;
+                return
             end
+
+            previousFolders = strings(1, 0);
+            if ~needsBuilding
+                previousFolders = registryInstance.ConverterFolders;
+            end
+
+            registryInstance = nansen.module.nwb.conversion.ConverterRegistry();
+            for i = 1:numel(previousFolders)
+                if isfolder(previousFolders(i))
+                    registryInstance.registerFolder(previousFolders(i))
+                end
+            end
+
             registry = registryInstance;
         end
     end
