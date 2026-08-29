@@ -1,4 +1,21 @@
 classdef NWBConfigurator < applify.MultiPageApp
+    %NWBConfigurator - App for configuring how a project converts to NWB
+    %   OBJ = NWBConfigurator(nwbConfigurationData) opens the configurator
+    %   on a configuration struct, with a page for data variables and a
+    %   page for dynamic tables.
+    %
+    %   OBJ = NWBConfigurator(...,FilePath=VALUE) also sets the file the
+    %   configuration is saved to. Without it, saving asks where to write.
+    %
+    %   NWBConfigurator functions:
+    %       saveNWBConfigurationData - Save the configuration to file
+    %
+    %   NWBConfigurator properties:
+    %       FilePath             - File the configuration is saved to
+    %       NWBConfigurationData - The configuration being edited
+    %
+    %   See also nansen.module.nwb.file.initializeNWBFileConfiguration,
+    %   nansen.module.nwb.file.checkNWBConfiguration
 
 % Todo:
 %
@@ -15,8 +32,8 @@ classdef NWBConfigurator < applify.MultiPageApp
     end
 
     properties (SetAccess = private)
-        FilePath (1,1) string = missing
-        NWBConfigurationData % Todo: Should this be a "file" object?
+        FilePath (1,1) string = missing % File the configuration is saved to
+        NWBConfigurationData % The configuration being edited. Todo: a "file" object?
     end
 
     properties (Access = private) % UI Components
@@ -126,7 +143,10 @@ classdef NWBConfigurator < applify.MultiPageApp
     methods
 
         function saveNWBConfigurationData(obj)
-        % saveNWBConfigurationData - Save NWB configuration to file
+        %saveNWBConfigurationData - Save the configuration to file
+        %   saveNWBConfigurationData(OBJ) writes the configuration to
+        %   FilePath, marks the data variable page clean, and reports any
+        %   problems it finds without blocking the save.
 
             nwbConfigurationData = obj.NWBConfigurationData;
 
