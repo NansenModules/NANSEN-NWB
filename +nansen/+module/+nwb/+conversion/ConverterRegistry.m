@@ -4,6 +4,10 @@ classdef ConverterRegistry < handle
 %   that ship with this module. Most callers want the shared registry
 %   from ConverterRegistry.instance instead of a private one.
 %
+%   OBJ = ConverterRegistry(IncludeBuiltin=false) creates an empty
+%   registry instead, for a caller that wants only the converters it adds
+%   itself.
+%
 %   The registry answers which converters can handle a given data
 %   variable, and which can produce a given neurodata type. It is the one
 %   abstraction the configurator, the runner and the session layer share.
@@ -51,8 +55,14 @@ classdef ConverterRegistry < handle
     end
 
     methods
-        function obj = ConverterRegistry()
-            obj.registerBuiltinConverters()
+        function obj = ConverterRegistry(options)
+            arguments
+                options.IncludeBuiltin (1,1) logical = true
+            end
+
+            if options.IncludeBuiltin
+                obj.registerBuiltinConverters()
+            end
         end
 
         function add(obj, descriptor)
