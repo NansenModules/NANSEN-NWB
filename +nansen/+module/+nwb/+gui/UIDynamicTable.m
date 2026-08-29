@@ -139,7 +139,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             tablePostInsert = obj.DynamicTable(rowIndex+1:end, :);
             
             for iName = columnNames
-                if startsWith( class( obj.DynamicTable.(iName) ), 'matnwb' )
+                if startsWith( class( obj.DynamicTable.(iName) ), 'types.' )
                     instance(numRows) = feval( class( obj.DynamicTable.(iName) ) ); %#ok<AGROW>
                     newRowData.(iName) = reshape( instance, [], 1 );
                 elseif isnumeric( obj.DynamicTable.(iName) )
@@ -391,11 +391,11 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
 
             mitem = uimenu(obj.UITableContextMenu, 'Text', 'Delete Row', 'Separator', 'on');
             mitem.Callback = @obj.onDeleteRowMenuItemClicked;
-            mitem = uimenu(obj.UITableContextMenu, 'Text', 'Delete Column');
+            uimenu(obj.UITableContextMenu, 'Text', 'Delete Column');
 
         end
 
-        function updateComponentLayout(obj)
+        function updateComponentLayout(~)
         end
         
         function openTableContextMenu(obj, x, y)
@@ -417,7 +417,6 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
 
         function updateTableColumnAttributes(obj)
             
-            numRows = size(obj.DynamicTable, 1);
             
             columnNames = obj.DynamicTable.Properties.VariableNames;
             columnFormat = cellfun(@(c) class( obj.DynamicTable.(c) ), columnNames, 'UniformOutput', false );
