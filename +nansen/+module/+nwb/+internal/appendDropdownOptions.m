@@ -5,7 +5,7 @@ function S = appendDropdownOptions(S, nwbNodeStack)
         nwbNodeStack (1,:) nansen.module.nwb.internal.NwbNode
     end
 
-    import nansen.module.nwb.internal.getMetadataInstances
+    import nansen.module.nwb.internal.getMetadataInstanceNames
     import nansen.module.nwb.internal.createNewNwbInstance
     import nansen.module.nwb.internal.lookup.getDynamicTableForRegionView
     
@@ -16,7 +16,7 @@ function S = appendDropdownOptions(S, nwbNodeStack)
     fullLinkedTypeName = nwbNodeStack(end).PropertyTypeFullName;
 
     % Load existing metadata instances for this neurodata type
-    metadataInstances = nansen.module.nwb.internal.getMetadataInstances(fullLinkedTypeName);
+    metadataInstances = nansen.module.nwb.internal.getMetadataInstanceNames(fullLinkedTypeName);
     metadataInstances = cellstr(metadataInstances);
     
     % Specify custom configuration for a dropdown control.
