@@ -1,4 +1,16 @@
 function [itemName, itemData] = createNewDynamicTable(items, nwbNodeStack, options)
+%createNewDynamicTable - Create a dynamic table from a form
+%   [itemName,itemData] = createNewDynamicTable(items,nwbNodeStack) opens
+%   a table editor for the dynamic table a region on this node may point
+%   at, and returns the name and table the user creates.
+%
+%   [...] = createNewDynamicTable(...,Edit=VALUE) edits the existing table
+%   rather than creating one.
+%
+%   Only the electrodes table is supported. Other dynamic tables raise,
+%   because there is no initializer for their columns yet.
+%
+%   See also nansen.module.nwb.internal.createNewNWBInstance
 
     % Note: work in progress. This function is currently only tested for
     % the electrodes table. Should be generalized to work for all dynmic

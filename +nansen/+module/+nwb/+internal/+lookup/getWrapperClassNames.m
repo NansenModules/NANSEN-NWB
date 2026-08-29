@@ -1,6 +1,6 @@
 function names = getWrapperClassNames()
 %getWrapperClassNames - Get name of data wrapper classes.
-%   Names for a set of classes that just wraps various timeseries objects/types
+%   Names of the classes that only wrap timeseries objects or types
     
     names = [...
         "BehavioralEpochs"

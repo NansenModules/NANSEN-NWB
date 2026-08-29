@@ -1,4 +1,12 @@
 function S = appendTableDropdownOptions(S, nwbNodeStack)
+%appendTableDropdownOptions - Offer dynamic tables as dropdown choices
+%   S = appendTableDropdownOptions(S,nwbNodeStack) does what
+%   appendDropdownOptions does, for the table property of a
+%   DynamicTableRegion. The choices are the dynamic tables a region on
+%   this type may point at, rather than instances of one type.
+%
+%   See also nansen.module.nwb.internal.appendDropdownOptions,
+%   nansen.module.nwb.internal.lookup.getDynamicTableForRegionView
 
 % Special function for creating a popup menu configuration struct for
 % creating a dynamic table for the table property of a DynamicTableRegion

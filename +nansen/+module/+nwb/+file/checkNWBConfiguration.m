@@ -18,7 +18,7 @@ function warnings = checkNWBConfiguration(dataItems)
 %                   NeuroDataType, DefaultMetadata (struct or empty).
 %
 %   Output Arguments:
-%     warnings  - Cell array of warning message strings. Empty if no issues.
+%     warnings  - Cell array of warning strings. Empty if none.
 %
 %   See also: nansen.module.nwb.internal.schemautil.getRequiredProperties
 

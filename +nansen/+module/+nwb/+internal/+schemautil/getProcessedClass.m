@@ -1,4 +1,17 @@
 function [processedClass, propertyInfo] = getProcessedClass(className)
+%getProcessedClass - Flatten a neurodata type's schema hierarchy
+%   processedClass = getProcessedClass(className) returns a struct
+%   gathering the attributes, datasets, subgroups and links a neurodata
+%   type declares, merged across the classes it inherits from.
+%
+%   [processedClass,propertyInfo] = getProcessedClass(...) also returns
+%   the name and readonly flag of each property found.
+%
+%   className may be short or fully qualified. The namespace is taken
+%   from the type rather than assumed, since a namespace resolves only
+%   the types it defines and those it depends on.
+%
+%   See also nansen.module.nwb.internal.getTypeMetadataStruct
 
     % Generated nodes and props for faster dependency resolution. Keyed by
     % namespace, because a type is only resolvable from the namespace that

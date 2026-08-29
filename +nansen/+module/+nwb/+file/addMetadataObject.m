@@ -1,7 +1,7 @@
 function addMetadataObject(nwbFile, name, nwbObject)
 %addMetadataObject - Add metadata-like neurodata types to NWB file
 %
-%   This will add a metadata-like neurodata types to the correct location in an
+%   Adds a metadata-like neurodata type to the right place in an
 %   NWB file, typically in the general group. Some metadata types, like
 %   Device, ImagingPlane or ElectrodeGroup should be placed in a specific
 %   location of an NWB file. This is a utility function that adds a type to

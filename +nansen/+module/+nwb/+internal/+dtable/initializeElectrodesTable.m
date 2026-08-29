@@ -1,5 +1,5 @@
 function electrodeTable = initializeElectrodesTable()
-%initializeElectrodesTable - Create an empty table for editing NWB electrodes
+%initializeElectrodesTable - Create an empty electrodes table
 %
 %   electrodeTable = initializeElectrodesTable() returns an empty MATLAB
 %   table whose columns mirror the NWB ElectrodesTable neurodata type. The

@@ -1,4 +1,14 @@
 function configureNwbFile()
+%configureNwbFile - Open the NWB configuration for the current project
+%   configureNwbFile() opens the configurator on the current project's
+%   NWB conversion configuration, creating one from the project's data
+%   variables if the project has none yet.
+%
+%   The project must have data variables defined; without them there is
+%   nothing to configure and the function reports that instead.
+%
+%   See also nansen.module.nwb.gui.NWBConfigurator,
+%   nansen.module.nwb.file.initializeNWBFileConfiguration
 
     import nansen.module.nwb.file.initializeNWBFileConfiguration
 

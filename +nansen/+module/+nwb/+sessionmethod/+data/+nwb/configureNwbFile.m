@@ -1,7 +1,7 @@
 function varargout = configureNwbFile(sessionObject, varargin)
 %configureNwbFile - Configure an NWB file for a session
 %
-%   Customize the configuration of an NWB file for an individual or multiple
+%   Customize the NWB file configuration for one or more
 %   sessions
 
 % Todo: make batch...

@@ -1,4 +1,17 @@
 function [metadata, instanceMap] = resolveMetadata(metadata, neuroDataType, nwbFile, instanceMap)
+%resolveMetadata - Turn stored metadata into linked neurodata objects
+%   [metadata,instanceMap] = resolveMetadata(metadata,neuroDataType,nwbFile,instanceMap)
+%   walks the metadata recorded for a neurodata type and replaces every
+%   reference to another type with a constructed object, adding it to the
+%   file as it goes. Links, embedded types and table regions are each
+%   handled.
+%
+%   instanceMap carries the objects already built, so a type referenced
+%   twice resolves to the same object rather than a second copy. Pass it
+%   back in on the next call.
+%
+%   See also nansen.module.nwb.internal.getMetadataInstance,
+%   nansen.module.nwb.file.addMetadataObject
 
     import nansen.module.nwb.internal.lookup.getFullTypeName
     import nansen.module.nwb.internal.lookup.getMatNWBTypeName

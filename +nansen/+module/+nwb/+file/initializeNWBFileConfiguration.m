@@ -1,4 +1,15 @@
 function S = initializeNWBFileConfiguration(currentProject)
+%initializeNWBFileConfiguration - Build a configuration from a project
+%   S = initializeNWBFileConfiguration() creates a configuration for the
+%   current project, with one item per custom data variable and an empty
+%   electrodes table. It returns an empty struct if the project defines
+%   no such variables.
+%
+%   S = initializeNWBFileConfiguration(currentProject) uses the given
+%   project instead of the current one.
+%
+%   See also nansen.module.nwb.file.getDefaultFileConfigurationItem,
+%   nansen.module.nwb.gui.NWBConfigurator
 
     import nansen.module.nwb.file.getDefaultFileConfigurationItem
     

@@ -1,8 +1,8 @@
 function S = addLinkedTypeInstances(S, neuroDataType, nwbNodeStack)
-%addLinkedTypeInstances - Add linked type instances to a metadata structure.
+%addLinkedTypeInstances - Add linked type instances to metadata
 %
 %   This function adds "config" fields for linked types of an NWB metadata
-%   structure. Each of the config fields will be a cell array of known instance
+%   structure. Each config field becomes a cell array of the known
 %   names of the corresponding type, as well as a structure with
 %   specifications for creating a new instance. The purpose of the "config"
 %   field is that the input field for the linked type will be a dropdown

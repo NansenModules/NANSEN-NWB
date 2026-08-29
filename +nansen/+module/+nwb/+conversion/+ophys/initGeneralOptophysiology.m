@@ -1,4 +1,17 @@
 function initGeneralOptophysiology(nwbFile, options)
+%initGeneralOptophysiology - Add the optophysiology metadata to a file
+%   initGeneralOptophysiology(nwbFile) creates the device, optical
+%   channel and imaging plane an optophysiology recording needs and adds
+%   them to the general_optophysiology group of the file. It modifies the
+%   file in place and returns nothing.
+%
+%   initGeneralOptophysiology(...,NumPlanes=VALUE,NumChannels=VALUE) also
+%   states how many planes and channels the recording has, so that one
+%   imaging plane is created per combination and named apart.
+%
+%   Values are taken from the project's stored metadata where present.
+%
+%   See also nansen.module.nwb.conversion.ophys.utility.getOphysTypeName
 
     arguments
         nwbFile
