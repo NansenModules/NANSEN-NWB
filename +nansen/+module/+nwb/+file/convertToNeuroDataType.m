@@ -96,17 +96,43 @@ function neuroData = convertToNeuroDataType(metadata, data, neuroDataType)
                 % nvPairs = [nvPairs, {'timestamps', seconds(data.Time), 'data' dataV}];
             
             elseif isa(data, 'timeseries')
+                neuroData = feval(fcn, 'data', data.Data, ...
+                    'timestamps', data.Time, nvPairs{:});
 
             elseif isa(data, 'duration')
                 time = seconds(data);
                 data = 1:numel(data);
                 neuroData = feval(fcn, 'data', data, 'timestamps', time, nvPairs{:});
+
             else
+                % Anything else is handed to the type as its data, with the
+                % metadata supplying whatever else the type needs. Data
+                % that carries no time of its own has to be given one, so
+                % the metadata must name either timestamps or a starting
+                % time and rate.
+                if ~hasTimeReference(metadata)
+                    error('nansen:nwb:missingTimeReference', ...
+                        ['%s data has no time information of its own, so ', ...
+                         'the metadata must supply it. Set either ', ...
+                         '"timestamps", or both "starting_time" and ', ...
+                         '"starting_time_rate".'], class(data))
+                end
+                neuroData = feval(fcn, 'data', data, nvPairs{:});
             end
     end
     
     % Get custom conversion function
-    
+
     % Neurodata type
     % nwbData = feval(sprintf('types.core.%s', neuroDataType), nvPairs{:});
+end
+
+function tf = hasTimeReference(metadata)
+%hasTimeReference - True if the metadata says when the samples were taken
+
+    hasTimestamps = isfield(metadata, 'timestamps') && ~isempty(metadata.timestamps);
+    hasStartingTime = isfield(metadata, 'starting_time') && ...
+        isfield(metadata, 'starting_time_rate');
+
+    tf = hasTimestamps || hasStartingTime;
 end
