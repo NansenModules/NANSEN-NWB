@@ -7,12 +7,12 @@ function [S, info, isRequired] = getTypeMetadataStruct(typeName)
 
     import nansen.module.nwb.internal.lookup.getDeprecatedPropertyNames
 
-    persistent dataPropertyMap customPropertyMap
-    if isempty(dataPropertyMap)
-        dataPropertyMap = nansen.module.nwb.internal.dataPropertyLookupMap();
+    persistent dataProperties customDefaults
+    if isempty(dataProperties)
+        dataProperties = nansen.module.nwb.internal.dataPropertyNames();
     end
-    if isempty(customPropertyMap)
-        customPropertyMap = nansen.module.nwb.internal.customPropertyLookupMap();
+    if isempty(customDefaults)
+        customDefaults = nansen.module.nwb.internal.customPropertyDefaults();
     end
 
     % typeName = 'types.core.RoiResponseSeries';
@@ -72,8 +72,8 @@ function [S, info, isRequired] = getTypeMetadataStruct(typeName)
         
         % Check lookup table if property should be ignored.
         definingClassShortName = utility.string.getSimpleClassName(definingClass);
-        if isfield(dataPropertyMap, definingClassShortName)
-            if any(strcmp(dataPropertyMap.(definingClassShortName), thisPropertyName))
+        if isfield(dataProperties, definingClassShortName)
+            if any(strcmp(dataProperties.(definingClassShortName), thisPropertyName))
                 continue
             end
         end
@@ -94,18 +94,18 @@ function [S, info, isRequired] = getTypeMetadataStruct(typeName)
         end
         
         % Check if there are any customizations based on this class
-        if isfield(customPropertyMap, typeShortName)
-            if isfield(customPropertyMap.(typeShortName), thisPropertyName)
-                S.(outPropertyName) = customPropertyMap.(typeShortName).(thisPropertyName);
+        if isfield(customDefaults, typeShortName)
+            if isfield(customDefaults.(typeShortName), thisPropertyName)
+                S.(outPropertyName) = customDefaults.(typeShortName).(thisPropertyName);
                 continue
             end
         end
     
         % Check if there are any customizations based on the defining class (could be superclass)
         if ~strcmp(typeShortName, definingClassShortName)
-            if isfield(customPropertyMap, definingClassShortName)
-                if isfield(customPropertyMap.(definingClassShortName), thisPropertyName)
-                    S.(outPropertyName) = customPropertyMap.(definingClassShortName).(thisPropertyName);
+            if isfield(customDefaults, definingClassShortName)
+                if isfield(customDefaults.(definingClassShortName), thisPropertyName)
+                    S.(outPropertyName) = customDefaults.(definingClassShortName).(thisPropertyName);
                     continue
                 end
             end

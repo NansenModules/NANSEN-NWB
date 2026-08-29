@@ -1,7 +1,7 @@
-classdef validateNwbConfigurationTest < matlab.unittest.TestCase
-% validateNwbConfigurationTest - Tests for validateNwbConfiguration
+classdef checkNwbConfigurationTest < matlab.unittest.TestCase
+% checkNwbConfigurationTest - Tests for checkNwbConfiguration
 %
-%   Tests nansen.module.nwb.file.validateNwbConfiguration, which reports
+%   Tests nansen.module.nwb.file.checkNwbConfiguration, which reports
 %   unfilled configuration columns and missing required NWB metadata
 %   properties.
 %
@@ -9,7 +9,7 @@ classdef validateNwbConfigurationTest < matlab.unittest.TestCase
 %   a neurodata type also needs matnwb and the NANSEN utility packages, so
 %   those tests are filtered when either is unavailable.
 %
-%   See also: nansen.module.nwb.file.validateNwbConfiguration
+%   See also: nansen.module.nwb.file.checkNwbConfiguration
 
     properties (TestParameter)
 
@@ -243,7 +243,7 @@ classdef validateNwbConfigurationTest < matlab.unittest.TestCase
 end
 
 function warnings = validateConfiguration(dataItems)
-    warnings = nansen.module.nwb.file.validateNwbConfiguration(dataItems);
+    warnings = nansen.module.nwb.file.checkNwbConfiguration(dataItems);
 end
 
 function item = createConfigurationItem(options)

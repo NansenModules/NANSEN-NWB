@@ -1,5 +1,5 @@
-function neuroData = convertToDataType(metadata, data, neuroDataType)
-% convertToDataType - Create an NWB "data" object
+function neuroData = convertToNeuroDataType(metadata, data, neuroDataType)
+% convertToNeuroDataType - Create an NWB "data" object
 %
 %   Create an NWB "data" object given metadata, data and the name of the
 %   neurodata type.
@@ -37,7 +37,7 @@ function neuroData = convertToDataType(metadata, data, neuroDataType)
         end
 
         % todo: recursive:
-        neuroData = nansen.module.nwb.file.convertToDataType(metadata, data, neuroDataType);
+        neuroData = nansen.module.nwb.file.convertToNeuroDataType(metadata, data, neuroDataType);
 
         fcn = str2func( getFullTypeName(containerType) );
 

@@ -1,9 +1,10 @@
-function warnings = validateNwbConfiguration(dataItems)
-% validateNwbConfiguration - Validate NWB configuration data items
+function warnings = checkNwbConfiguration(dataItems)
+% checkNwbConfiguration - Report problems in NWB configuration data items
 %
-%   warnings = validateNwbConfiguration(dataItems) checks an array of NWB
+%   warnings = checkNwbConfiguration(dataItems) checks an array of NWB
 %   configuration item structs and returns a cell array of warning strings
-%   describing any problems found.
+%   describing any problems found. It reports rather than enforces, and
+%   never raises, so a caller decides what to do about the result.
 %
 %   Two classes of problems are detected:
 %     1. Unfilled required table columns — PrimaryGroupName, NwbModule, or
