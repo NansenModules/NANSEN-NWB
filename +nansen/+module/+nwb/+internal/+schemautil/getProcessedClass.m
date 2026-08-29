@@ -1,15 +1,22 @@
 function [processedClass, propertyInfo] = getProcessedClass(className)
 
-    persistent pregenerated
-    if isempty(pregenerated)
-        % generated nodes and props for faster dependency resolution
-        pregenerated = containers.Map;
+    % Generated nodes and props for faster dependency resolution. Keyed by
+    % namespace, because a type is only resolvable from the namespace that
+    % defines it and the cache would otherwise be shared across them.
+    persistent pregeneratedByNamespace
+    if isempty(pregeneratedByNamespace)
+        pregeneratedByNamespace = containers.Map;
     end
 
+    namespaceName = getNamespaceName(className);
     className = utility.string.getSimpleClassName(className);
-    
+
+    if ~isKey(pregeneratedByNamespace, namespaceName)
+        pregeneratedByNamespace(namespaceName) = containers.Map;
+    end
+    pregenerated = pregeneratedByNamespace(namespaceName);
+
     nwbSourceDir = misc.getMatnwbDir();
-    namespaceName = 'core';
     Namespace = schemes.loadNamespace(namespaceName, nwbSourceDir);
 
     [processedClassHierarchy, ~, ~] = file.processClass(className, Namespace, pregenerated);
@@ -139,4 +146,32 @@ function mergedAttributes = mergeAttributes(attributesChild, attributesParent)
     mergedAttributes = cat(1, ...
         reshape(mergedAttributes, [], 1), ...
         reshape(attributesChild(isUniqueToChild), [], 1));
+end
+
+function namespaceName = getNamespaceName(className)
+% getNamespaceName - Resolve which NWB namespace defines a type
+%
+%   A namespace only resolves the types it defines and those of the
+%   namespaces it depends on. core reaches hdmf-common but not
+%   hdmf-experimental, so the namespace cannot be assumed and is derived
+%   from the type's fully qualified name instead.
+
+    className = string(className);
+
+    if ~startsWith(className, "types.")
+        try
+            className = string( nansen.module.nwb.internal.lookup ...
+                .getFullTypeName( utility.string.getSimpleClassName(char(className)) ) );
+        catch
+            error('nansen:nwb:unknownNeurodataType', ...
+                ['Neurodata type "%s" was not found in the NWB schema. ', ...
+                 'Provide the name of a type from the loaded NWB namespaces, ', ...
+                 'for example "TimeSeries" or "types.core.TimeSeries".'], className)
+        end
+    end
+
+    % types.<namespace>.<TypeName>. The schema files name the namespace with
+    % a hyphen where the generated package uses an underscore.
+    nameParts = split(className, ".");
+    namespaceName = char( replace(nameParts(2), "_", "-") );
 end

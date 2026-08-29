@@ -33,6 +33,15 @@ classdef getProcessedClassTest < matlab.unittest.TestCase
             'electrodesTable', "ElectrodesTable", ...
             'device', "Device", ...
             'nwbFile', "NWBFile")
+
+        % One type per namespace. A namespace resolves only the types it
+        % defines and those of the namespaces it depends on, so core cannot
+        % reach hdmf-experimental and the namespace has to be derived from
+        % the type rather than assumed.
+        namespacedType = struct( ...
+            'core', "TimeSeries", ...
+            'hdmfCommon', "VectorData", ...
+            'hdmfExperimental', "EnumData")
     end
 
     methods (TestClassSetup)
@@ -85,6 +94,31 @@ classdef getProcessedClassTest < matlab.unittest.TestCase
             fromQualified = processClassNamed("types.core.TimeSeries");
 
             testCase.verifyEqual(fromQualified.type, fromShort.type)
+        end
+
+        function typeResolvesRegardlessOfNamespace(testCase, namespacedType)
+            processedClass = processClassNamed(namespacedType);
+
+            testCase.verifyClass(processedClass, "struct")
+            testCase.verifyEqual(string(processedClass.type), namespacedType)
+        end
+
+        function interleavingNamespacesDoesNotPoisonTheCache(testCase)
+        % The processed-type cache is kept per namespace. Sharing one cache
+        % across namespaces would let an entry resolved in one answer for
+        % another.
+
+            first = processClassNamed("EnumData");
+            processClassNamed("TimeSeries");
+            again = processClassNamed("EnumData");
+
+            testCase.verifyEqual(again.type, first.type)
+            testCase.verifyEqual(string(again.type), "EnumData")
+        end
+
+        function unknownTypeNameThrows(testCase)
+            testCase.verifyError(@() processClassNamed("NotARealNeurodataType"), ...
+                'nansen:nwb:unknownNeurodataType')
         end
     end
 end
