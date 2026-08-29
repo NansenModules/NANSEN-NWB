@@ -1,4 +1,4 @@
-function convertGeneralTwoPhotonSeries(metadata, data, nwbFilePath)
+function convertGeneralTwoPhotonSeries(~, data, nwbFilePath)
     
     % Todo: How to inject metadata?
 

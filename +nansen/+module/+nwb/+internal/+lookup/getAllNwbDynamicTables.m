@@ -5,7 +5,6 @@ function getAllNwbDynamicTables()
 
     [classInfo, ~] = getProcessedClass('NWBFile');
 
-    S = struct;
     displayGroupNameAndType( classInfo.subgroups )
     
 end

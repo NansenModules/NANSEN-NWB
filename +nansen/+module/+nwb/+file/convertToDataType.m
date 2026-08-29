@@ -31,7 +31,7 @@ function neuroData = convertToDataType(metadata, data, neuroDataType)
         metadata = struct2cell(metadata);
         if ~isempty(metadata)
             metadata = metadata{1};
-            [metadata, name] = utility.struct.popfield(metadata, 'name');
+            [metadata, ~] = utility.struct.popfield(metadata, 'name');
         else
             metadata = struct;
         end

@@ -139,7 +139,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             tablePostInsert = obj.DynamicTable(rowIndex+1:end, :);
             
             for iName = columnNames
-                if startsWith( class( obj.DynamicTable.(iName) ), 'matnwb' )
+                if startsWith( class( obj.DynamicTable.(iName) ), 'types.' )
                     instance(numRows) = feval( class( obj.DynamicTable.(iName) ) ); %#ok<AGROW>
                     newRowData.(iName) = reshape( instance, [], 1 );
                 elseif isnumeric( obj.DynamicTable.(iName) )
@@ -234,7 +234,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             obj.UITable.ColumnEditable(colNumber) = false;
         end
 
-        function onTableCellSelected(obj, ~, ~)
+        function onTableCellSelected(~, ~, ~)
             %obj.UITable.ColumnEditable(:) = false;
         end
 
@@ -381,8 +381,8 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             mitem.Callback = @(s,e) obj.onAddNewRowMenuItemClicked(s,e,'below');
 
             %mitem.Callback = @obj.onRemoveTaskMenuItemClicked;
-            mitem = uimenu(obj.UITableContextMenu, 'Text', 'Add Column Before');
-            mitem = uimenu(obj.UITableContextMenu, 'Text', 'Add Column Before');
+            uimenu(obj.UITableContextMenu, 'Text', 'Add Column Before');
+            uimenu(obj.UITableContextMenu, 'Text', 'Add Column After');
 
             mitem = uimenu(obj.UITableContextMenu, 'Text', sprintf('Add N %ss Above...', rowName), 'Separator', 'on');
             mitem.Callback = @(s,e) obj.onAddXNewRowsMenuItemClicked(s,e,'above');
@@ -391,11 +391,11 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
 
             mitem = uimenu(obj.UITableContextMenu, 'Text', 'Delete Row', 'Separator', 'on');
             mitem.Callback = @obj.onDeleteRowMenuItemClicked;
-            mitem = uimenu(obj.UITableContextMenu, 'Text', 'Delete Column');
+            uimenu(obj.UITableContextMenu, 'Text', 'Delete Column');
 
         end
 
-        function updateComponentLayout(obj)
+        function updateComponentLayout(~)
         end
         
         function openTableContextMenu(obj, x, y)
@@ -417,7 +417,6 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
 
         function updateTableColumnAttributes(obj)
             
-            numRows = size(obj.DynamicTable, 1);
             
             columnNames = obj.DynamicTable.Properties.VariableNames;
             columnFormat = cellfun(@(c) class( obj.DynamicTable.(c) ), columnNames, 'UniformOutput', false );
@@ -475,7 +474,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             obj.UITable.ColumnPreferredWidth = columnWidth;
         end
         
-        function options = getNwbTypeOptionsForDropdown(obj, neurodataType)
+        function options = getNwbTypeOptionsForDropdown(~, neurodataType)
             
             instanceCatalog = nansen.module.nwb.internal.getMetadataCatalog(neurodataType);
             typeShortName = utility.string.getSimpleClassName(neurodataType);

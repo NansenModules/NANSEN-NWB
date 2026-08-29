@@ -30,7 +30,7 @@ function [itemName, itemData] = createNewNwbInstance(items, nwbNodeStack, option
 
     % % Should be separate method (initializeNwbInstanceForm)
     % Get the defaults for the current item
-    [SOrig, info, isRequired] = nansen.module.nwb.internal.getTypeMetadataStruct(nwbDataType);
+    [SOrig, info, ~] = nansen.module.nwb.internal.getTypeMetadataStruct(nwbDataType);
     SOrig.name = '';
 
     actionStr = 'Create new';
@@ -112,6 +112,6 @@ function [itemName, itemData] = createNewNwbInstance(items, nwbNodeStack, option
     end
 end
 
-function onValueChanged(src, evt)
+function onValueChanged(~, ~)
     % Todo: Validation of entered values...
 end

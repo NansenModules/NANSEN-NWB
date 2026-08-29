@@ -97,7 +97,7 @@ classdef NWBVideoExporter < nansen.stack.ImageStackProcessor
                 obj.SemanticDataType = "MotionCorrected";
             end
 
-            wasInitialized = obj.initializeNWBFile();
+            obj.initializeNWBFile();
 
             obj.initializeGroups() % Device / opticalchannel / imagingplanes
 

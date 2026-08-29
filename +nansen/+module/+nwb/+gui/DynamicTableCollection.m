@@ -175,7 +175,7 @@ classdef DynamicTableCollection < handle
         function createContextMenus(obj)
             hFigure = ancestor(obj.Parent, 'figure');
             obj.TableContextMenu = uicontextmenu(hFigure);
-            mitem = uimenu(obj.TableContextMenu, 'Text', 'Remove Task');
+            uimenu(obj.TableContextMenu, 'Text', 'Remove Task');
             %mitem.Callback = @obj.onRemoveTaskMenuItemClicked;
         end
         
@@ -243,7 +243,6 @@ classdef DynamicTableCollection < handle
             if isempty(obj.DynamicTableSelector); return; end
             
             w = obj.DynamicTableSelector.Width;
-            uiTable = obj.DynamicTable;
             
             % Todo: Get the padding value programmatically
             xPadding = 3;
@@ -273,7 +272,7 @@ classdef DynamicTableCollection < handle
     
     methods (Access = protected)
         
-        function addDynamicTable(obj, ~, ~)
+        function addDynamicTable(~, ~, ~)
             msgbox('Not implemented yet', 'Error')
             % Todo: 
             
@@ -289,7 +288,7 @@ classdef DynamicTableCollection < handle
 
         end
 
-        function onDynamicTableTypeChanged(obj, s, e)
+        function onDynamicTableTypeChanged(obj, s, ~)
 
             selectedTableName = s.Text;
             % Only hide/show panels if they exist
@@ -301,11 +300,11 @@ classdef DynamicTableCollection < handle
             end
         end
             
-        function setDefaultFigureCallbacks(obj)
+        function setDefaultFigureCallbacks(~)
             %obj.Figure.WindowKeyPressFcn = @obj.onKeyPressedInTable;
         end
     
-        function onThemeChanged(obj)
+        function onThemeChanged(~)
             % Todo:
         end
     end

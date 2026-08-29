@@ -18,7 +18,7 @@ function configureNwbFile()
         end
         % Todo: Save configuration catalog here or later?
     else
-        if numel(L) == 1
+        if isscalar(L)
             configurationFilePath = fullfile(L(1).folder, L(1).name);
         else
             [selectedIndex, wasConfirmed] = listdlg( ...

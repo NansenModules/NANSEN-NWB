@@ -12,7 +12,7 @@ function [processedClass, propertyInfo] = getProcessedClass(className)
     namespaceName = 'core';
     Namespace = schemes.loadNamespace(namespaceName, nwbSourceDir);
 
-    [processedClassHierarchy, classprops, inherited] = file.processClass(className, Namespace, pregenerated);
+    [processedClassHierarchy, ~, ~] = file.processClass(className, Namespace, pregenerated);
 
     if isa(processedClassHierarchy, 'file.Group')
         % Get all groups, datasets, attributes and links
@@ -99,7 +99,7 @@ function mergedDatasets = mergeDatasets(datasets)
             
             mergedDatasets(isSame) = thisDataset;
         else
-            mergedDatasets(end+1) = thisDataset; %#ok<AGROW>
+            mergedDatasets(end+1) = thisDataset; 
         end
     end
 

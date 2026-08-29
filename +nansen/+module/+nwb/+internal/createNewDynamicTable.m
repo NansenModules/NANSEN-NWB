@@ -1,24 +1,19 @@
-function [itemName, itemData] = createNewDynamicTable(items, nwbNodeStack)
+function [itemName, itemData] = createNewDynamicTable(items, nwbNodeStack, options)
 
     % Note: work in progress. This function is currently only tested for
     % the electrodes table. Should be generalized to work for all dynmic
     % tables, and also allow creation of arbitrary dynamic tables, i.e not
     % just those that are defined in the nwb file schema (see
-    % getDynamicTableForRegionView)
+    % nansen.module.nwb.internal.lookup.getDynamicTableForRegionView)
 
     arguments
-        items (1,:) string % Currently noy used. 
+        items (1,:) string % Currently not used. 
         nwbNodeStack (1,:) nansen.module.nwb.internal.NwbNode
+        options.Edit (1,1) logical = false
     end
 
     import nansen.module.nwb.internal.lookup.getDynamicTableForRegionView
     import nansen.module.nwb.internal.lookup.getFullTypeName
-
-    isEditing = false; % todo: support editing?
-
-    nwbDataType = nwbNodeStack.PropertyTypeFullName;
-    %nwbShortName = nwbNodeStack.PropertyType;
-    %ancestorType = nwbNodeStack.DefiningType;
 
     %linkedTableName='SimultaneousRecordingsTable'
     %linkedTableName='PlaneSegmentation'
@@ -30,20 +25,17 @@ function [itemName, itemData] = createNewDynamicTable(items, nwbNodeStack)
 
     % Initialize the table
     if strcmp(linkedTableName, 'ElectrodesTable')
-        dynamicTable = nansen.module.nwb.internal.dtable.initializeElectrodesTable();
+        matlabTable = nansen.module.nwb.internal.dtable.initializeElectrodesTable();
     else
-        % Todo: Need an initializer cuz this just creates empty tables...
-        error('Not implemented yet')
+        % Todo: Need an initializer (for columns?) because this just 
+        % creates empty tables
         fullLinkedTableType = getFullTypeName(linkedTableName);
         dynamicTable = feval(fullLinkedTableType);
-        dynamicTable = dynamicTable.toTable();
-
-        % Todo: Is there any case where we just need to create a generic
-        % dynamic table???
+        matlabTable = dynamicTable.toTable();
     end
 
     % Open the table in the UIDynamicTable
-    [h, data] = nansen.module.nwb.gui.UICreateDynamicTable(dynamicTable);
+    [h, data] = nansen.module.nwb.gui.UICreateDynamicTable(matlabTable);
         
     % The figure on top of the stack should be the reference figure.
     f = findall(0, 'type','figure'); f = f(1);
@@ -76,7 +68,7 @@ function [itemName, itemData] = createNewDynamicTable(items, nwbNodeStack)
             % Remove config fields.
             S = utility.struct.removeConfigFields(S);
     
-            if isEditing
+            if options.Edit
                 catalog.replace(S)
             else
                 catalog.add(S)

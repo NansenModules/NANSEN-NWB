@@ -91,11 +91,11 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
     end
     
     methods 
-        function deactivate(obj)
+        function deactivate(~)
             % pass
         end
 
-        function activate(obj)
+        function activate(~)
             % pass
         end
     end
@@ -260,7 +260,6 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
 
             if ~isInitialized
                         
-                numRows = size(obj.TableDataCurrent, 1);
 
                 % Update the column formatting properties
                 obj.UITable.ColumnFormat = {'char', 'char', 'popup', 'popup', 'popup', 'popup', 'char'};
@@ -360,10 +359,9 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             end
         end
         
-        function onTableCellSelected(obj, ~, evt)
+        function onTableCellSelected(obj, ~, ~)
                          
             colNum = obj.UITable.JTable.getSelectedColumns() + 1;
-            rowNum = evt.SelectedRows;
             
             if colNum == 4
                 obj.dropdownOpen = true;
@@ -423,7 +421,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             obj.updateTableTooltip(rowNum, colNum)
         end
         
-        function rearrangeRows(obj, hTable, eventData)
+        function rearrangeRows(obj, ~, eventData)
         %rearrangeRows Rearrange table rows in response to user input
         
             data = obj.UITable.DataTable;
@@ -658,7 +656,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
 
             nwbClassName = nansen.module.nwb.internal.lookup.getFullTypeName(neuroDataType);
             %nwbClassName = sprintf( 'matnwb.types.core.%s', neuroDataType );
-            [S, info, isRequired] = nansen.module.nwb.internal.getTypeMetadataStruct(nwbClassName);
+            [S, info, ~] = nansen.module.nwb.internal.getTypeMetadataStruct(nwbClassName);
             
             % If data already exists, use that insted
             if ~isempty( obj.TableDataCurrent{rowNumber, 'DefaultMetadata'}{1} )
@@ -682,7 +680,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             end
         end
 
-        function onValueChanged(obj, ~, ~)
+        function onValueChanged(~, ~, ~)
             % Todo: should not be part of this class
             %disp('a')
         end
