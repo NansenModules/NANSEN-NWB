@@ -75,7 +75,9 @@ import nansen.session.SessionMethod
     nwbFilename = sprintf('sub-%s_ses-%s.nwb', sessionObject.subjectID, sessionObject.sessionID);
     nwbFilePath = fullfile(saveFolder, nwbFilename);
     
-    if isfile(nwbFilePath); delete(nwbFilePath); end
+    if strcmp(params.WriteMode, 'Overwrite') && isfile(nwbFilePath)
+        delete(nwbFilePath);
+    end
 
     %% Open or create NWB file depending on if file exists.
     if isfile(nwbFilePath)
@@ -189,6 +191,7 @@ function params = getDefaultParameters()
     params = struct();
     params.ConfigurationFileName = "";
     params.TimeZone = "local";
+    params.WriteMode = 'Overwrite'; % 'Overwrite' | 'Append'
 end
 
 function sessionStartTime = getSessionStartTime(sessionObject, timeZone)

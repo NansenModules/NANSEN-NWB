@@ -181,7 +181,15 @@ classdef NwbFileConverter < handle
             end
 
             name = sprintf('%sImage', name);
-            imageCollection.image.set(name, neurodata);
+
+            % NWB 2.9 renamed the Images collection's member property from
+            % image to baseimage. The module does not pin a matnwb version,
+            % so pick whichever the installed schema defines.
+            if isprop(imageCollection, 'baseimage')
+                imageCollection.baseimage.set(name, neurodata);
+            else
+                imageCollection.image.set(name, neurodata);
+            end
         end
 
         function addProcessingModule(obj, name, description)

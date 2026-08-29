@@ -531,8 +531,11 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             if ~descriptionMap.isConfigured() || ~descriptionMap.isKey(neurodataType)
                 % Get nwb module from column
                 nwbModuleName = obj.TableDataCurrent.NwbModule{rowNumber};
+
+                % Return if no module selection has been made
                 if isempty(nwbModuleName); return; end
-    
+                if strcmp(nwbModuleName, '<Select an NWB module>'); return; end
+
                 [neuroDataTypes, descriptions] = getTypesForModule(nwbModuleName);
                 descriptionMap(neuroDataTypes) = descriptions;
             end
