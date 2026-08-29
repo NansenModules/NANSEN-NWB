@@ -381,8 +381,8 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             mitem.Callback = @(s,e) obj.onAddNewRowMenuItemClicked(s,e,'below');
 
             %mitem.Callback = @obj.onRemoveTaskMenuItemClicked;
-            mitem = uimenu(obj.UITableContextMenu, 'Text', 'Add Column Before');
-            mitem = uimenu(obj.UITableContextMenu, 'Text', 'Add Column Before');
+            uimenu(obj.UITableContextMenu, 'Text', 'Add Column Before');
+            uimenu(obj.UITableContextMenu, 'Text', 'Add Column After');
 
             mitem = uimenu(obj.UITableContextMenu, 'Text', sprintf('Add N %ss Above...', rowName), 'Separator', 'on');
             mitem.Callback = @(s,e) obj.onAddXNewRowsMenuItemClicked(s,e,'above');
