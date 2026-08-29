@@ -16,7 +16,11 @@ function [processedClass, propertyInfo] = getProcessedClass(className)
 
     if isa(processedClassHierarchy, 'file.Group')
         % Get all groups, datasets, attributes and links
-        subgroups = [processedClassHierarchy.subgroups];
+        % Concatenate down, as the sibling fields below do. Classes in the
+        % hierarchy report differently shaped subgroup arrays, so a
+        % horizontal concatenation fails whenever one of them holds more
+        % than a single subgroup.
+        subgroups = cat(1, processedClassHierarchy.subgroups);
         attributes = cat(1, processedClassHierarchy.attributes);
         datasets = mergeDatasets( cat(1, processedClassHierarchy.datasets) );
         links = cat(1, processedClassHierarchy.links);
@@ -128,5 +132,11 @@ function mergedAttributes = mergeAttributes(attributesChild, attributesParent)
 
     % Todo: Also add attributes which are unique to the child...
     [~, isUniqueToChild] = setdiff(attributeNamesChild, attributeNamesParent);
-    mergedAttributes = [mergedAttributes, attributesChild(isUniqueToChild)];
+
+    % The parent and child attribute arrays do not share an orientation, so
+    % normalize both to columns before concatenating. Appending along the
+    % row otherwise fails whenever the two differ in height.
+    mergedAttributes = cat(1, ...
+        reshape(mergedAttributes, [], 1), ...
+        reshape(attributesChild(isUniqueToChild), [], 1));
 end
