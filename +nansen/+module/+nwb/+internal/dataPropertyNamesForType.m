@@ -1,5 +1,5 @@
 function propertyNames = dataPropertyNamesForType(typeName)
-% dataPropertyNamesForType - Data properties of a type and its superclasses
+%dataPropertyNamesForType - Data properties of a type and its superclasses
 %
 %   propertyNames = dataPropertyNamesForType(typeName) returns the
 %   properties that carry data rather than metadata for the neurodata type

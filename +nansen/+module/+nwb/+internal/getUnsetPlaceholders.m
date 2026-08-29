@@ -1,5 +1,5 @@
 function placeholders = getUnsetPlaceholders()
-% getUnsetPlaceholders - Placeholder labels for unset configuration columns
+%getUnsetPlaceholders - Placeholder labels for unset configuration columns
 %
 %   placeholders = getUnsetPlaceholders() returns a struct whose fields name
 %   the columns of the NWB data variable configuration table that require a
