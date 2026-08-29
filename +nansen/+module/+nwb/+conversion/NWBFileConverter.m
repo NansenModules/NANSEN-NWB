@@ -1,28 +1,28 @@
 classdef NWBFileConverter < handle
-    %NWBFileConverter - Build an NWB file for a session, piece by piece
-    %   OBJ = NWBFileConverter(sessionObject,targetFolder) creates a
-    %   converter holding a new NWB file for the session, to be written
-    %   into the given folder. Add content with the methods below, then
-    %   call export.
-    %
-    %   OBJ = NWBFileConverter(...,FilenameSuffix=VALUE) also appends a
-    %   suffix to the file name, to tell several files for one session
-    %   apart.
-    %
-    %   NWBFileConverter functions:
-    %       addTrials             - Add a trial table
-    %       addRois               - Add a segmentation of a ROI group
-    %       addRoiSignals         - Add the signals extracted from ROIs
-    %       addFovProjectionImage - Add a projection image of the field
-    %       addProcessingModule   - Add a processing module
-    %       addToAcquisition      - Add data to the acquisition group
-    %       export                - Write the file to disk
-    %
-    %   NWBFileConverter properties:
-    %       NwbFile  - The NWB file being built
-    %       FilePath - Where export will write it
-    %
-    %   See also nansen.module.nwb.conversion.initNWBFile
+%NWBFileConverter - Build an NWB file for a session, piece by piece
+%   OBJ = NWBFileConverter(sessionObject,targetFolder) creates a
+%   converter holding a new NWB file for the session, to be written
+%   into the given folder. Add content with the methods below, then
+%   call export.
+%
+%   OBJ = NWBFileConverter(...,FilenameSuffix=VALUE) also appends a
+%   suffix to the file name, to tell several files for one session
+%   apart.
+%
+%   NWBFileConverter functions:
+%       addTrials             - Add a trial table
+%       addRois               - Add a segmentation of a ROI group
+%       addRoiSignals         - Add the signals extracted from ROIs
+%       addFovProjectionImage - Add a projection image of the field
+%       addProcessingModule   - Add a processing module
+%       addToAcquisition      - Add data to the acquisition group
+%       export                - Write the file to disk
+%
+%   NWBFileConverter properties:
+%       NwbFile  - The NWB file being built
+%       FilePath - Where export will write it
+%
+%   See also nansen.module.nwb.conversion.initNWBFile
 
     properties
         NwbFile (1,1) NwbFile % The NWB file being built
