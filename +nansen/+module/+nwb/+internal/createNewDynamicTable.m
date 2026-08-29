@@ -57,7 +57,7 @@ function [itemName, itemData] = createNewDynamicTable(items, nwbNodeStack)
     uiwait(h)
 
     % Preallocate an empty item
-    nwbDataType = 'matnwb.types.hdmf_common.DynamicTable';
+    nwbDataType = nansen.module.nwb.internal.lookup.getMatNwbTypeName('hdmf_common', 'DynamicTable');
     itemName = ''; itemData = feval(sprintf('%s.empty', nwbDataType));
 
     if isKey(data, 'State')

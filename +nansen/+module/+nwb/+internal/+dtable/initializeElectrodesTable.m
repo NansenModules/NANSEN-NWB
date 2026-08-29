@@ -1,33 +1,81 @@
 function electrodeTable = initializeElectrodesTable()
-% Todo: Add ID.
-    
-    electrodeGroup = nansen.module.nwb.internal.schemautil.getElectrodesTableGroup();
+% initializeElectrodesTable - Create an empty table for editing NWB electrodes
+%
+%   electrodeTable = initializeElectrodesTable() returns an empty MATLAB
+%   table whose columns mirror the NWB ElectrodesTable neurodata type. The
+%   table is used by the dynamic table editor, so it carries the column
+%   descriptions and the group-to-group_name dependency the editor reads.
+%
+%   Output Arguments:
+%     electrodeTable - Empty table with one variable per electrode column.
+%
+%   See also: nansen.module.nwb.internal.schemautil.getProcessedClass
 
-    dynamicTableColumns = electrodeGroup.datasets;
+    % NWB 2.9.0 moved the electrode columns off an anonymous group on
+    % NWBFile and into the ElectrodesTable neurodata type, leaving that
+    % group with no datasets of its own. The column set is therefore read
+    % from the type rather than by walking NWBFile's subgroups.
+    [classInfo, ~] = nansen.module.nwb.internal.schemautil ...
+        .getProcessedClass('ElectrodesTable');
 
-    columnNames = {dynamicTableColumns.name};
-    columnDescriptions = {dynamicTableColumns.doc};
-    numColumns = numel(columnNames);
+    columns = selectDataColumns(classInfo.datasets);
 
-    variableTypes = {dynamicTableColumns.dtype};
-    variableTypes{7} = 'matnwb.types.core.ElectrodeGroup';
-    variableTypes = string(variableTypes);
-    variableTypes(variableTypes=="char")="string";
+    columnNames = {columns.name};
+    variableTypes = cellfun(@matlabTypeForColumn, {columns.dtype}, ...
+        'UniformOutput', false);
 
-    electrodeTable = table('Size', [0,numColumns], 'VariableTypes', variableTypes);
+    % The columns are built here rather than by preallocating with
+    % table(Size=...), because matnwb's "types" package shares its name
+    % with a variable inside table's preallocation code. Resolving
+    % "types.core.ElectrodeGroup" in that scope fails, while calling empty
+    % on the class from here works.
+    columnValues = cellfun(@(t) feval(sprintf('%s.empty', t), 0, 1), ...
+        variableTypes, 'UniformOutput', false);
 
-    electrodeTable.Properties.Description = electrodeGroup.doc;
-    electrodeTable.Properties.VariableNames = columnNames;
-    electrodeTable.Properties.VariableDescriptions = columnDescriptions;
+    electrodeTable = table(columnValues{:}, 'VariableNames', columnNames);
 
-    % Some ad-hoc mess to account for the fact that the name of an
-    % electrode group is stored in a separate vectordata entry in the
-    % dynamic table.
+    electrodeTable.Properties.Description = classInfo.type;
+    electrodeTable.Properties.VariableDescriptions = {columns.doc};
+
+    % The editor stores an electrode group as an object in "group" but
+    % writes its name into the separate "group_name" column, so the link
+    % between the two travels with the table.
     electrodeTable = addprop(electrodeTable, 'ColumnDependency', 'variable');
     columnDependency = repmat(string(missing), 1, width(electrodeTable));
-    isGroup = strcmp(electrodeTable.Properties.VariableNames, 'group');
-    columnDependency(isGroup) = "group_name";
+    columnDependency(strcmp(columnNames, 'group')) = "group_name";
     electrodeTable.Properties.CustomProperties.ColumnDependency = columnDependency;
-    
+
     electrodeTable.Properties.DimensionNames{1} = 'Electrode';
+end
+
+function columns = selectDataColumns(datasets)
+% selectDataColumns - Keep the named data columns, in a stable order
+%
+%   The processed class also carries the anonymous VectorData placeholder
+%   inherited from DynamicTable and the "id" row identifier, neither of
+%   which is an editable data column. Sorting by name keeps the column
+%   order stable across matnwb versions, which the schema order is not.
+
+    isDataColumn = ~cellfun(@isempty, {datasets.name}) ...
+        & ~strcmp({datasets.name}, 'id');
+    columns = datasets(isDataColumn);
+
+    [~, order] = sort(string({columns.name}));
+    columns = columns(order);
+end
+
+function typeName = matlabTypeForColumn(dtype)
+% matlabTypeForColumn - Map an NWB schema dtype onto a MATLAB table type
+
+    if isa(dtype, 'containers.Map')
+        % An object reference. The column holds instances of the target
+        % type, for example ElectrodeGroup for the "group" column.
+        typeName = nansen.module.nwb.internal.lookup.getMatNwbTypeName( ...
+            'core', dtype('target_type'));
+    elseif strcmp(dtype, 'char')
+        % Text columns are edited as strings rather than character arrays.
+        typeName = 'string';
+    else
+        typeName = dtype;
+    end
 end

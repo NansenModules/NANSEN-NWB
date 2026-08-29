@@ -1,6 +1,7 @@
 function [metadata, instanceMap] = resolveMetadata(metadata, neuroDataType, nwbFile, instanceMap)
 
     import nansen.module.nwb.internal.lookup.getFullTypeName
+    import nansen.module.nwb.internal.lookup.getMatNwbTypeName
 
     if ~isempty(metadata)
         metadata = utility.struct.removeConfigFields(metadata);
@@ -131,7 +132,7 @@ function [metadata, instanceMap] = resolveMetadata(metadata, neuroDataType, nwbF
                     end
                     %matnwb.types.untyped.ObjectView(EGroup)
 
-                    nwbType = matnwb.util.table2nwb(dynamicTable);
+                    nwbType = util.table2nwb(dynamicTable);
                 
                     if ~isempty(nwbFile)
                         nansen.module.nwb.file.addMetadataObject(nwbFile, instanceName, nwbType);
@@ -141,7 +142,7 @@ function [metadata, instanceMap] = resolveMetadata(metadata, neuroDataType, nwbF
                 error('Unhandled type')
             end
 
-            metadata.( typedAttributes(i).name ) = matnwb.types.untyped.ObjectView(nwbType);
+            metadata.( typedAttributes(i).name ) = feval(getMatNwbTypeName('untyped', 'ObjectView'), nwbType);
         end
     end
 end
@@ -161,7 +162,7 @@ end
 
 function [dynamicTable, instanceMap] = convertElectrodeGroups(dynamicTable, nwbFile, instanceMap)
     %electrodeGroups = dynamicTable.group;
-    
+
     % Note: Electrode groups are stored both in this table and in a
     % metadata instance catalog. For now, we use the instances from the
     % table and not the catalog. Not sure what is the best long term
@@ -169,9 +170,11 @@ function [dynamicTable, instanceMap] = convertElectrodeGroups(dynamicTable, nwbF
     % Note2: Would be great to generalize the conversion of dynamic tables
     % with object references...
 
+    import nansen.module.nwb.internal.lookup.getMatNwbTypeName
+
     groupName = dynamicTable.group_name;
 
-    nwbType = 'matnwb.types.core.ElectrodeGroup';
+    nwbType = getMatNwbTypeName('core', 'ElectrodeGroup');
     catalog = nansen.module.nwb.internal.getMetadataCatalog(nwbType);
     
     objectViews = cell(size(groupName));
@@ -194,12 +197,12 @@ function [dynamicTable, instanceMap] = convertElectrodeGroups(dynamicTable, nwbF
         [iElectrodeGroup, ~] = utility.struct.popfield(iElectrodeGroup, 'name', false);    
 
         nvPairs = namedargs2cell(iElectrodeGroup);
-        iElectrodeGroup = feval(nwbType, nvPairs{:}); %#ok<FVAL>
+        iElectrodeGroup = feval(nwbType, nvPairs{:});
 
         nwbFile.general_extracellular_ephys.set(iGroupName, iElectrodeGroup);
         %nansen.module.nwb.file.addMetadataObject(nwbFile, iGroupName, iElectrodeGroup);
 
-        objectViews{i} =  matnwb.types.untyped.ObjectView( iElectrodeGroup );
+        objectViews{i} = feval(getMatNwbTypeName('untyped', 'ObjectView'), iElectrodeGroup);
     end
 
     dynamicTable.group = cat(1, objectViews{:});

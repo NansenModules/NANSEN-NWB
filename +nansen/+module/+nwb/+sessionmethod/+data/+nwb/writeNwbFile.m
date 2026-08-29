@@ -48,6 +48,8 @@ import nansen.session.SessionMethod
     %% Initialize configurations
 
     currentProject = nansen.getCurrentProject();
+    projectName = string(currentProject.Name);
+
     configurationFolderPath = currentProject.getConfigurationFolder('Subfolder', 'nwb');
     configurationFilePath = getConfigurationFilePath( ...
         configurationFolderPath, params.ConfigurationFileName);
@@ -78,12 +80,16 @@ import nansen.session.SessionMethod
     if isfile(nwbFilePath); delete(nwbFilePath); end
 
     %% Open or create NWB file depending on if file exists.
-    % Todo: Function of nwb module:
     if isfile(nwbFilePath)
-        nwbFile = nansen.module.nwb.file.NWBFile(nwbFilePath);
+        nwbFile = nwbRead(nwbFilePath);
         wasInitialized = false;
     else
-        nwbFile = nansen.module.nwb.file.NWBFile();
+        nwbFile = NwbFile(...
+            'identifier', strjoin([projectName, string(sessionObject.subjectID), string(sessionObject.sessionID)], '_'), ...
+            'session_description', sessionObject.Description, ...
+            'session_start_time', getSessionStartTime(sessionObject, params.TimeZone), ...
+            'general_session_id', sessionObject.sessionID);
+
         wasInitialized = true;
     end
 
@@ -134,18 +140,24 @@ import nansen.session.SessionMethod
         else
             customConverterFcn = variableConfiguration.Converter;
             feval(customConverterFcn, metadata, data, nwbFilePath);
-            nwbFile = nansen.module.nwb.file.NWBFile(nwbFilePath);
+            nwbFile = nwbRead(nwbFilePath);
             continue
         end
 
         switch variableConfiguration.PrimaryGroupName
             case 'Acquisition'
-                nwbFile.acquisition.set(variableName, neuroData);
-            
+                if isa(neuroData, 'struct')
+                    for j = 1:numel(neuroData)
+                        nwbFile.acquisition.set(neuroData(j).name, neuroData(j).data);
+                    end
+                else
+                    nwbFile.acquisition.set(variableName, neuroData);
+                end
+
             case 'Processing'
                 moduleName = variableConfiguration.NwbModule;
                 % Create or get processing module based on nwb module
-                 processingModule = nwbFile.getProcessingModule(moduleName, 'No Description');
+                processingModule = nansen.module.nwb.file.getProcessingModule(nwbFile, moduleName, 'No Description');
                 if isa(neuroData, 'struct')
                     for j = 1:numel(neuroData)
                         processingModule.nwbdatainterface.set(...
@@ -165,7 +177,7 @@ import nansen.session.SessionMethod
     
         nwbExport(nwbFile, nwbFilePath)
     end
-            
+    
     %nwbExport(nwbFile, nwbFilePath)
     fprintf('Finished writing file ''%s''\n', nwbFilePath)
 
@@ -180,6 +192,39 @@ function params = getDefaultParameters()
 %getDefaultParameters Define the default parameters for this function
     params = struct();
     params.ConfigurationFileName = "";
+    params.TimeZone = "local";
+end
+
+function sessionStartTime = getSessionStartTime(sessionObject, timeZone)
+% getSessionStartTime - Combine a session's date and time into a zoned datetime
+%
+%   NWB records session_start_time as an ISO 8601 timestamp. matnwb writes
+%   the UTC offset only when the datetime carries a time zone, so an
+%   unzoned value would produce a timestamp that cannot be placed on an
+%   absolute timeline. The session's date and time come from folder names
+%   and carry no zone of their own, so one is attached here.
+
+    if isempty(sessionObject.Date) || isempty(sessionObject.Time)
+        error('nansen:nwb:missingSessionStartTime', ...
+            ['Session "%s" has no date or time, so session_start_time ', ...
+             'cannot be determined. Set the Date and Time metadata for ', ...
+             'the session before writing an NWB file.'], sessionObject.sessionID)
+    end
+
+    % DataLocationModel.getDate only parses a datetime when the "Experiment
+    % Date" metadata variable has a string format configured. Without one it
+    % returns the raw substring, which would fail further down with an error
+    % that does not point at the cause.
+    if ~isdatetime(sessionObject.Date)
+        error('nansen:nwb:unparsedSessionDate', ...
+            ['Session "%s" has a date of type %s rather than datetime, so ', ...
+             'session_start_time cannot be determined. Configure a string ', ...
+             'format for the "Experiment Date" metadata variable so that it ', ...
+             'is parsed as a date.'], sessionObject.sessionID, class(sessionObject.Date))
+    end
+
+    sessionStartTime = sessionObject.Date + duration( char( sessionObject.Time ) );
+    sessionStartTime.TimeZone = timeZone;
 end
 
 function configurationFilePath = getConfigurationFilePath(configurationFolderPath, configurationFileName)

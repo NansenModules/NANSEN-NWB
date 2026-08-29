@@ -174,11 +174,12 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             % vectordata nwb type has a dependent column...
             columnNames = obj.DynamicTable.Properties.VariableNames;
             columnFormat = cellfun(@(c) class( obj.DynamicTable.(c) ), columnNames, 'UniformOutput', false );
-            isNwbType = startsWith(columnFormat, 'matnwb.types.core');
+            isNwbType = startsWith(columnFormat, 'types.core');
 
             nwbTypeInd = find(isNwbType);
             for idx = nwbTypeInd
                 dependentColumnName = obj.getDependentColumnName(idx);
+                if ismissing(dependentColumnName); continue; end
                 tableDataDisplay.(columnNames{idx}) = tableDataDisplay.(dependentColumnName);
             end
 
@@ -430,7 +431,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             columnFormat(strcmp(columnFormat, 'single'))={'numeric'};
             columnFormat(strcmp(columnFormat, 'string'))={'char'};
 
-            isNwbType = startsWith(columnFormat, 'matnwb.types.core');
+            isNwbType = startsWith(columnFormat, 'types.core');
 
             for i = find(isNwbType)
                 colFormatData{i} = obj.getNwbTypeOptionsForDropdown( columnFormat{i} );
@@ -525,13 +526,25 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
         end
 
         function columnName = getDependentColumnName(obj, columnNumber)
+        % getDependentColumnName - Name of the column a column depends on
+        %
+        %   Returns missing when the table declares no dependencies. Only
+        %   tables built by the dtable initializers carry the
+        %   ColumnDependency property, so a table arriving from elsewhere
+        %   is treated as having no dependent columns.
+
+            if ~isprop(obj.DynamicTable, 'ColumnDependency')
+                columnName = string(missing);
+                return
+            end
+
             columnName = obj.DynamicTable.Properties.CustomProperties.ColumnDependency(columnNumber);
         end
 
         function tf = isNwbType(obj, columnNumber)
             columnNames = obj.DynamicTable.Properties.VariableNames(columnNumber);
             columnFormat = cellfun(@(c) class( obj.DynamicTable.(c) ), columnNames, 'UniformOutput', false );
-            tf = startsWith(columnFormat, 'matnwb.types.core');
+            tf = startsWith(columnFormat, 'types.core');
         end
 
         function nwbType = getNwbType(obj, columnNumber)
