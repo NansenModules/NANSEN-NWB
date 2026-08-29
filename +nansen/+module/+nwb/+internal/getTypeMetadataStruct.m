@@ -18,6 +18,14 @@ function [S, info, isRequired] = getTypeMetadataStruct(typeName)
     % typeName = 'types.core.RoiResponseSeries';
 
     mc = meta.class.fromName(typeName);
+    if isempty(mc)
+        % Not every name under the types namespace is a neurodata type.
+        % Version, for one, is a function returning the schema version.
+        error('nansen:nwb:notANeurodataType', ...
+            ['"%s" does not name a neurodata type class. Pass the fully ', ...
+             'qualified name of a generated NWB type, for example ', ...
+             '"types.core.TimeSeries".'], typeName)
+    end
     typeShortName = utility.string.getSimpleClassName(typeName);
 
     propertyList = mc.PropertyList;
