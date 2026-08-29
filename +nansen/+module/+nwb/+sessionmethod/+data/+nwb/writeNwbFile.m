@@ -173,11 +173,14 @@ import nansen.session.SessionMethod
         % nwbFile.(primaryGroupName).set(nwbVariableName, nwbData);
         
         % nwbFile = nansen.module.nwb.convert.writeDataToFile(nwbFile, data, metadata, customConversinFcn); % anything else???
-    
-        nwbExport(nwbFile, nwbFilePath)
     end
-    
-    % nwbExport(nwbFile, nwbFilePath)
+
+    % Export once, after every data item has been added. NwbFile.export
+    % appends an entry to file_create_date on each call, so exporting inside
+    % the loop stamped the file once per configuration item and rewrote the
+    % whole file every pass.
+    nwbExport(nwbFile, nwbFilePath)
+
     fprintf('Finished writing file ''%s''\n', nwbFilePath)
 
     %% Export the file
