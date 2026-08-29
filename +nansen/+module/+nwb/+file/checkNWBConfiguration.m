@@ -25,6 +25,13 @@ function warnings = checkNWBConfiguration(dataItems)
 %
 %   See also: nansen.module.nwb.internal.schemautil.getRequiredProperties
 
+    arguments
+        % mustBeA rejects other types. A bare "struct" class constraint
+        % would instead convert a table by calling struct() on it, which
+        % succeeds and then fails on a missing field further down.
+        dataItems {mustBeA(dataItems, 'struct')}
+    end
+
     import nansen.module.nwb.internal.schemautil.getRequiredProperties
     import nansen.module.nwb.internal.lookup.getFullTypeName
     import nansen.module.nwb.internal.dataPropertyNamesForType

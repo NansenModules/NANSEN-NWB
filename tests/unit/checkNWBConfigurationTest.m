@@ -75,6 +75,15 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
             testCase.verifyClass(warnings, "cell")
         end
 
+        function nonStructInputIsRejected(testCase)
+        % A table must be refused rather than converted. MATLAB satisfies a
+        % bare class-name constraint by calling struct() on the value, which
+        % succeeds and then fails on a missing field several frames later.
+
+            testCase.verifyError( ...
+                @() validateConfiguration(table()), 'MATLAB:validators:mustBeA')
+        end
+
         function placeholderLabelsMatchTheSharedDefinition(testCase)
         % The cases above spell the labels out so that the TestParameter
         % block stays free of module calls. Guard them against drift in
