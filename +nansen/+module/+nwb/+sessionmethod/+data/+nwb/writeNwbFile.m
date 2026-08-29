@@ -70,6 +70,11 @@ import nansen.session.SessionMethod
     % data location
     saveFolder = sessionObject.getSessionFolder('', 'create');
 
+    % Both the filename below and the NWB identifier are built from the
+    % subject and session IDs. A blank component would silently collapse the
+    % name instead of failing, so reject it before anything is written.
+    mustHaveSessionIdentifiers(sessionObject)
+
     % We build the filename using BIDS/DandiArchive convention.
     % Todo: Add custom postfix via configuration
     nwbFilename = sprintf('sub-%s_ses-%s.nwb', sessionObject.subjectID, sessionObject.sessionID);
@@ -195,6 +200,40 @@ function params = getDefaultParameters()
     params.ConfigurationFileName = "";
     params.TimeZone = "local";
     params.WriteMode = 'Overwrite'; % 'Overwrite' | 'Append'
+end
+
+function mustHaveSessionIdentifiers(sessionObject)
+% mustHaveSessionIdentifiers - Verify the session has a subject and session ID
+%
+%   strjoin drops blank components silently, so a session with no subject ID
+%   would otherwise produce the identifier "Project_ses-01" and the filename
+%   "sub-_ses-01.nwb", both of which collide with any other subject sharing
+%   that session ID. NWB identifiers are required to be globally unique.
+
+    missingNames = string.empty;
+
+    if isBlank(sessionObject.subjectID)
+        missingNames(end+1) = "subjectID";
+    end
+    if isBlank(sessionObject.sessionID)
+        missingNames(end+1) = "sessionID";
+    end
+
+    if ~isempty(missingNames)
+        error('nansen:nwb:missingSessionIdentifier', ...
+            ['Session is missing a value for %s. These identify the NWB file ', ...
+             'and form its globally unique identifier. Set them for this ', ...
+             'session, or configure the data location so they can be detected ', ...
+             'from the session folder, before writing an NWB file.'], ...
+            strjoin(missingNames, ' and '))
+    end
+end
+
+function tf = isBlank(value)
+% isBlank - True if a value holds no usable text
+
+    text = strtrim(string(value));
+    tf = isempty(text) || ~isscalar(text) || strlength(text) == 0;
 end
 
 function sessionStartTime = getSessionStartTime(sessionObject, timeZone)
