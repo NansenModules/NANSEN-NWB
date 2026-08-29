@@ -5,24 +5,23 @@
 %
 % 3) Make conversion functions for the main neurodata types..
 %
-% Biggest challenges: 
+% Biggest challenges:
 % 1) How to deal with types with many dependency types,
 %    like two-photon-series with device, imaging-plane and optical-channel
 % 2) How to deal with dynamic tables. How the fuck to deal with electrodes
 % table where the group name is depending on the group in a different
 % column..
-%  
+%
 
-
-% Todo: 
+% Todo:
 % [?] Linked /embedded metadata should have a special format. ?
 %    name
 %    neurodata_type
 %    metadata
 
 % [ ] Object views. Link to table + rows / ids of table...
-%     - Use case example: Electrical Series / Electrodes. 
-%       [ ] In ElectricalSeries / Electrodes, the option for electrode 
+%     - Use case example: Electrical Series / Electrodes.
+%       [ ] In ElectricalSeries / Electrodes, the option for electrode
 %           should be Edit DynamicTableRegion
 %       [ ] The table should be prefilled, and be a pointer to the
 %           electrodes dynamic table
@@ -41,13 +40,13 @@
 %
 % [ ] Some types are "singletons", i.e the electrode
 
-% 
-% NWB Configurator. 
-%    [v] Multi tab 
-%    [v]  - Tables 
+%
+% NWB Configurator.
+%    [v] Multi tab
+%    [v]  - Tables
 %    [v]  - DataVariables
 
-% % % - -   - - Create dynamic tables - - - -  
+% % % - -   - - Create dynamic tables - - - -
 %
 % 1) Select the <Create dynamic table region> from a dropdown
 %
@@ -61,22 +60,21 @@
 %      Sometimes the table type is given, but not very explicitly, i.e
 %      electrodes table...
 %   3) Question: Open table in NWB configurator or popup window?
-%       Popup. Have a "dialog-like" app. 
+%       Popup. Have a "dialog-like" app.
 %       Imagine if users can edit entries in that popup table. Then that
 %       needs to be saved back to a catalog, and there should be an
 %       event/notification system to update other tables of the same
 %       instance that might be open...
-%   
-%   
+%
+%
 
 % % - - - - - Electrodes table
-% [ ] How to make the electrodes table a singleton that updates everywhere 
+% [ ] How to make the electrodes table a singleton that updates everywhere
 %     when changed?
-%    
+%
 %       1) Create singleton file catalog with events
 %       2) create singleton nwb configurator
 %   ->  3) Hardcoded shit
-% 
+%
 % [ ] Remove config flags before saving metadata!
-% 
-
+%

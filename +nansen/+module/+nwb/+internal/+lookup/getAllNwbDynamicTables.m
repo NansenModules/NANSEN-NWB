@@ -1,12 +1,10 @@
 function getAllNwbDynamicTables()
 
-
     import nansen.module.nwb.internal.schemautil.getProcessedClass
 
     [classInfo, ~] = getProcessedClass('NWBFile');
 
     displayGroupNameAndType( classInfo.subgroups )
-    
 end
 
 function displayGroupNameAndType(subgroups)
@@ -17,5 +15,5 @@ function displayGroupNameAndType(subgroups)
         if ~isempty( subgroups(i).subgroups )
             displayGroupNameAndType(subgroups(i).subgroups )
         end
-    end 
+    end
 end

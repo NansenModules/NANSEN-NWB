@@ -10,14 +10,14 @@ function S = addLinkedTypeInstances(S, neuroDataType, nwbNodeStack)
 %   create a new instance when the struct is passed to the structeditor
 %   app
 %
-%   S = addLinkedTypeInstances(S, neuroDataType) adds config fields for 
-%   instances of linked types to the structure S based on the provided 
-%   neuroDataType. It populates S with dropdown configurations for 
+%   S = addLinkedTypeInstances(S, neuroDataType) adds config fields for
+%   instances of linked types to the structure S based on the provided
+%   neuroDataType. It populates S with dropdown configurations for
 %   each linked type instance, facilitating the creation of new instances.
 %
 %   Inputs:
 %   - S: Structure to which linked type config fields will be added.
-%   - neuroDataType: The type of neuro data (NWB) for which linked type 
+%   - neuroDataType: The type of neuro data (NWB) for which linked type
 %     instances need to be added.
 %   - nwbNodeStack: stack of NWB nodes, used when creating nested instances
 %
@@ -59,7 +59,7 @@ function S = addLinkedTypeInstances(S, neuroDataType, nwbNodeStack)
             S = appendDropdownOptions(S, [nwbNodeStack, nwbNode]);
             
             if isa(S.(lower(subgroups(i).type)), 'types.untyped.Set')
-                % This is an internal nwb type and the value needs to 
+                % This is an internal nwb type and the value needs to
                 % initialized to a char in order to correctly render in the
                 % struct editor
                 S.(lower(subgroups(i).type)) = '';
@@ -87,7 +87,7 @@ function S = addLinkedTypeInstances(S, neuroDataType, nwbNodeStack)
         typedAttributes = classInfo.attributes(isTyped);
         for i = 1:numel(typedAttributes)
             assert(strcmp(typedAttributes(i).dtype('reftype'), 'object'), ...
-                'Expected object') 
+                'Expected object')
             
             dataType = typedAttributes(i).dtype('target_type');
                        

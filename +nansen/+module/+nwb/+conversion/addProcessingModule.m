@@ -6,8 +6,8 @@ function addProcessingModule(nwbFile, name, description)
 %
 % Input Arguments:
 %   nwbFile       - The NWB file to which the processing module will be added.
-%   name          - A string specifying the name of the processing module. 
-%   description   - An optional string describing the processing module. 
+%   name          - A string specifying the name of the processing module.
+%   description   - An optional string describing the processing module.
 %                   If not provided, a default description will be used.
 %
 % Output Arguments:

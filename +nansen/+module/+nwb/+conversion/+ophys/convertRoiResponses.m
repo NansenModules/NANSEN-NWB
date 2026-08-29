@@ -1,13 +1,13 @@
 function rrs = convertRoiResponses(signalArray)
 % convertRoiResponses - Converts the provided signal array into a RoiResponseSeries object.
-% 
+%
 % Syntax:
-%   roiResponseSeries = convertRoiResponses(signalArray) converts a signal 
+%   roiResponseSeries = convertRoiResponses(signalArray) converts a signal
 %   array into a RoiResponseSeries.
-% 
+%
 % Input Arguments:
 %   signalArray - The array of signals to be converted.
-% 
+%
 % Output Arguments:
 %   rrs         - The resulting RoiResponseSeries object containing the converted data.
 
@@ -51,4 +51,3 @@ function chunkSize = getChunkSize(A, dimensionConstraints, targetChunkSize)
     flexLength = round(targetNumElements / dimensionConstraints{1});
     chunkSize = [ dimensionConstraints{1}, flexLength ];
 end
-

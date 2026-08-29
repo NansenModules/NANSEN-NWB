@@ -8,11 +8,10 @@ function varargout = configureNwbFile(sessionObject, varargin)
 
 import nansen.session.SessionMethod
 
-
-% % % % % % % % % % % % CONFIGURATION CODE BLOCK % % % % % % % % % % % % 
-% Create a struct of default parameters (if applicable) and specify one or 
-% more attributes (see nansen.session.SessionMethod.setAttributes) for 
-% details. You can use the local function "getDefaultParameters" at the 
+% % % % % % % % % % % % CONFIGURATION CODE BLOCK % % % % % % % % % % % %
+% Create a struct of default parameters (if applicable) and specify one or
+% more attributes (see nansen.session.SessionMethod.setAttributes) for
+% details. You can use the local function "getDefaultParameters" at the
 % bottom of this file to define default parameters.
 
     % % % Get struct of default parameters for function.
@@ -22,10 +21,9 @@ import nansen.session.SessionMethod
     % Todo: Provide each of the configured NWB files as alternatives
     % nwbFiles = getNwbFileNames();
     % ATTRIBUTES = [ATTRIBUTES, {'Alternatives', nwbFiles}];
-    
 
-% % % % % % % % % % % % % DEFAULT CODE BLOCK % % % % % % % % % % % % % % 
-% - - - - - - - - - - Please do not edit this part - - - - - - - - - - - 
+% % % % % % % % % % % % % DEFAULT CODE BLOCK % % % % % % % % % % % % % %
+% - - - - - - - - - - Please do not edit this part - - - - - - - - - - -
    
     % % % Initialization block for a session method function.
 
@@ -37,14 +35,13 @@ import nansen.session.SessionMethod
     % % % Parse name-value pairs from function input.
     params = utility.parsenvpairs(params, true, varargin);
     
-    
-% % % % % % % % % % % % % % CUSTOM CODE BLOCK % % % % % % % % % % % % % % 
+% % % % % % % % % % % % % % CUSTOM CODE BLOCK % % % % % % % % % % % % % %
 % Sketch for session method
 % Sketch for session method
 
-    % options: 
+    % options:
     % - File (if there are multiple configurations)
-    % - Mode : append, rewrite 
+    % - Mode : append, rewrite
 
     %% Initialize configurations
 
@@ -65,11 +62,7 @@ import nansen.session.SessionMethod
 
     % Get the appropriate conversion function.
 
-
     %% Export the file
-
-
-
 end
 
 function params = getDefaultParameters()

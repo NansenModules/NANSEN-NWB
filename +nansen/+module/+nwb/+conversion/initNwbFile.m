@@ -1,6 +1,6 @@
 function nwbFile = initNwbFile(sessionObject)
 % initNwbFile - Initializes an NWB file using session details and metadata.
-% 
+%
 % Syntax:
 %   nwbFilePath = initNwbFile(sessionObject, targetFolder, options)
 %

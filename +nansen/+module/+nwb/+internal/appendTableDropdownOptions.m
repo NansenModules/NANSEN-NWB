@@ -17,17 +17,16 @@ function S = appendTableDropdownOptions(S, nwbNodeStack)
 
 % There should be two cases:
 %
-%   1) Create a generic dynamic table or a specific dynamic table if it 
+%   1) Create a generic dynamic table or a specific dynamic table if it
 %      has a specified type
 %   2) Create a singleton "special" dynamic table like e.g the electrodes
 %      table. Any other?
-
 
     % Todo: Explain why using the second last item of the stack...
     ancestorNeuroDataType = nwbNodeStack(end-1).DefiningType;
     ancestorPropertyName = nwbNodeStack(end-1).PropertyName;
     propertyName = nwbNodeStack(end).PropertyName;
-    %propertyType = nwbNodeStack(end).PropertyType; % Not used
+    % propertyType = nwbNodeStack(end).PropertyType; % Not used
 
     % Use a lookup function to figure out if a special table is going to be
     % created.
@@ -47,12 +46,11 @@ function S = appendTableDropdownOptions(S, nwbNodeStack)
                 nansen.module.nwb.internal.createNewDynamicTable(item, nwbNodeStack), ...
             'ItemName', linkedTableName );
 
-        % Prepend the dropdown configuration to the list of instances. 
+        % Prepend the dropdown configuration to the list of instances.
         % The structeditor will expect this config as the first cell of the
         % cell array.
-        metadataInstances = {dropdownConfig}; 
+        metadataInstances = {dropdownConfig};
     end
-
 
     if isfield(S, propertyName)
         % Add _ to the end of the link name to create the "config" name

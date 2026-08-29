@@ -1,10 +1,10 @@
 classdef DynamicTableCollection < handle
 %DynamicTableCollection A GUI tab component for handling a collection of
-%dynamic tables.
+% dynamic tables.
     
     % Note: Currently only supports an electrodes table.
 
-    % Todo: 
+    % Todo:
     %   [ ] Store multiple tables
     %   [ ] Add options for creating new dynamic tables.
     %   [ ] Add dynamic tables programmatically, i.e from a function or
@@ -73,17 +73,16 @@ classdef DynamicTableCollection < handle
             
             obj.initializeTables()
             
-            %obj.IsConstructed = true;
+            % obj.IsConstructed = true;
             obj.onThemeChanged()
 
             if ~nargout
                 clear obj
             end
         end
-
     end
     
-    methods 
+    methods
         function tf = isDirty(obj)
             % Check if any tables are dirty, handling case where tables might not exist
             if ~isConfigured(obj.DynamicTable)
@@ -130,12 +129,11 @@ classdef DynamicTableCollection < handle
         % function assignDefaultSubclassProperties(obj)
         %     obj.DEFAULT_FIGURE_SIZE = [1000 560];
         %     obj.MINIMUM_FIGURE_SIZE = [560 420];
-        % end 
+        % end
         
         function updateSize(obj)
             obj.updateTablePosition()
         end
-        
     end
     
     methods (Access = private)
@@ -169,14 +167,14 @@ classdef DynamicTableCollection < handle
             obj.DynamicTableSelector = buttonGroup;
 
             obj.createAddTableButton()
-            %obj.updateTablePosition()
+            % obj.updateTablePosition()
         end
         
         function createContextMenus(obj)
             hFigure = ancestor(obj.Parent, 'figure');
             obj.TableContextMenu = uicontextmenu(hFigure);
             uimenu(obj.TableContextMenu, 'Text', 'Remove Task');
-            %mitem.Callback = @obj.onRemoveTaskMenuItemClicked;
+            % mitem.Callback = @obj.onRemoveTaskMenuItemClicked;
         end
         
         function createAddTableButton(obj)
@@ -209,8 +207,6 @@ classdef DynamicTableCollection < handle
             % obj.NWBConfigurationData.General.ExtracellularEphys.Electrodes = ...
             %     nansen.module.nwb.internal.dtable.initializeElectrodesTable();
             % electrodeTable = obj.NWBConfigurationData.General.ExtracellularEphys.Electrodes;
-        
-
     
             % Todo: Create panels and dynamic tables for each dynamic table
             % of the NWB Configuration
@@ -274,7 +270,7 @@ classdef DynamicTableCollection < handle
         
         function addDynamicTable(~, ~, ~)
             msgbox('Not implemented yet', 'Error')
-            % Todo: 
+            % Todo:
             
             % Select table from list
 
@@ -285,7 +281,6 @@ classdef DynamicTableCollection < handle
             % Add table to NWB Configuration Data
 
             % Add button to GUI
-
         end
 
         function onDynamicTableTypeChanged(obj, s, ~)

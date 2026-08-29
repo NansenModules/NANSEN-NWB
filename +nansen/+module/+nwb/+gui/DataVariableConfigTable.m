@@ -81,16 +81,15 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             dataItemTable = struct2table( nwbConfigurationData.DataItems, 'AsArray', true );
             obj.TableDataCurrent = dataItemTable;
             
-            %obj.IsConstructed = true;
+            % obj.IsConstructed = true;
 
             if ~nargout
                 clear obj
             end
         end
-
     end
     
-    methods 
+    methods
         function deactivate(~)
             % pass
         end
@@ -109,7 +108,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             totalWidth = parentSize(3)-MARGIN(1)-MARGIN(3);
             
             % h+w of autocomplete and buttons:
-            componentHeight = [30, 22, 22]; 
+            componentHeight = [30, 22, 22];
             componentWidth = [1, 50, 85];
             
             % Calculate position:
@@ -118,7 +117,6 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
 
             % Complete ad hoc...
             y = parentSize(4) - MARGIN(4) - (componentHeight/3);
-
             
             % Set positions:
             obj.AutoCompleteWidget.Position = [x(1), y(1), w(1), componentHeight(1)];
@@ -134,11 +132,10 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             colWidth = max( [colWidth; obj.MinimumColumnWidth] );
 
             obj.UITable.ColumnPreferredWidth = colWidth;
-            %obj.UITable.ColumnWidth = [40, 100, 100, 100];
+            % obj.UITable.ColumnWidth = [40, 100, 100, 100];
             
             obj.HintTextbox.Position = [MARGIN(1), sum(obj.UITable.Position([2,4])) + 15];
         end
-        
     end
     
     methods (Access = private)
@@ -155,7 +152,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
         function createComponents(obj)
             
             % Create search dialog
-            %variableNames = obj.NWBConfigurationData.AllVariableNames;
+            % variableNames = obj.NWBConfigurationData.AllVariableNames;
             variableModel = nansen.VariableModel();
             variableNames = variableModel.VariableNames;
             
@@ -182,7 +179,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             obj.HintTextbox.String = 'Hint: Search in the above dropdown to add more variables';
             obj.HintTextbox.HorizontalAlignment = 'left';
             obj.HintTextbox.FontSize = 10;
-            %obj.HintTextbox.BackgroundColor = 'none';
+            % obj.HintTextbox.BackgroundColor = 'none';
             % Create table
             obj.UITable  = uim.widget.StylableTable('Parent', obj.Parent, ...
                         'RowHeight', 25, ...
@@ -197,7 +194,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             obj.UITable.KeyPressFcn = @obj.onKeyPressedInTable;
 
             addlistener(obj.UITable, 'MouseMotion', @obj.onMouseMotionOnTable);
-            %addlistener(obj.UITable, 'KeyPress', @obj.onKeyPressedInTable);
+            % addlistener(obj.UITable, 'KeyPress', @obj.onKeyPressedInTable);
         end
         
         function createContextMenus(obj)
@@ -231,7 +228,6 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
                         obj.RemoveVariable(selectedRow)
                     end
             end
-            
         end
 
         function onTableDataCurrentSet(obj)
@@ -259,7 +255,6 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             obj.UITable.DataTable = tableDataDisplay;
 
             if ~isInitialized
-                        
 
                 % Update the column formatting properties
                 obj.UITable.ColumnFormat = {'char', 'char', 'popup', 'popup', 'popup', 'popup', 'char'};
@@ -345,7 +340,6 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             elseif strcmp(evt.SelectionType, 'open')
                 obj.onTableCellDoubleClicked(src, evt)
             end
-
         end
 
         function onTableCellDoubleClicked(obj, ~, evt)
@@ -369,15 +363,13 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
                 obj.dropdownOpen = false;
             end
             
+            % cellRenderer = obj.UITable.JTable.getCellRenderer(rowNum-1,colNum-1);
             
-            %cellRenderer = obj.UITable.JTable.getCellRenderer(rowNum-1,colNum-1);
+            % mPos = java.awt.Point(x,y)
             
-            %mPos = java.awt.Point(x,y)
-            
-            %obj.UITable.JTable.getPoint(rowNum, colNum)
-            %obj.UiMenuA.Visible = 'on';
-            %colNum = evt.Cell(2);
-            
+            % obj.UITable.JTable.getPoint(rowNum, colNum)
+            % obj.UiMenuA.Visible = 'on';
+            % colNum = evt.Cell(2);
         end
         
         function onMouseRightClickedInTable(obj, ~, evt)
@@ -413,7 +405,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             rowNum = evt.Cell(1);
             colNum = evt.Cell(2);
 
-            if rowNum ~= previousRow && rowNum ~= 0                
+            if rowNum ~= previousRow && rowNum ~= 0
                 obj.updateNeurodataTypeSelectionDropdown(rowNum)
                 previousRow = rowNum;
             end
@@ -440,7 +432,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
         end
 
         function updateRowOrder(obj)
-        %updateRowOrder Update order of rows in list. 
+        %updateRowOrder Update order of rows in list.
         %
         %   Useful when rows are removed.
         
@@ -451,11 +443,10 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             end
             
             obj.TableDataCurrent = data;
-            %obj.UITable.DataTable = data;
+            % obj.UITable.DataTable = data;
             
             % Update the items in the dropdown on the first row.
             % obj.UITable.ColumnFormatData{1} = arrayfun(@(x) uint8(x), 1:numRows, 'uni',0);
-
         end
         
         function onAddVariableButtonPushed(obj, ~, ~)
@@ -489,9 +480,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             if ~isempty(rowNumber)
                 obj.RemoveVariable(rowNumber)
             end
-
         end
-        
     end
     
     methods (Access = private) % Internal methods
@@ -582,7 +571,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             end
             
             if size(obj.TableDataCurrent, 1) == 1
-                %obj.updateOptionSelectionDropdown(1)
+                % obj.updateOptionSelectionDropdown(1)
                 obj.updateNeurodataTypeSelectionDropdown(1)
             end
             
@@ -610,19 +599,18 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             % Set position and make menu visible.
             obj.TableContextMenu.Position = cMenuPos;
             obj.TableContextMenu.Visible = 'on';
-            
         end
         
         function updateNeurodataTypeSelectionDropdown(obj, rowNumber)
         %updateOptionSelectionDropdown Update table columnformatdata to
-        %show options alternatives for current row.
+        % show options alternatives for current row.
         
             import nansen.module.nwb.internal.schemautil.getTypesForModule
 
             % Get nwb module from column
             nwbModuleName = obj.TableDataCurrent.NwbModule{rowNumber};
             if isempty(nwbModuleName); return; end
-            %disp(nwbModuleName)
+            % disp(nwbModuleName)
             
             if strcmp(nwbModuleName, '<Select an NWB module>')
                 neuroDataTypes = '<Select an NWB module>';
@@ -640,7 +628,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
 
             % % fcnName = obj.UITable.Data{rowNumber, 3};
             % % isMatch = strcmp({obj.SessionMethodCatalog.Data.FunctionName}, fcnName);
-            % % 
+            % %
             obj.UITable.ColumnFormatData{isColumn} = cellstr( neuroDataTypes );
         end
     
@@ -655,7 +643,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             end
 
             nwbClassName = nansen.module.nwb.internal.lookup.getFullTypeName(neuroDataType);
-            %nwbClassName = sprintf( 'matnwb.types.core.%s', neuroDataType );
+            % nwbClassName = sprintf( 'matnwb.types.core.%s', neuroDataType );
             [S, info, ~] = nansen.module.nwb.internal.getTypeMetadataStruct(nwbClassName);
             
             % If data already exists, use that insted
@@ -682,8 +670,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
 
         function onValueChanged(~, ~, ~)
             % Todo: should not be part of this class
-            %disp('a')
+            % disp('a')
         end
     end
-    
 end

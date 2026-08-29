@@ -5,7 +5,7 @@ classdef UICreateDynamicTable < uiw.abstract.AppWindow
 %   Note: This was originally duplicated from the UIDynamicTableRegionSelector
 %         Consider whether these can be based on the same class
 %
-%   Todo: 
+%   Todo:
 %     [ ] Should there be a description field here or elsewhere?
 %     [ ] Should there be a dialog in the constructor to select table, or
 %         should this be handled before opening this app.?
@@ -18,7 +18,7 @@ classdef UICreateDynamicTable < uiw.abstract.AppWindow
         DynamicTable % Dynamic table to select region (rows) from
     end
 
-    properties (Access = private) % UI Components 
+    properties (Access = private) % UI Components
         UIDynamicTable
         SaveButton
         InstructionTextbox
@@ -46,7 +46,7 @@ classdef UICreateDynamicTable < uiw.abstract.AppWindow
         end
     end
 
-    methods 
+    methods
         function uiwait(app)
             uiwait(app.Figure)
         end
@@ -150,7 +150,7 @@ classdef UICreateDynamicTable < uiw.abstract.AppWindow
             app.Data('Table') = app.UIDynamicTable.DynamicTable;
             app.Data('State') = "Saved";
             uiresume(app.Figure)
-            app.Figure.CloseRequestFcn = []; 
+            app.Figure.CloseRequestFcn = [];
             
             % Disable deletion of class when figure is deleted
             delete(app.Figure)

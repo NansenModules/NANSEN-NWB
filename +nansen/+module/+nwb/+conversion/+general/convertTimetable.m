@@ -1,19 +1,18 @@
 function timeseriesSet = convertTimetable(TT, options)
 % convertTimetable - Convert a time table into a set of NWB Timeseries objects
-% 
+%
 % Syntax:
-%   convertedData = convertTimetable(TT, options) 
+%   convertedData = convertTimetable(TT, options)
 %   This function takes a time table and converts it into a specified format.
-% 
+%
 % Input Arguments:
 %   TT - The timetable to be converted
-% 
+%
 % Output Arguments:
 %   convertedData - The converted data in the desired format
 
 % Todo:
 % Add containertype as option? then add set to container?
-
 
     arguments
         TT timetable
@@ -52,5 +51,5 @@ function timeseriesSet = convertTimetable(TT, options)
             metadataNvPairs{:});
 
         timeseriesSet.set(name, timeSeries);
-    end 
+    end
 end

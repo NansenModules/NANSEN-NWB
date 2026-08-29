@@ -2,8 +2,8 @@ function [processedClass, propertyInfo] = getProcessedClass(className)
 
     persistent pregenerated
     if isempty(pregenerated)
-        %generated nodes and props for faster dependency resolution
-        pregenerated = containers.Map; 
+        % generated nodes and props for faster dependency resolution
+        pregenerated = containers.Map;
     end
 
     className = utility.string.getSimpleClassName(className);
@@ -21,7 +21,6 @@ function [processedClass, propertyInfo] = getProcessedClass(className)
         datasets = mergeDatasets( cat(1, processedClassHierarchy.datasets) );
         links = cat(1, processedClassHierarchy.links);
     
-    
         % Create a struct where different elements across class hierarchy
         % are added...
     
@@ -31,7 +30,6 @@ function [processedClass, propertyInfo] = getProcessedClass(className)
         processedClass.datasets = datasets;
         processedClass.subgroups = subgroups;
         processedClass.links = links;
-        
 
     elseif isa(processedClassHierarchy, 'file.Dataset')
         
@@ -43,7 +41,7 @@ function [processedClass, propertyInfo] = getProcessedClass(className)
         processedClass.datasets = [];%mergeDatasets( cat(1, processedClassHierarchy.datasets) );
         processedClass.subgroups = [];
         processedClass.links = [];
-        %links = cat(1, processedClassHierarchy.links);
+        % links = cat(1, processedClassHierarchy.links);
     end
 
     % Extract propertyInfo
@@ -72,7 +70,7 @@ function mergedDatasets = mergeDatasets(datasets)
 
     % This class merges entities from top in hierarchy to bottom.
     
-    if isempty(datasets) 
+    if isempty(datasets)
         mergedDatasets = datasets; return
     end
 
@@ -99,7 +97,7 @@ function mergedDatasets = mergeDatasets(datasets)
             
             mergedDatasets(isSame) = thisDataset;
         else
-            mergedDatasets(end+1) = thisDataset; 
+            mergedDatasets(end+1) = thisDataset;
         end
     end
 

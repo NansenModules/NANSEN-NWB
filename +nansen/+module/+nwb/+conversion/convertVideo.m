@@ -1,13 +1,13 @@
 function convertVideo(nwbReference, videoFilePath, videoName, nwbFileOptions, deviceOptions)
     arguments
-        nwbReference (1,1) {mustBeNwbFileReference} 
+        nwbReference (1,1) {mustBeNwbFileReference}
         videoFilePath (1,:) string {mustBeFile}
         videoName (1,1) string
         
         nwbFileOptions.module (1,1) string = 'acquisition'
         nwbFileOptions.processingModule (1,1) string = 'acquisition'
         
-        deviceOptions.Description 
+        deviceOptions.Description
         deviceOptions.Manufacturer
     end
 end

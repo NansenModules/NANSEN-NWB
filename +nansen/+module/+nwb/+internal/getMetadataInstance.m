@@ -5,5 +5,5 @@ function metadataStruct = getMetadataInstance(instanceName, nwbType)
 
     catalog = nansen.module.nwb.internal.getMetadataCatalog(nwbType);
     metadataStruct = catalog.get(instanceName);
-    [metadataStruct, ~] = utility.struct.popfield(metadataStruct, 'Uuid', false);    
+    [metadataStruct, ~] = utility.struct.popfield(metadataStruct, 'Uuid', false);
 end

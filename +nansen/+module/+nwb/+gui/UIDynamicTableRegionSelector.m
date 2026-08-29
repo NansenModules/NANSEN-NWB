@@ -2,7 +2,7 @@ classdef UIDynamicTableRegionSelector < uiw.abstract.AppWindow
 % UIDynamicTableRegionSelector - A dialog app for selecting a region of a
 % dynamic table.
 
-%   Todo: 
+%   Todo:
 %     [ ] Should there be a description field here or elsewhere?
 %     [ ] Should there be a dialog in the constructor to select table, or
 %       should this be handles before opening this app.?
@@ -16,7 +16,7 @@ classdef UIDynamicTableRegionSelector < uiw.abstract.AppWindow
         Selection
     end
 
-    properties (Access = private) % UI Components 
+    properties (Access = private) % UI Components
         UIDynamicTable
         SelectRowsButton
         InstructionTextbox
@@ -44,7 +44,7 @@ classdef UIDynamicTableRegionSelector < uiw.abstract.AppWindow
         end
     end
 
-    methods 
+    methods
         function uiwait(app)
             uiwait(app.Figure)
         end
@@ -163,13 +163,13 @@ classdef UIDynamicTableRegionSelector < uiw.abstract.AppWindow
             if ~tf; return; end
 
             % Store on object
-            %app.Selection = app.getSelection();
+            % app.Selection = app.getSelection();
             app.Data('Selection') = app.getSelection();
             app.Data('Table') = app.UIDynamicTable.DynamicTable;
             app.Data('State') = "Saved";
             
             uiresume(app.Figure)
-            app.Figure.CloseRequestFcn = []; 
+            app.Figure.CloseRequestFcn = [];
             
             % Disable deletion of class when figure is deleted
             delete(app.Figure)

@@ -115,9 +115,9 @@ function [metadata, instanceMap] = resolveMetadata(metadata, neuroDataType, nwbF
         for i = 1:numel(typedAttributes)
            
             assert(strcmp(typedAttributes(i).dtype('reftype'), 'object'), ...
-                'Expected object') 
+                'Expected object')
 
-            %targetType = typedAttributes(i).dtype('target_type');
+            % targetType = typedAttributes(i).dtype('target_type');
            
             if contains(neuroDataType, 'DynamicTableRegion') % Or if targetType is DynamicTable
                 
@@ -130,7 +130,7 @@ function [metadata, instanceMap] = resolveMetadata(metadata, neuroDataType, nwbF
                     if strcmp(instanceName, 'ElectrodesTable')
                         dynamicTable = convertElectrodeGroups(dynamicTable, nwbFile, instanceMap);
                     end
-                    %matnwb.types.untyped.ObjectView(EGroup)
+                    % matnwb.types.untyped.ObjectView(EGroup)
 
                     nwbType = util.table2nwb(dynamicTable);
                 
@@ -193,14 +193,14 @@ function [dynamicTable, instanceMap] = convertElectrodeGroups(dynamicTable, nwbF
                 iElectrodeGroup, nwbType, nwbFile, instanceMap);
 
         % Todo: Need to do this more consistently in one place...
-        [iElectrodeGroup, ~] = utility.struct.popfield(iElectrodeGroup, 'Uuid', false);    
-        [iElectrodeGroup, ~] = utility.struct.popfield(iElectrodeGroup, 'name', false);    
+        [iElectrodeGroup, ~] = utility.struct.popfield(iElectrodeGroup, 'Uuid', false);
+        [iElectrodeGroup, ~] = utility.struct.popfield(iElectrodeGroup, 'name', false);
 
         nvPairs = namedargs2cell(iElectrodeGroup);
         iElectrodeGroup = feval(nwbType, nvPairs{:});
 
         nwbFile.general_extracellular_ephys.set(iGroupName, iElectrodeGroup);
-        %nansen.module.nwb.file.addMetadataObject(nwbFile, iGroupName, iElectrodeGroup);
+        % nansen.module.nwb.file.addMetadataObject(nwbFile, iGroupName, iElectrodeGroup);
 
         objectViews{i} = feval(getMatNwbTypeName('untyped', 'ObjectView'), iElectrodeGroup);
     end

@@ -7,7 +7,7 @@ function [itemName, itemData] = createNewDynamicTable(items, nwbNodeStack, optio
     % nansen.module.nwb.internal.lookup.getDynamicTableForRegionView)
 
     arguments
-        items (1,:) string % Currently not used. 
+        items (1,:) string % Currently not used.
         nwbNodeStack (1,:) nansen.module.nwb.internal.NwbNode
         options.Edit (1,1) logical = false
     end
@@ -15,8 +15,8 @@ function [itemName, itemData] = createNewDynamicTable(items, nwbNodeStack, optio
     import nansen.module.nwb.internal.lookup.getDynamicTableForRegionView
     import nansen.module.nwb.internal.lookup.getFullTypeName
 
-    %linkedTableName='SimultaneousRecordingsTable'
-    %linkedTableName='PlaneSegmentation'
+    % linkedTableName='SimultaneousRecordingsTable'
+    % linkedTableName='PlaneSegmentation'
 
     % Use a lookup function to figure out if a special table is going to be created.
     ancestorNeuroDataType = nwbNodeStack(end-1).DefiningType;
@@ -27,7 +27,7 @@ function [itemName, itemData] = createNewDynamicTable(items, nwbNodeStack, optio
     if strcmp(linkedTableName, 'ElectrodesTable')
         matlabTable = nansen.module.nwb.internal.dtable.initializeElectrodesTable();
     else
-        % Todo: Need an initializer (for columns?) because this just 
+        % Todo: Need an initializer (for columns?) because this just
         % creates empty tables
         fullLinkedTableType = getFullTypeName(linkedTableName);
         dynamicTable = feval(fullLinkedTableType);
@@ -55,11 +55,11 @@ function [itemName, itemData] = createNewDynamicTable(items, nwbNodeStack, optio
     if isKey(data, 'State')
         % Save to table to a catalog when user hit save!
         if strcmp( data('State'), "Saved" )
-            %newTable = data('Table');
+            % newTable = data('Table');
             itemName = linkedTableName;
             itemData = data('Table');
 
-            S = struct; 
+            S = struct;
             S.name = linkedTableName;
             S.DynamicTable = itemData;
 
@@ -75,7 +75,7 @@ function [itemName, itemData] = createNewDynamicTable(items, nwbNodeStack, optio
             end
             catalog.save()
     
-            %itemName = S.name;
+            % itemName = S.name;
         end
     end
 
@@ -83,8 +83,8 @@ function [itemName, itemData] = createNewDynamicTable(items, nwbNodeStack, optio
 
     if nargout == 1
         clear itemData
-        %S = rmfield(S, "name");
-        %nvPairs = namedargs2cell(S);
-        %itemData = feval( nwbDataType, nvPairs{:} );
+        % S = rmfield(S, "name");
+        % nvPairs = namedargs2cell(S);
+        % itemData = feval( nwbDataType, nvPairs{:} );
     end
 end

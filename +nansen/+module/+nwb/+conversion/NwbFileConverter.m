@@ -200,7 +200,6 @@ classdef NwbFileConverter < handle
                 converter function_handle = ...
                     @nansen.module.nwb.conversion.general.convertTimetable
                     % Todo: mustBeSetConverter?
-
             end
 
             converted = converter(data);
@@ -210,7 +209,6 @@ classdef NwbFileConverter < handle
                 obj.NwbFile.acquisition.set(names{i}, converted.get(names{i}));
             end
         end
-
     end
 
     methods (Access = private)
@@ -228,7 +226,6 @@ classdef NwbFileConverter < handle
         end
     end
 end
-
 
 function nwbFilePath = createNwbFilePath(targetFolder, options)
 % createNwbFilePath - Creates a file path for the NWB file based on

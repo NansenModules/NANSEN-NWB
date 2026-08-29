@@ -6,8 +6,8 @@ function neuroData = convertToDataType(metadata, data, neuroDataType)
 %
 %   Note: Work in progress, currently handles timeseries somewhat...
 
-%   Todo: 
-%     [ ] Handle other types. 
+%   Todo:
+%     [ ] Handle other types.
 %        [ ] Dynamic tables?
 %        [ ] Images
 
@@ -19,7 +19,7 @@ function neuroData = convertToDataType(metadata, data, neuroDataType)
 
     import nansen.module.nwb.internal.lookup.getFullTypeName
 
-    % Special case: Handle "wrapper" types. 
+    % Special case: Handle "wrapper" types.
     wrapperNames = nansen.module.nwb.internal.lookup.getWrapperClassNames();
     isContainerType = any(wrapperNames==neuroDataType);
     
@@ -64,10 +64,10 @@ function neuroData = convertToDataType(metadata, data, neuroDataType)
         case "Timeseries"
     
             if isa(data, 'timetable')
-                %assert(isContainerType)
+                % assert(isContainerType)
                 variables = data.Properties.VariableNames;
                 
-                %time = seconds( data.Time );
+                % time = seconds( data.Time );
                 time = seconds( data.Properties.RowTimes );
 
                 if numel(variables) > 1
@@ -92,8 +92,8 @@ function neuroData = convertToDataType(metadata, data, neuroDataType)
                     neuroData = feval(fcn, 'data', data, 'timestamps', time, nvPairs{:});
                 end
 
-                %dataV = data{:,1};
-                %nvPairs = [nvPairs, {'timestamps', seconds(data.Time), 'data' dataV}];
+                % dataV = data{:,1};
+                % nvPairs = [nvPairs, {'timestamps', seconds(data.Time), 'data' dataV}];
             
             elseif isa(data, 'timeseries')
 
@@ -102,7 +102,6 @@ function neuroData = convertToDataType(metadata, data, neuroDataType)
                 data = 1:numel(data);
                 neuroData = feval(fcn, 'data', data, 'timestamps', time, nvPairs{:});
             else
-                
             end
     end
     
