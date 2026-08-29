@@ -236,7 +236,7 @@ classdef NWBConfigurator < applify.MultiPageApp
                 return
             end
 
-            warnings = nansen.module.nwb.file.validateNwbConfiguration(dataItems);
+            warnings = nansen.module.nwb.file.checkNwbConfiguration(dataItems);
 
             if isempty(warnings)
                 return
