@@ -273,7 +273,7 @@ classdef DynamicTableCollection < handle
     
     methods (Access = protected)
         
-        function addDynamicTable(obj, ~, ~)
+        function addDynamicTable(~, ~, ~)
             msgbox('Not implemented yet', 'Error')
             % Todo: 
             
@@ -289,7 +289,7 @@ classdef DynamicTableCollection < handle
 
         end
 
-        function onDynamicTableTypeChanged(obj, s, e)
+        function onDynamicTableTypeChanged(obj, s, ~)
 
             selectedTableName = s.Text;
             % Only hide/show panels if they exist

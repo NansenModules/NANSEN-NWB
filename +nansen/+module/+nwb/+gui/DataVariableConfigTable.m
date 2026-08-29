@@ -423,7 +423,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             obj.updateTableTooltip(rowNum, colNum)
         end
         
-        function rearrangeRows(obj, hTable, eventData)
+        function rearrangeRows(obj, ~, eventData)
         %rearrangeRows Rearrange table rows in response to user input
         
             data = obj.UITable.DataTable;
@@ -658,7 +658,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
 
             nwbClassName = nansen.module.nwb.internal.lookup.getFullTypeName(neuroDataType);
             %nwbClassName = sprintf( 'matnwb.types.core.%s', neuroDataType );
-            [S, info, isRequired] = nansen.module.nwb.internal.getTypeMetadataStruct(nwbClassName);
+            [S, info, ~] = nansen.module.nwb.internal.getTypeMetadataStruct(nwbClassName);
             
             % If data already exists, use that insted
             if ~isempty( obj.TableDataCurrent{rowNumber, 'DefaultMetadata'}{1} )
@@ -682,7 +682,7 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             end
         end
 
-        function onValueChanged(obj, ~, ~)
+        function onValueChanged(~, ~, ~)
             % Todo: should not be part of this class
             %disp('a')
         end

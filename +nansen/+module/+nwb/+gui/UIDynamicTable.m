@@ -234,7 +234,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             obj.UITable.ColumnEditable(colNumber) = false;
         end
 
-        function onTableCellSelected(obj, ~, ~)
+        function onTableCellSelected(~, ~, ~)
             %obj.UITable.ColumnEditable(:) = false;
         end
 
@@ -475,7 +475,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             obj.UITable.ColumnPreferredWidth = columnWidth;
         end
         
-        function options = getNwbTypeOptionsForDropdown(obj, neurodataType)
+        function options = getNwbTypeOptionsForDropdown(~, neurodataType)
             
             instanceCatalog = nansen.module.nwb.internal.getMetadataCatalog(neurodataType);
             typeShortName = utility.string.getSimpleClassName(neurodataType);
