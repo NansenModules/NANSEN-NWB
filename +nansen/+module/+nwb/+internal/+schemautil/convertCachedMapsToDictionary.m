@@ -1,4 +1,13 @@
 function D = convertCachedMapsToDictionary()
+%convertCachedMapsToDictionary - Read the cached core schema
+%   D = convertCachedMapsToDictionary() loads matnwb's cached core
+%   namespace and returns it with every containers.Map replaced by a
+%   dictionary, nested maps included.
+%
+%   The cache is matnwb's own, so what this returns follows whichever
+%   schema version is installed.
+%
+%   See also nansen.module.nwb.internal.schemautil.getNWBModules
 
     folderPath = fullfile(misc.getMatnwbDir(), 'namespaces');
     S = load(fullfile(folderPath, "core.mat") );

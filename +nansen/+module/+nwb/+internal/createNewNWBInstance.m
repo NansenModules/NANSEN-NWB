@@ -1,4 +1,17 @@
 function [itemName, itemData] = createNewNWBInstance(items, nwbNodeStack, options)
+%createNewNWBInstance - Create a neurodata type instance from a form
+%   [itemName,itemData] = createNewNWBInstance(items,nwbNodeStack) opens a
+%   form for the neurodata type at the top of the node stack and returns
+%   the name and metadata of the instance the user creates. Both are empty
+%   if the form is cancelled.
+%
+%   [...] = createNewNWBInstance(...,IsEditing=VALUE) edits the instance
+%   named in ITEMS rather than creating one.
+%
+%   The instance is written to the type's catalog, so it becomes available
+%   to later dropdowns.
+%
+%   See also nansen.module.nwb.internal.createNewDynamicTable
 
     % Todo. Add onValue changed callback and popup error dialog if provided
     % name already exists when a new item is created (but no if edited...)

@@ -1,5 +1,5 @@
 function instanceNames = getMetadataInstanceNames(neuroDataType)
-%getMetadataInstanceNames - Get names of stored instances of a neurodata type
+%getMetadataInstanceNames - Get names of stored type instances
 %
 %   instanceNames = getMetadataInstanceNames(neuroDataType) returns the
 %   names under which instances of the given neurodata type are stored in

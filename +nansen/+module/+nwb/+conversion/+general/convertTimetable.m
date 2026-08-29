@@ -1,9 +1,9 @@
 function timeseriesSet = convertTimetable(TT, options)
-%convertTimetable - Convert a time table into a set of NWB Timeseries objects
+%convertTimetable - Convert a timetable into NWB TimeSeries objects
 %
 % Syntax:
 %   convertedData = convertTimetable(TT, options)
-%   This function takes a time table and converts it into a specified format.
+%   Takes a timetable and converts it into the specified format.
 %
 % Input Arguments:
 %   TT - The timetable to be converted

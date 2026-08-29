@@ -1,4 +1,11 @@
 function S = appendDropdownOptions(S, nwbNodeStack)
+%appendDropdownOptions - Offer stored instances as dropdown choices
+%   S = appendDropdownOptions(S,nwbNodeStack) adds the configuration a
+%   struct editor needs to show the property at the top of the node stack
+%   as a dropdown, listing the instances already stored for its type and
+%   an entry for creating a new one.
+%
+%   See also nansen.module.nwb.internal.appendTableDropdownOptions
 
     arguments
         S (1,1) struct
