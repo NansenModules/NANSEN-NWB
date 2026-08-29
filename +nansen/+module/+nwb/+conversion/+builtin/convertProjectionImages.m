@@ -56,7 +56,11 @@ function addImage(imageCollection, name, imageData)
 %   baseimage. The module does not pin a matnwb version, so whichever the
 %   installed schema defines is used.
 
-    grayscaleImage = types.core.GrayscaleImage('data', imageData);
+    % An image with no description of its own is reported by NWB
+    % Inspector, and the name is the only thing distinguishing one
+    % projection from another.
+    grayscaleImage = types.core.GrayscaleImage('data', imageData, ...
+        'description', char(name + " projection image"));
 
     if isprop(imageCollection, 'baseimage')
         imageCollection.baseimage.set(char(name), grayscaleImage);

@@ -69,16 +69,17 @@ function neuroData = convertToNeuroDataType(metadata, data, neuroDataType)
                 
                 % time = seconds( data.Time );
                 time = seconds( data.Properties.RowTimes );
+                timeArgs = nansen.module.nwb.internal.resolveTimeArguments(time, metadata);
 
                 if numel(variables) > 1
                     % % assert(isContainerType, ...
                     % %     'NeuroDataType must be one of the following to support adding multiple timetable variables: \n\n%s\n', strjoin("  " + wrapperNames, newline))
-                    
+
                     neuroData = struct;
                     for i = 1:numel(variables)
                         thisData = data.(variables{i});
                         neuroData(i).name = variables{i};
-                        neuroData(i).data = feval(fcn, 'data', thisData, 'timestamps', time, nvPairs{:});
+                        neuroData(i).data = feval(fcn, 'data', thisData, timeArgs{:}, nvPairs{:});
                     end
                 else
                     data = data.(variables{1});
@@ -89,7 +90,7 @@ function neuroData = convertToNeuroDataType(metadata, data, neuroDataType)
                     else
                         error('Unhandled data shape')
                     end
-                    neuroData = feval(fcn, 'data', data, 'timestamps', time, nvPairs{:});
+                    neuroData = feval(fcn, 'data', data, timeArgs{:}, nvPairs{:});
                 end
 
                 % dataV = data{:,1};
