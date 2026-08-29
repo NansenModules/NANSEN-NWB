@@ -191,14 +191,16 @@ classdef NWBConfigurator < applify.MultiPageApp
 
                 switch answer
                     case 'Yes'
-                        if ismissing(obj.FilePath)
-                            error('Filepath is not set')
-                            % Todo:
-                            [filename, folder] = uigetfile('.m')
-                        else
-                            obj.saveNwbConfigurationData()
-                            obj.DynamicTableConfigurator.deactivate()
+                        % The configurator can be constructed without a
+                        % file path, in which case ask where to save before
+                        % closing. Treat a cancelled prompt like a
+                        % cancelled close, leaving the figure open.
+                        if ismissing(obj.FilePath) && ~obj.promptForFilePath()
+                            return
                         end
+
+                        obj.saveNwbConfigurationData()
+                        obj.DynamicTableConfigurator.deactivate()
                     case 'No'
                         % discard changes
                     otherwise
@@ -207,6 +209,23 @@ classdef NWBConfigurator < applify.MultiPageApp
             end
 
             delete(obj.Figure)
+        end
+
+        function wasSelected = promptForFilePath(obj)
+        % promptForFilePath - Ask where to save the configuration
+        %
+        %   Returns true if a location was chosen and assigned to FilePath,
+        %   false if the user dismissed the dialog. The configuration is
+        %   written with save, so the file is a MAT-file.
+
+            [fileName, folderPath] = uiputfile( ...
+                '*.mat', 'Save NWB Configuration', 'nwbConfiguration.mat');
+
+            wasSelected = ~isequal(fileName, 0);
+
+            if wasSelected
+                obj.FilePath = string( fullfile(folderPath, fileName) );
+            end
         end
 
         function warnIfConfigurationIssues(~, dataItems)
