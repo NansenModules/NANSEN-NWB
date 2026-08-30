@@ -69,16 +69,17 @@ function neuroData = convertToNeuroDataType(metadata, data, neuroDataType)
                 
                 % time = seconds( data.Time );
                 time = seconds( data.Properties.RowTimes );
+                timeArgs = nansen.module.nwb.internal.resolveTimeArguments(time, metadata);
 
                 if numel(variables) > 1
                     % % assert(isContainerType, ...
                     % %     'NeuroDataType must be one of the following to support adding multiple timetable variables: \n\n%s\n', strjoin("  " + wrapperNames, newline))
-                    
+
                     neuroData = struct;
                     for i = 1:numel(variables)
                         thisData = data.(variables{i});
                         neuroData(i).name = variables{i};
-                        neuroData(i).data = feval(fcn, 'data', thisData, 'timestamps', time, nvPairs{:});
+                        neuroData(i).data = feval(fcn, 'data', thisData, timeArgs{:}, nvPairs{:});
                     end
                 else
                     data = data.(variables{1});
@@ -89,24 +90,50 @@ function neuroData = convertToNeuroDataType(metadata, data, neuroDataType)
                     else
                         error('Unhandled data shape')
                     end
-                    neuroData = feval(fcn, 'data', data, 'timestamps', time, nvPairs{:});
+                    neuroData = feval(fcn, 'data', data, timeArgs{:}, nvPairs{:});
                 end
 
                 % dataV = data{:,1};
                 % nvPairs = [nvPairs, {'timestamps', seconds(data.Time), 'data' dataV}];
             
             elseif isa(data, 'timeseries')
+                neuroData = feval(fcn, 'data', data.Data, ...
+                    'timestamps', data.Time, nvPairs{:});
 
             elseif isa(data, 'duration')
                 time = seconds(data);
                 data = 1:numel(data);
                 neuroData = feval(fcn, 'data', data, 'timestamps', time, nvPairs{:});
+
             else
+                % Anything else is handed to the type as its data, with the
+                % metadata supplying whatever else the type needs. Data
+                % that carries no time of its own has to be given one, so
+                % the metadata must name either timestamps or a starting
+                % time and rate.
+                if ~hasTimeReference(metadata)
+                    error('nansen:nwb:missingTimeReference', ...
+                        ['%s data has no time information of its own, so ', ...
+                         'the metadata must supply it. Set either ', ...
+                         '"timestamps", or both "starting_time" and ', ...
+                         '"starting_time_rate".'], class(data))
+                end
+                neuroData = feval(fcn, 'data', data, nvPairs{:});
             end
     end
     
     % Get custom conversion function
-    
+
     % Neurodata type
     % nwbData = feval(sprintf('types.core.%s', neuroDataType), nvPairs{:});
+end
+
+function tf = hasTimeReference(metadata)
+%hasTimeReference - True if the metadata says when the samples were taken
+
+    hasTimestamps = isfield(metadata, 'timestamps') && ~isempty(metadata.timestamps);
+    hasStartingTime = isfield(metadata, 'starting_time') && ...
+        isfield(metadata, 'starting_time_rate');
+
+    tf = hasTimestamps || hasStartingTime;
 end

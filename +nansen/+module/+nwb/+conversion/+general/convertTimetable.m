@@ -34,6 +34,11 @@ function timeseriesSet = convertTimetable(TT, options)
 
     metadataNvPairs = namedargs2cell(options.Metadata);
 
+    % A regularly sampled series is stored as a start time and a rate
+    % rather than one timestamp per sample.
+    timeArguments = nansen.module.nwb.internal.resolveTimeArguments( ...
+        seconds(TT.Time), options.Metadata);
+
     timeseriesSet = types.untyped.Set();
     
     for i = 1:numel(variableNames)
@@ -47,7 +52,7 @@ function timeseriesSet = convertTimetable(TT, options)
             'description', char(variableDescriptions(i)), ...
             'data', TT.(name)', ... % Transpose to get time on last dimension
             'data_unit', char(variableUnits(i)), ...
-            'timestamps', seconds( TT.Time ), ...
+            timeArguments{:}, ...
             metadataNvPairs{:});
 
         timeseriesSet.set(name, timeSeries);

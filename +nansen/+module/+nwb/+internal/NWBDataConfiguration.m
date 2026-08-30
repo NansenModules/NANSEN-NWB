@@ -12,11 +12,16 @@ classdef NWBDataConfiguration < handle
 %                              Processing
 %
 %   See also nansen.module.nwb.enum.PrimaryGroupName,
-%   nansen.module.nwb.enum.NeuroDataType
+%   nansen.module.nwb.lookup.listNeurodataTypes
 
     properties
         PrimaryGroupName (1,1) nansen.module.nwb.enum.PrimaryGroupName % Top-level NWB group to write into
-        NeuroDataType (1,1) nansen.module.nwb.enum.NeuroDataType % Neurodata type the variable converts to
+
+        %NeuroDataType - Neurodata type the variable converts to
+        %   Held as text and checked when the conversion runs, rather
+        %   than against a fixed list. The types come from the schema
+        %   matnwb loaded, which a property validator cannot follow.
+        NeuroDataType (1,1) string
         DataName (1,1) string % Name the data is stored under
     end
 

@@ -7,7 +7,7 @@ classdef ProcessingModule < handle
 %   Note: types.core.ProcessingModule is matnwb's class for a module
 %   itself; this enumeration only names them
 %
-%   See also NeuroDataType, PrimaryGroupName
+%   See also PrimaryGroupName, nansen.module.nwb.lookup.listNeurodataTypes
 
     enumeration
         ecephys % extracellular electrophysiology
