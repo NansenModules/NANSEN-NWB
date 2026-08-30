@@ -73,9 +73,17 @@ classdef registerConverterFolderTest < matlab.unittest.TestCase
         function keepsRegisteredFoldersAcrossARefresh(testCase)
             % A refresh picks up edited converters; losing the lab's
             % folder while doing so would be a surprise.
+            %
+            % This test touches the shared registry, so it starts from a
+            % fresh one, and registers its cleanup refresh before creating
+            % the folder: teardowns run in reverse, so the folder is gone
+            % by the time the refresh runs and cannot be re-registered
+            % into the instance later tests see.
+            import nansen.module.nwb.conversion.ConverterRegistry
+            ConverterRegistry.instance(Refresh=true);
+            testCase.addTeardown(@() ConverterRegistry.instance(Refresh=true));
+
             folderPath = testCase.folderWithConverter("myLabConverter");
-            testCase.addTeardown( ...
-                @() nansen.module.nwb.conversion.ConverterRegistry.instance(Refresh=true));
 
             nansen.module.nwb.registerConverterFolder(folderPath)
             nansen.module.nwb.refreshConverters()

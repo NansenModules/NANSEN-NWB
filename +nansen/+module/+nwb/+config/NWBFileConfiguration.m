@@ -8,9 +8,10 @@ classdef NWBFileConfiguration
 %   Any subset of the properties below may be given.
 %
 %   NWBFileConfiguration functions:
-%       toStruct   - Convert to a struct for serialization
-%       fromStruct - Build a configuration from a struct
-%       fromAny    - Accept either a configuration or a struct
+%       toStruct      - Convert to a struct for serialization
+%       fromStruct    - Build a configuration from a struct
+%       fromAny       - Accept either a configuration or a struct
+%       applyDefaults - Fill metadata gaps from project-wide defaults
 %
 %   NWBFileConfiguration properties:
 %       Version         - Schema version of this configuration
@@ -63,6 +64,52 @@ classdef NWBFileConfiguration
             obj.DataItems = ...
                 nansen.module.nwb.config.NWBDataItemConfig.fromAny(options.DataItems);
             obj.WriteMode = options.WriteMode;
+        end
+
+        function obj = applyDefaults(obj, defaults)
+            %applyDefaults - Fill metadata gaps from project-wide defaults
+            %   OBJ = applyDefaults(OBJ,DEFAULTS) lays the configuration's
+            %   metadata over DEFAULTS, so values already in the
+            %   configuration win and the defaults supply what is missing.
+            %
+            %   DEFAULTS is a struct with any subset of the fields
+            %   SessionMetadata, SubjectMetadata and GeneralMetadata,
+            %   holding the values a whole project shares: institution,
+            %   lab, experimenter, keywords, species, and the like. They
+            %   belong in one place rather than repeated in every
+            %   configuration, both to save the typing and so a correction
+            %   lands everywhere at once.
+            %
+            %   Errors:
+            %     nansen:nwb:invalidMetadataDefaults - DEFAULTS carries a
+            %                     field that is not a metadata section.
+            %
+            %   See also nansen.module.nwb.config.loadMetadataDefaults,
+            %   nansen.module.nwb.internal.deepMerge
+
+            arguments
+                obj
+                defaults (1,1) struct
+            end
+
+            sectionNames = ["SessionMetadata", "SubjectMetadata", "GeneralMetadata"];
+
+            unknownFields = setdiff(string(fieldnames(defaults)), sectionNames);
+            if ~isempty(unknownFields)
+                error("nansen:nwb:invalidMetadataDefaults", ...
+                    ['Metadata defaults may only carry the sections %s, ', ...
+                     'but ''%s'' was given. Check the spelling in the ', ...
+                     'defaults file.'], strjoin(sectionNames, ", "), ...
+                    unknownFields(1))
+            end
+
+            for i = 1:numel(sectionNames)
+                sectionName = sectionNames(i);
+                if isfield(defaults, sectionName)
+                    obj.(sectionName) = nansen.module.nwb.internal.deepMerge( ...
+                        defaults.(sectionName), obj.(sectionName));
+                end
+            end
         end
 
         function S = toStruct(obj)

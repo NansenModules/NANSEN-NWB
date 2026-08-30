@@ -124,6 +124,139 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
         end
     end
 
+    methods (Test) % Filling subject metadata from a subject record
+
+        function mapsTheSubjectRecordIntoSubjectMetadata(testCase)
+            config = buildFor(sessionStub(), SubjectRecord=subjectRecordStub());
+
+            testCase.verifyEqual(config.SubjectMetadata.age, "P90D")
+            testCase.verifyEqual(config.SubjectMetadata.sex, "M")
+            testCase.verifyEqual(config.SubjectMetadata.genotype, "Scn1a+/-")
+
+            % A full zoned timestamp, because pynwb rejects a birth date
+            % without a time zone. The offset depends on the machine, so
+            % only its presence is checked.
+            testCase.verifyTrue(startsWith(config.SubjectMetadata.date_of_birth, ...
+                "2026-02-09T00:00:00"))
+            testCase.verifyMatches(config.SubjectMetadata.date_of_birth, ...
+                ".*[+-]\d{4}$")
+        end
+
+        function keepsTheSessionSubjectIdOverTheRecords(testCase)
+            record = subjectRecordStub();
+            record.SubjectID = 'somethingElse';
+
+            config = buildFor(sessionStub(), SubjectRecord=record);
+
+            testCase.verifyEqual(config.SubjectMetadata.subject_id, "mouse01")
+        end
+
+        function mapsFullSexWordsToTheNwbLetters(testCase)
+            record = subjectRecordStub();
+            record.BiologicalSex = 'Female';
+
+            config = buildFor(sessionStub(), SubjectRecord=record);
+
+            testCase.verifyEqual(config.SubjectMetadata.sex, "F")
+        end
+
+        function mapsAnUnrecognizedSexToUnknownRatherThanGuessing(testCase)
+            record = subjectRecordStub();
+            record.BiologicalSex = 'not recorded';
+
+            config = buildFor(sessionStub(), SubjectRecord=record);
+
+            testCase.verifyEqual(config.SubjectMetadata.sex, "U")
+        end
+
+        function leavesAgeOutWhenTheRecordHasNone(testCase)
+            % NWB Inspector reports the gap; inventing an age would hide
+            % it in a shared file.
+            record = subjectRecordStub();
+            record.AgeDays = NaN;
+
+            config = buildFor(sessionStub(), SubjectRecord=record);
+
+            testCase.verifyFalse(isfield(config.SubjectMetadata, "age"))
+        end
+
+        function toleratesARecordWithNoneOfTheExpectedFields(testCase)
+            config = buildFor(sessionStub(), SubjectRecord=struct("Irrelevant", 1));
+
+            testCase.verifyEqual(config.SubjectMetadata.subject_id, "mouse01")
+        end
+    end
+
+    methods (Test) % Project-wide metadata defaults
+
+        function fillsMetadataGapsFromTheDefaults(testCase)
+            defaults = struct("GeneralMetadata", struct("institution", "UiO"), ...
+                "SubjectMetadata", struct("species", "Mus musculus"));
+
+            config = buildFor(sessionStub(), MetadataDefaults=defaults);
+
+            testCase.verifyEqual(config.GeneralMetadata.institution, "UiO")
+            testCase.verifyEqual(config.SubjectMetadata.species, "Mus musculus")
+        end
+
+        function sessionValuesWinOverTheDefaults(testCase)
+            defaults = struct("SessionMetadata", ...
+                struct("session_description", "From the defaults"));
+
+            config = buildFor(sessionStub(), MetadataDefaults=defaults);
+
+            testCase.verifyEqual(string(config.SessionMetadata.session_description), ...
+                "A test session")
+        end
+
+        function defaultsSupplyTheDescriptionWhenTheSessionHasNone(testCase)
+            % The "no description" placeholder must not shadow a default.
+            session = sessionStub();
+            session.Description = '';
+            defaults = struct("SessionMetadata", ...
+                struct("session_description", "From the defaults"));
+
+            config = buildFor(session, MetadataDefaults=defaults);
+
+            testCase.verifyEqual(string(config.SessionMetadata.session_description), ...
+                "From the defaults")
+        end
+    end
+
+    methods (Test) % Deciding where the file goes
+
+        function anExplicitOutputPathWins(testCase)
+            config = buildFor(sessionStub(), OutputPath="/elsewhere/custom.nwb");
+
+            testCase.verifyEqual(config.OutputPath, "/elsewhere/custom.nwb")
+        end
+
+        function anOutputPathFunctionDerivesThePathFromTheSession(testCase)
+            % The hook for a project with its own layout, such as one
+            % grouping output by figure.
+            pathBuilder = @(session) fullfile("/data/figure-2", ...
+                "sub-" + session.subjectID + ".nwb");
+
+            config = buildFor(sessionStub(), OutputPathFcn=pathBuilder);
+
+            testCase.verifyEqual(config.OutputPath, ...
+                string(fullfile("/data/figure-2", "sub-mouse01.nwb")))
+        end
+
+        function rejectsBothAPathAndAPathFunction(testCase)
+            testCase.verifyError( ...
+                @() buildFor(sessionStub(), OutputPath="/a.nwb", ...
+                    OutputPathFcn=@(s) "/b.nwb"), ...
+                "nansen:nwb:ambiguousOutputPath")
+        end
+
+        function rejectsAPathFunctionReturningNothingUsable(testCase)
+            testCase.verifyError( ...
+                @() buildFor(sessionStub(), OutputPathFcn=@(s) ""), ...
+                "nansen:nwb:invalidOutputPath")
+        end
+    end
+
     methods (Test) % Rejecting sessions that cannot identify a file
 
         function rejectsASessionWithNoSubjectIdentifier(testCase)
@@ -169,11 +302,33 @@ function config = buildFor(session, options)
         session
         options.DataItems = nansen.module.nwb.config.NWBDataItemConfig.empty(0, 1)
         options.TimeZone (1,1) string = "UTC"
+        options.SubjectRecord = []
+        options.MetadataDefaults = struct()
+        options.OutputPath (1,1) string = ""
+        options.OutputPathFcn = function_handle.empty
     end
 
     config = nansen.module.nwb.session.NWBSessionConfigBuilder.buildConfig( ...
         session, options.DataItems, ...
-        TimeZone=options.TimeZone, ProjectName="TestProject");
+        TimeZone=options.TimeZone, ProjectName="TestProject", ...
+        SubjectRecord=options.SubjectRecord, ...
+        MetadataDefaults=options.MetadataDefaults, ...
+        OutputPath=options.OutputPath, ...
+        OutputPathFcn=options.OutputPathFcn);
+end
+
+function record = subjectRecordStub()
+%subjectRecordStub - Stand-in for a row of the Subject metatable
+%
+%   Carries the fields subjectMetadataFromRecord looks for, with the
+%   names the Roth project's subject table uses.
+
+    record = struct();
+    record.SubjectID = 'mouse01';
+    record.AgeDays = 90;
+    record.BiologicalSex = 'male';
+    record.DateOfBirth = datetime(2026, 2, 9);
+    record.Genotype = 'Scn1a+/-';
 end
 
 function item = dataItem(variableName)

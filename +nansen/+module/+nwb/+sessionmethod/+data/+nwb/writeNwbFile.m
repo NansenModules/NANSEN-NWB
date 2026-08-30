@@ -9,6 +9,13 @@ function varargout = writeNwbFile(sessionObject, varargin)
 %   Use the 'ConfigurationFileName' parameter to select a specific
 %   configuration file when multiple NWB configuration files are present.
 %
+%   Metadata is pulled from wherever the project holds it: the session
+%   supplies the identifier and start time, the Subject metatable (when
+%   the project keeps one) supplies age, sex and genotype, and a
+%   nwb_metadata_defaults.json next to the configuration supplies what
+%   every conversion shares — institution, experimenter, keywords and the
+%   like. Values from the session win over the defaults.
+%
 %   The method itself only assembles the configuration for this session and
 %   hands it to the conversion runner. Everything about how data becomes
 %   neurodata lives in the converters, and everything about how the file is
@@ -58,11 +65,18 @@ import nansen.session.SessionMethod
 
     dataItems = loadConfiguredDataItems(configurationFilePath);
 
+    % The subject record carries what the session does not: age or date
+    % of birth, sex, genotype. Without at least an age, NWB Inspector
+    % rates the file critically incomplete.
+    subjectRecord = findSubjectRecord(currentProject, sessionObject);
+
     config = nansen.module.nwb.session.NWBSessionConfigBuilder.buildConfig( ...
         sessionObject, dataItems, ...
         TimeZone=params.TimeZone, ...
         WriteMode=lower(string(params.WriteMode)), ...
-        ProjectName=string(currentProject.Name));
+        ProjectName=string(currentProject.Name), ...
+        SubjectRecord=subjectRecord, ...
+        MetadataDefaults=findMetadataDefaults(configurationFolderPath));
 
     % Checking the file is worth the Python round trip here: a session
     % export that is missing metadata a repository requires should say so
@@ -87,6 +101,43 @@ function params = getDefaultParameters()
     params.TimeZone = "local";
     params.WriteMode = 'Overwrite'; % 'Overwrite' | 'Append'
     params.Validate = true; % Check the written file against NWB Best Practices
+end
+
+function subjectRecord = findSubjectRecord(currentProject, sessionObject)
+%findSubjectRecord - Look the session's subject up in the Subject metatable
+%
+%   Returns [] when the project keeps no Subject metatable or the subject
+%   is not in it. That is a metadata gap for the validation step to
+%   report, not a reason the conversion cannot run.
+
+    try
+        subjectTable = currentProject.MetaTableCatalog.getMetaTable('Subject');
+        subjectRecord = subjectTable.getMetaObjectById(sessionObject.subjectID);
+    catch
+        subjectRecord = [];
+    end
+end
+
+function defaults = findMetadataDefaults(configurationFolderPath)
+%findMetadataDefaults - Locate the project's metadata defaults, if any
+%
+%   The defaults file holds what every conversion in the project shares:
+%   institution, lab, experimenter, keywords, species. See
+%   nansen.module.nwb.config.loadMetadataDefaults for its format.
+
+    defaultsFilePath = fullfile(configurationFolderPath, metadataDefaultsFilename());
+
+    if isfile(defaultsFilePath)
+        defaults = string(defaultsFilePath);
+    else
+        defaults = struct();
+    end
+end
+
+function fileName = metadataDefaultsFilename()
+%metadataDefaultsFilename - Name of the project metadata defaults file
+
+    fileName = "nwb_metadata_defaults.json";
 end
 
 function dataItems = loadConfiguredDataItems(configurationFilePath)
@@ -134,6 +185,12 @@ function configurationFilePath = getConfigurationFilePath(configurationFolderPat
 
     availableFiles = [dir(fullfile(configurationFolderPath, '*.json')); ...
                       dir(fullfile(configurationFolderPath, '*.mat'))];
+
+    % The metadata defaults live in the same folder but are not a
+    % conversion configuration, so they are not offered as one.
+    availableFiles = availableFiles( ...
+        ~strcmp({availableFiles.name}, metadataDefaultsFilename()));
+
     if isempty(availableFiles)
         return
     end

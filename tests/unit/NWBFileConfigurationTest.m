@@ -125,6 +125,72 @@ classdef NWBFileConfigurationTest < matlab.unittest.TestCase
         end
     end
 
+    methods (Test) % Project-wide metadata defaults
+
+        function defaultsFillMetadataTheConfigurationLacks(testCase)
+            config = configurationWith(dataItem("speed"));
+
+            config = config.applyDefaults(struct( ...
+                "GeneralMetadata", struct("institution", "UiO", ...
+                    "experimenter", {{'Lastname, Firstname'}}), ...
+                "SubjectMetadata", struct("species", "Mus musculus")));
+
+            testCase.verifyEqual(config.GeneralMetadata.institution, "UiO")
+            testCase.verifyEqual(config.SubjectMetadata.species, "Mus musculus")
+        end
+
+        function configurationValuesWinOverDefaults(testCase)
+            config = configurationWith(dataItem("speed"));
+            config.GeneralMetadata = struct("institution", "NTNU");
+
+            config = config.applyDefaults(struct( ...
+                "GeneralMetadata", struct("institution", "UiO", "lab", "Some lab")));
+
+            testCase.verifyEqual(config.GeneralMetadata.institution, "NTNU")
+            testCase.verifyEqual(config.GeneralMetadata.lab, "Some lab")
+        end
+
+        function defaultsFillAFieldLeftBlank(testCase)
+            % "" means never filled in, so the default should take.
+            config = configurationWith(dataItem("speed"));
+            config.SessionMetadata.session_description = "";
+
+            config = config.applyDefaults(struct( ...
+                "SessionMetadata", struct("session_description", "From the defaults")));
+
+            testCase.verifyEqual(string(config.SessionMetadata.session_description), ...
+                "From the defaults")
+        end
+
+        function rejectsDefaultsWithAnUnknownSection(testCase)
+            config = configurationWith(dataItem("speed"));
+
+            testCase.verifyError( ...
+                @() config.applyDefaults(struct("GeneralMetdata", struct())), ...
+                "nansen:nwb:invalidMetadataDefaults")
+        end
+
+        function loadsDefaultsFromAJsonFile(testCase)
+            filePath = testCase.temporaryFile();
+            writelines(['{"GeneralMetadata": {"institution": "UiO", ' ...
+                '"keywords": ["patch-clamp", "hippocampus"]}}'], filePath)
+
+            defaults = nansen.module.nwb.config.loadMetadataDefaults(filePath);
+
+            testCase.verifyEqual(string(defaults.GeneralMetadata.institution), "UiO")
+            testCase.verifyNumElements(defaults.GeneralMetadata.keywords, 2)
+        end
+
+        function rejectsADefaultsFileWithAnUnknownSection(testCase)
+            filePath = testCase.temporaryFile();
+            writelines('{"NotASection": {}}', filePath)
+
+            testCase.verifyError( ...
+                @() nansen.module.nwb.config.loadMetadataDefaults(filePath), ...
+                "nansen:nwb:invalidMetadataDefaults")
+        end
+    end
+
     methods (Test) % Defaults
 
         function fillsFieldsMissingFromAStruct(testCase)
