@@ -17,7 +17,7 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
         unsetColumn = struct( ...
             'placeholderPrimaryGroup', struct( ...
                 'FieldName', "PrimaryGroupName", ...
-                'Value', "<Select group>", ...
+                'Value', "<Select a group>", ...
                 'Message', "Primary group is not set"), ...
             'emptyPrimaryGroup', struct( ...
                 'FieldName', "PrimaryGroupName", ...
@@ -25,7 +25,7 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
                 'Message', "Primary group is not set"), ...
             'placeholderNwbModule', struct( ...
                 'FieldName', "NwbModule", ...
-                'Value', "<Select module>", ...
+                'Value', "<Select an NWB module>", ...
                 'Message', "NWB module is not set"), ...
             'emptyNwbModule', struct( ...
                 'FieldName', "NwbModule", ...
@@ -33,7 +33,7 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
                 'Message', "NWB module is not set"), ...
             'placeholderNeuroDataType', struct( ...
                 'FieldName', "NeuroDataType", ...
-                'Value', "<Select type>", ...
+                'Value', "<Select a neurodata type>", ...
                 'Message', "Neurodata type is not set"), ...
             'emptyNeuroDataType', struct( ...
                 'FieldName', "NeuroDataType", ...
@@ -41,21 +41,21 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
                 'Message', "Neurodata type is not set"))
 
         % Ways a required property can be present but unusable. Each case
-        % is a TimeSeries, whose required properties are data and
-        % data_unit.
+        % is a TimeSeries, whose only configurable required property is
+        % data_unit; data is supplied at conversion time, not configured.
         incompleteMetadata = struct( ...
             'absentProperty', struct( ...
-                'Metadata', struct("data", [1 2 3]), ...
+                'Metadata', struct("description", "EEG signal"), ...
                 'ReportedProperty', "data_unit"), ...
             'blankString', struct( ...
-                'Metadata', struct("data", [1 2 3], "data_unit", "   "), ...
+                'Metadata', struct("data_unit", "   "), ...
                 'ReportedProperty', "data_unit"), ...
             'zeroLengthString', struct( ...
-                'Metadata', struct("data", [1 2 3], "data_unit", ""), ...
+                'Metadata', struct("data_unit", ""), ...
                 'ReportedProperty', "data_unit"), ...
-            'emptyNumeric', struct( ...
-                'Metadata', struct("data", [], "data_unit", "volts"), ...
-                'ReportedProperty', "data"))
+            'emptyValue', struct( ...
+                'Metadata', struct("data_unit", []), ...
+                'ReportedProperty', "data_unit"))
     end
 
     methods (TestClassSetup)
@@ -75,6 +75,39 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
             testCase.verifyClass(warnings, "cell")
         end
 
+        function nonStructInputIsRejected(testCase)
+        % A table must be refused rather than converted. MATLAB satisfies a
+        % bare class-name constraint by calling struct() on the value, which
+        % succeeds and then fails on a missing field several frames later.
+
+            testCase.verifyError( ...
+                @() validateConfiguration(table()), 'MATLAB:validators:mustBeA')
+        end
+
+        function placeholderLabelsMatchTheSharedDefinition(testCase)
+        % The cases above spell the labels out so that the TestParameter
+        % block stays free of module calls. Guard them against drift in
+        % getUnsetPlaceholders, which is what the configurator writes.
+
+            placeholders = nansen.module.nwb.internal.getUnsetPlaceholders();
+
+            testCase.verifyEqual(placeholders.PrimaryGroupName, "<Select a group>")
+            testCase.verifyEqual(placeholders.NwbModule, "<Select an NWB module>")
+            testCase.verifyEqual(placeholders.NeuroDataType, "<Select a neurodata type>")
+        end
+
+        function realValueBeginningWithAngleBracketIsNotUnset(testCase)
+        % A value is a placeholder only if it equals one, not because it
+        % happens to start with '<'.
+
+            item = createConfigurationItem(PrimaryGroupName="<legacy>");
+
+            warnings = validateConfiguration(item);
+
+            testCase.verifyEmpty( ...
+                warnings(contains(warnings, "Primary group is not set")))
+        end
+
         function unsetColumnIsReported(testCase, unsetColumn)
             item = createConfigurationItem();
             item.(unsetColumn.FieldName) = unsetColumn.Value;
@@ -91,7 +124,7 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
         % metadata is empty.
 
             item = createConfigurationItem( ...
-                NeuroDataType="<Select type>", DefaultMetadata='');
+                NeuroDataType="<Select a neurodata type>", DefaultMetadata='');
 
             warnings = validateConfiguration(item);
 
@@ -101,9 +134,9 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
 
         function multipleUnsetColumnsAreEachReported(testCase)
             item = createConfigurationItem( ...
-                PrimaryGroupName="<Select group>", ...
-                NwbModule="<Select module>", ...
-                NeuroDataType="<Select type>");
+                PrimaryGroupName="<Select a group>", ...
+                NwbModule="<Select an NWB module>", ...
+                NeuroDataType="<Select a neurodata type>");
 
             warnings = validateConfiguration(item);
 
@@ -115,7 +148,7 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
         % each line has to name the variable it refers to.
 
             item = createConfigurationItem( ...
-                VariableName="WheelData", PrimaryGroupName="<Select group>");
+                VariableName="WheelData", PrimaryGroupName="<Select a group>");
 
             warnings = validateConfiguration(item);
 
@@ -125,9 +158,9 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
         function eachItemInArrayIsChecked(testCase)
             items = [ ...
                 createConfigurationItem( ...
-                    VariableName="Eeg", PrimaryGroupName="<Select group>"), ...
+                    VariableName="Eeg", PrimaryGroupName="<Select a group>"), ...
                 createConfigurationItem( ...
-                    VariableName="WheelData", NwbModule="<Select module>")];
+                    VariableName="WheelData", NwbModule="<Select an NWB module>")];
 
             warnings = validateConfiguration(items);
 
@@ -174,7 +207,8 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
 
         function emptyMetadataReportsEveryRequiredProperty(testCase)
         % Saved configurations carry '' rather than a struct until
-        % metadata has been entered.
+        % metadata has been entered. Only data_unit is reported, because
+        % TimeSeries.data holds data rather than metadata.
 
             testCase.assumeSchemaLookupIsAvailable()
 
@@ -182,12 +216,54 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
 
             warnings = validateConfiguration(item);
 
-            testCase.verifyNumElements(warnings, 2)
-            testCase.verifySubstring(strjoin(warnings, newline), """data""")
-            testCase.verifySubstring(strjoin(warnings, newline), """data_unit""")
+            testCase.verifyNumElements(warnings, 1)
+            testCase.verifySubstring(warnings{1}, """data_unit""")
         end
 
         function warningNamesTheNeuroDataType(testCase)
+            testCase.assumeSchemaLookupIsAvailable()
+
+            item = createConfigurationItem( ...
+                NeuroDataType="ElectricalSeries", DefaultMetadata='');
+
+            warnings = validateConfiguration(item);
+
+            testCase.verifySubstring(warnings{1}, "ElectricalSeries")
+        end
+
+        function dataCarryingPropertiesAreNotReported(testCase)
+        % convertToNeuroDataType supplies data and timestamps from the
+        % session data, and getTypeMetadataStruct hides them from the
+        % metadata editor, so a configuration can never set them. Reporting
+        % them would flag every correctly configured item.
+
+            testCase.assumeSchemaLookupIsAvailable()
+
+            warnings = validateConfiguration(createConfigurationItem());
+
+            testCase.verifyEmpty(warnings)
+        end
+
+        function dataCarryingPropertiesOfSuperclassAreNotReported(testCase)
+        % RoiResponseSeries declares only "rois" as data-carrying; "data"
+        % and "timestamps" are declared by TimeSeries, which it extends.
+        % Resolving them needs the class hierarchy walked.
+
+            testCase.assumeSchemaLookupIsAvailable()
+
+            item = createConfigurationItem( ...
+                NeuroDataType="RoiResponseSeries", ...
+                DefaultMetadata=struct("data_unit", "lumens"));
+
+            warnings = validateConfiguration(item);
+
+            testCase.verifyEmpty(warnings)
+        end
+
+        function typeWithOnlyDataRequirementsReturnsNoWarnings(testCase)
+        % SpatialSeries requires only data, which is not configured, so
+        % there is nothing left for the user to fill in.
+
             testCase.assumeSchemaLookupIsAvailable()
 
             item = createConfigurationItem( ...
@@ -195,7 +271,7 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
 
             warnings = validateConfiguration(item);
 
-            testCase.verifySubstring(warnings{1}, "SpatialSeries")
+            testCase.verifyEmpty(warnings)
         end
 
         function typeWithoutRequiredPropertiesReturnsNoWarnings(testCase)
@@ -215,8 +291,8 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
             testCase.assumeSchemaLookupIsAvailable()
 
             item = createConfigurationItem( ...
-                PrimaryGroupName="<Select group>", ...
-                DefaultMetadata=struct("data", [1 2 3]));
+                PrimaryGroupName="<Select a group>", ...
+                DefaultMetadata=struct("description", "EEG signal"));
 
             warnings = validateConfiguration(item);
 
@@ -255,7 +331,7 @@ function item = createConfigurationItem(options)
         options.PrimaryGroupName = "Acquisition"
         options.NwbModule = "ecephys"
         options.NeuroDataType = "TimeSeries"
-        options.DefaultMetadata = struct("data", [1 2 3], "data_unit", "volts")
+        options.DefaultMetadata = struct("data_unit", "volts")
     end
 
     item = options;

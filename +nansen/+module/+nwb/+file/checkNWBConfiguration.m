@@ -11,6 +11,9 @@ function warnings = checkNWBConfiguration(dataItems)
 %        NeuroDataType still hold their placeholder values.
 %     2. Missing required NWB metadata properties — required properties for
 %        the selected NeuroDataType are absent or empty in DefaultMetadata.
+%        Properties that carry data rather than metadata, such as "data"
+%        and "timestamps", are excluded: they are supplied at conversion
+%        time and are never part of a configuration.
 %
 %   Input Arguments:
 %     dataItems - Struct array of configuration items, each with fields:
@@ -22,7 +25,18 @@ function warnings = checkNWBConfiguration(dataItems)
 %
 %   See also: nansen.module.nwb.internal.schemautil.getRequiredProperties
 
+    arguments
+        % mustBeA rejects other types. A bare "struct" class constraint
+        % would instead convert a table by calling struct() on it, which
+        % succeeds and then fails on a missing field further down.
+        dataItems {mustBeA(dataItems, 'struct')}
+    end
+
     import nansen.module.nwb.internal.schemautil.getRequiredProperties
+    import nansen.module.nwb.internal.lookup.getFullTypeName
+    import nansen.module.nwb.internal.dataPropertyNamesForType
+
+    placeholders = nansen.module.nwb.internal.getUnsetPlaceholders();
 
     warnings = {};
 
@@ -31,15 +45,15 @@ function warnings = checkNWBConfiguration(dataItems)
         varName = item.VariableName;
 
         % --- 1. Check required table columns ---
-        if isUnset(item.PrimaryGroupName)
+        if isUnset(item.PrimaryGroupName, placeholders.PrimaryGroupName)
             warnings{end+1} = sprintf('"%s": Primary group is not set.', varName); %#ok<AGROW>
         end
 
-        if isUnset(item.NwbModule)
+        if isUnset(item.NwbModule, placeholders.NwbModule)
             warnings{end+1} = sprintf('"%s": NWB module is not set.', varName); %#ok<AGROW>
         end
 
-        if isUnset(item.NeuroDataType)
+        if isUnset(item.NeuroDataType, placeholders.NeuroDataType)
             warnings{end+1} = sprintf('"%s": Neurodata type is not set.', varName); %#ok<AGROW>
             continue  % Cannot check metadata without a type
         end
@@ -47,9 +61,18 @@ function warnings = checkNWBConfiguration(dataItems)
         % --- 2. Check required NWB metadata properties ---
         try
             requiredProps = getRequiredProperties(item.NeuroDataType);
+            shortTypeName = utility.string.getSimpleClassName(char(item.NeuroDataType));
+            dataProps = dataPropertyNamesForType(getFullTypeName(string(shortTypeName)));
         catch
             continue  % Skip if type is not resolvable
         end
+
+        % Properties that carry the data itself never appear in
+        % DefaultMetadata: convertToNeuroDataType supplies them from the
+        % data loaded for the session, and getTypeMetadataStruct hides them
+        % from the metadata editor. Requiring them here would report every
+        % correctly configured item.
+        requiredProps = setdiff(requiredProps, cellstr(dataProps), 'stable');
 
         if isempty(requiredProps)
             continue
@@ -68,12 +91,12 @@ function warnings = checkNWBConfiguration(dataItems)
     end
 end
 
-function tf = isUnset(value)
-% isUnset - True if value is empty or a placeholder string (starts with '<')
+function tf = isUnset(value, placeholder)
+% isUnset - True if a column is empty or still shows its placeholder label
     if isempty(value)
         tf = true;
     elseif ischar(value) || isstring(value)
-        tf = startsWith(strtrim(value), '<');
+        tf = isscalar(string(value)) && strcmp(strtrim(string(value)), placeholder);
     else
         tf = false;
     end

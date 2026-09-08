@@ -70,6 +70,11 @@ import nansen.session.SessionMethod
     % data location
     saveFolder = sessionObject.getSessionFolder('', 'create');
 
+    % Both the filename below and the NWB identifier are built from the
+    % subject and session IDs. A blank component would silently collapse the
+    % name instead of failing, so reject it before anything is written.
+    mustHaveSessionIdentifiers(sessionObject)
+
     % We build the filename using BIDS/DandiArchive convention.
     % Todo: Add custom postfix via configuration
     nwbFilename = sprintf('sub-%s_ses-%s.nwb', sessionObject.subjectID, sessionObject.sessionID);
@@ -80,9 +85,13 @@ import nansen.session.SessionMethod
     end
 
     %% Open or create NWB file depending on if file exists.
+    % hasUnexportedChanges tracks whether the in-memory NwbFile is ahead of
+    % the file on disk. Custom converters below work on the file on disk,
+    % so pending changes must be flushed before one runs, and the final
+    % export can be skipped when nothing is pending.
     if isfile(nwbFilePath)
         nwbFile = nwbRead(nwbFilePath);
-        wasInitialized = false;
+        hasUnexportedChanges = false;
     else
         nwbFile = NwbFile(...
             'identifier', strjoin([projectName, string(sessionObject.subjectID), string(sessionObject.sessionID)], '_'), ...
@@ -90,13 +99,8 @@ import nansen.session.SessionMethod
             'session_start_time', getSessionStartTime(sessionObject, params.TimeZone), ...
             'general_session_id', sessionObject.sessionID);
 
-        wasInitialized = true;
+        hasUnexportedChanges = true;
     end
-
-    % Question: Is there anything against saving right away?
-    % % if wasInitialized
-    % %     nwbExport(nwbFile, nwbFilePath);
-    % % end
 
     % Create a map for holding resolved metadata / neurodata types.
     instanceMap = dictionary;
@@ -123,6 +127,9 @@ import nansen.session.SessionMethod
             [metadata, instanceMap] = ...
                 nansen.module.nwb.internal.resolveMetadata(...
                     metadata, nwbDataType, nwbFile, instanceMap);
+            % resolveMetadata adds linked instances (devices, electrode
+            % groups, ...) to the in-memory NwbFile as a side effect.
+            hasUnexportedChanges = true;
         end
         
         % Run default or custom converter.
@@ -137,9 +144,18 @@ import nansen.session.SessionMethod
                 continue
             end
         else
+            % Custom converters receive the file path and read, extend and
+            % write the file on disk themselves. Flush pending in-memory
+            % changes first: the re-read below would otherwise replace them
+            % with the file's last exported state, and a converter running
+            % as the first item would not find a file at all.
+            if hasUnexportedChanges
+                nwbExport(nwbFile, nwbFilePath)
+            end
             customConverterFcn = variableConfiguration.Converter;
             feval(customConverterFcn, metadata, data, nwbFilePath);
             nwbFile = nwbRead(nwbFilePath);
+            hasUnexportedChanges = false;
             continue
         end
 
@@ -168,22 +184,24 @@ import nansen.session.SessionMethod
                 % Add to processing module
         end
 
+        hasUnexportedChanges = true;
+
         % primaryGroupName = lower(variableConfiguration.PrimaryGroupName);
         % nwbVariableName = variableConfiguration.NWBVariableName;
         % nwbFile.(primaryGroupName).set(nwbVariableName, nwbData);
-        
+
         % nwbFile = nansen.module.nwb.convert.writeDataToFile(nwbFile, data, metadata, customConversinFcn); % anything else???
-    
+    end
+
+    % Export pending changes once, after the last data item. NwbFile.export
+    % appends an entry to file_create_date on each call, so exporting more
+    % often than necessary stamps the file repeatedly and rewrites the
+    % whole file every pass.
+    if hasUnexportedChanges
         nwbExport(nwbFile, nwbFilePath)
     end
-    
-    % nwbExport(nwbFile, nwbFilePath)
-    fprintf('Finished writing file ''%s''\n', nwbFilePath)
 
-    %% Export the file
-    if wasInitialized
-        % nwbExport(obj.NWBObject, obj.PathName);
-    end
+    fprintf('Finished writing file ''%s''\n', nwbFilePath)
 end
 
 function params = getDefaultParameters()
@@ -192,6 +210,40 @@ function params = getDefaultParameters()
     params.ConfigurationFileName = "";
     params.TimeZone = "local";
     params.WriteMode = 'Overwrite'; % 'Overwrite' | 'Append'
+end
+
+function mustHaveSessionIdentifiers(sessionObject)
+% mustHaveSessionIdentifiers - Verify the session has a subject and session ID
+%
+%   strjoin drops blank components silently, so a session with no subject ID
+%   would otherwise produce the identifier "Project_ses-01" and the filename
+%   "sub-_ses-01.nwb", both of which collide with any other subject sharing
+%   that session ID. NWB identifiers are required to be globally unique.
+
+    missingNames = string.empty;
+
+    if isBlank(sessionObject.subjectID)
+        missingNames(end+1) = "subjectID";
+    end
+    if isBlank(sessionObject.sessionID)
+        missingNames(end+1) = "sessionID";
+    end
+
+    if ~isempty(missingNames)
+        error('nansen:nwb:missingSessionIdentifier', ...
+            ['Session is missing a value for %s. These identify the NWB file ', ...
+             'and form its globally unique identifier. Set them for this ', ...
+             'session, or configure the data location so they can be detected ', ...
+             'from the session folder, before writing an NWB file.'], ...
+            strjoin(missingNames, ' and '))
+    end
+end
+
+function tf = isBlank(value)
+% isBlank - True if a value holds no usable text
+
+    text = strtrim(string(value));
+    tf = isempty(text) || ~isscalar(text) || strlength(text) == 0;
 end
 
 function sessionStartTime = getSessionStartTime(sessionObject, timeZone)

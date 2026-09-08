@@ -263,9 +263,10 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
                 [~, neuroDataTypes] = enumeration( 'nansen.module.nwb.enum.NeuroDataType' );
                 [~, groupNames] = enumeration( 'nansen.module.nwb.enum.PrimaryGroupName' );
 
-                groupNames = [{'<Select a group>'}; groupNames];
-                nwbModules = [{'<Select an NWB module>'}; nwbModules'];
-                neuroDataTypes = [{'<Select a neurodata type>'}; neuroDataTypes];
+                placeholders = nansen.module.nwb.internal.getUnsetPlaceholders();
+                groupNames = [{char(placeholders.PrimaryGroupName)}; groupNames];
+                nwbModules = [{char(placeholders.NwbModule)}; nwbModules'];
+                neuroDataTypes = [{char(placeholders.NeuroDataType)}; neuroDataTypes];
                 converterNames = [{'Default'}; obj.NWBConverters.keys()];
 
                 colFormatData = {[], [], groupNames, nwbModules, neuroDataTypes, converterNames, []};
@@ -534,7 +535,10 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
 
                 % Return if no module selection has been made
                 if isempty(nwbModuleName); return; end
-                if strcmp(nwbModuleName, '<Select an NWB module>'); return; end
+                if strcmp(nwbModuleName, ...
+                        nansen.module.nwb.internal.getUnsetPlaceholders().NwbModule)
+                    return
+                end
 
                 [neuroDataTypes, descriptions] = getTypesForModule(nwbModuleName);
                 descriptionMap(neuroDataTypes) = descriptions;
@@ -615,8 +619,9 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             if isempty(nwbModuleName); return; end
             % disp(nwbModuleName)
             
-            if strcmp(nwbModuleName, '<Select an NWB module>')
-                neuroDataTypes = '<Select an NWB module>';
+            modulePlaceholder = nansen.module.nwb.internal.getUnsetPlaceholders().NwbModule;
+            if strcmp(nwbModuleName, modulePlaceholder)
+                neuroDataTypes = char(modulePlaceholder);
             else
                 neuroDataTypes = getTypesForModule(nwbModuleName);
             end
