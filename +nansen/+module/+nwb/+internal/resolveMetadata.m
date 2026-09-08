@@ -143,9 +143,8 @@ function [metadata, instanceMap] = resolveMetadata(metadata, neuroDataType, nwbF
                     if strcmp(instanceName, 'ElectrodesTable')
                         dynamicTable = convertElectrodeGroups(dynamicTable, nwbFile, instanceMap);
                     end
-                    % matnwb.types.untyped.ObjectView(EGroup)
-
-                    nwbType = util.table2nwb(dynamicTable);
+                    nwbType = nansen.module.nwb.internal.dtable ...
+                        .convertToNWBTable(dynamicTable, instanceName);
                 
                     if ~isempty(nwbFile)
                         nansen.module.nwb.file.addMetadataObject(nwbFile, instanceName, nwbType);
