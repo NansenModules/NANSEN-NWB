@@ -19,6 +19,11 @@ function result = convertWithNeuroconv(context)
 %       SourcePathMode     - How to derive that path from the data item
 %       PythonExecutable   - Python interpreter to use, when not the default
 %       RunConversionArgs  - Extra arguments forwarded to run_conversion
+%       UseInterfaceMetadata - Whether to start from the metadata the
+%                            interface reads out of its own files, with
+%                            the item's metadata laid over it. Needed by
+%                            interfaces that derive electrodes or tables
+%                            from file headers, such as AbfInterface
 %
 %   Errors:
 %     nansen:nwb:missingConverterArg - InterfaceClassName is not set.
@@ -66,6 +71,9 @@ function result = convertWithNeuroconv(context)
     if isstruct(runConversionArgs)
         runArguments = [runArguments, {"RunConversionArgs", runConversionArgs}];
     end
+
+    useInterfaceMetadata = getConverterArg(args, "UseInterfaceMetadata", false);
+    runArguments = [runArguments, {"UseInterfaceMetadata", logical(useInterfaceMetadata)}];
 
     nansen.module.nwb.neuroconv.runConversion(interfaceClassName, sourceArg, ...
         context.FilePath, itemMetadata(context), runArguments{:});

@@ -50,6 +50,32 @@ classdef neuroconvBridgeTest < matlab.unittest.TestCase
             testCase.verifyEqual(string(sourceArg.file_paths), ["/data/a.tif", "/data/b.tif"])
         end
 
+        function passesEveryFileBesideTheRecordedOneWhenAsked(testCase)
+            % NANSEN records one path per variable, but an ABF session is
+            % a folder of files NeuroConv takes together. The extension
+            % match ignores case, and unrelated files stay out.
+            fixture = testCase.applyFixture( ...
+                matlab.unittest.fixtures.TemporaryFolderFixture);
+            for name = ["b_0002.abf", "a_0001.ABF", "notes.txt"]
+                fclose(fopen(fullfile(fixture.Folder, name), "w"));
+            end
+
+            sourceArg = resolveFor(fullfile(fixture.Folder, "b_0002.abf"), ...
+                struct("SourceArgumentName", "file_paths", ...
+                    "SourcePathMode", "siblingFiles"));
+
+            [~, names, extensions] = fileparts(string(sourceArg.file_paths));
+            testCase.verifyEqual(names + extensions, ["a_0001.ABF", "b_0002.abf"])
+        end
+
+        function reportsAFolderWithNoSiblingFiles(testCase)
+            testCase.verifyError( ...
+                @() resolveFor(fullfile(tempdir, "no-such-folder", "rec.abf"), ...
+                    struct("SourceArgumentName", "file_paths", ...
+                        "SourcePathMode", "siblingFiles")), ...
+                "nansen:nwb:missingSourcePath")
+        end
+
         function acceptsAnExplicitSourceArgument(testCase)
             % An interface whose constructor does not fit the pattern can
             % be given its arguments verbatim.

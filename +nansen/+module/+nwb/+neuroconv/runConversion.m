@@ -20,6 +20,15 @@ function runConversion(interfaceClassName, sourceArg, nwbFilePath, metadata, opt
 %   runConversion(...,RunConversionArgs=ARGS) forwards the fields of the
 %   struct ARGS to run_conversion as further arguments.
 %
+%   runConversion(...,UseInterfaceMetadata=true) starts from the metadata
+%   the interface harvests from its source files and lays METADATA over
+%   it. An intracellular interface, for one, works out its electrodes and
+%   recording tables from the file headers, and run_conversion uses that
+%   only when handed no metadata at all. Values in METADATA win where the
+%   two overlap. When appending, the NWBFile section is emptied and
+%   Subject dropped after the merge, since whoever created the file wrote
+%   its own metadata.
+%
 %   This is the only place in the module that calls Python. Everything
 %   else, including the registry and the configurator, works whether or
 %   not Python is available.
@@ -49,6 +58,7 @@ function runConversion(interfaceClassName, sourceArg, nwbFilePath, metadata, opt
         options.Overwrite (1,1) logical = false
         options.AppendOnDiskNwbFile (1,1) logical = false
         options.RunConversionArgs (1,1) struct = struct()
+        options.UseInterfaceMetadata (1,1) logical = false
     end
 
     if options.Overwrite && options.AppendOnDiskNwbFile
@@ -66,9 +76,15 @@ function runConversion(interfaceClassName, sourceArg, nwbFilePath, metadata, opt
         sourceNvPairs = structToPyargs(sourceArg);
         interface = interfaceClass(pyargs(sourceNvPairs{:}));
 
+        metadataValue = nansen.module.nwb.neuroconv.toPythonValue(metadata);
+        if options.UseInterfaceMetadata
+            metadataValue = mergeWithInterfaceMetadata(interface, metadataValue, ...
+                options.AppendOnDiskNwbFile);
+        end
+
         runConversionNvPairs = { ...
             "nwbfile_path", char(nwbFilePath), ...
-            "metadata", nansen.module.nwb.neuroconv.toPythonValue(metadata)};
+            "metadata", metadataValue};
 
         if options.Overwrite
             runConversionNvPairs = [runConversionNvPairs, {"overwrite", py.bool(true)}];
@@ -113,6 +129,26 @@ function configurePython(pythonExecutable, executionMode)
             ['Python is already loaded in this MATLAB session from ''%s'', ', ...
              'so ''%s'' cannot be used. Restart MATLAB to switch ', ...
              'interpreters.'], string(environment.Executable), pythonExecutable)
+    end
+end
+
+function merged = mergeWithInterfaceMetadata(interface, callerMetadata, isAppending)
+%mergeWithInterfaceMetadata - Lay the caller's metadata over the interface's
+%
+%   dict_deep_update is NeuroConv's own merge: nested dicts merge key by
+%   key, and lists of named entries merge on their "name" field, so a
+%   device description supplied by the caller replaces the placeholder
+%   the interface put under the same device name.
+
+    utils = py.importlib.import_module("neuroconv.utils");
+    merged = utils.dict_deep_update(interface.get_metadata(), callerMetadata);
+
+    if isAppending
+        % Appending drops the requirements inside the NWBFile section but
+        % not the section itself, and the harvested one carries a session
+        % start time that must not compete with what the file already has.
+        merged.update(py.dict(pyargs("NWBFile", py.dict())));
+        merged.pop("Subject", py.None);
     end
 end
 
