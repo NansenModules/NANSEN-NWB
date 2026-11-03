@@ -181,6 +181,44 @@ classdef builtinConverterTest < matlab.unittest.TestCase
         end
     end
 
+    methods (Test) % Patch-clamp sweeps
+
+        function storesEachSweepAsItsOwnCurrentClampSeries(testCase)
+            recording = patchClampRecording("mV", 3);
+
+            nwbFile = testCase.convert(recording, "PatchClampSweeps", NWBVariableName="Vm", ...
+                ConverterArgs=struct("DeviceMetadata", struct("name", "EPC8"), ...
+                    "ElectrodeMetadata", struct("name", "pipette", "location", "CA1")));
+
+            testCase.verifyEqual(string(nwbFile.acquisition.keys()), ...
+                ["Vm_sweep001", "Vm_sweep002", "Vm_sweep003"])
+            series = nwbFile.acquisition.get("Vm_sweep002");
+            testCase.verifyClass(series, "types.core.CurrentClampSeries")
+            testCase.verifyEqual(series.data_conversion, 1e-3)
+            testCase.verifyEqual(string(series.data_unit), "volts")
+            testCase.verifyEqual(series.sweep_number, uint32(2))
+            testCase.verifyEqual(series.starting_time_rate, 1000)
+            testCase.verifyTrue(nwbFile.general_devices.isKey("EPC8"))
+            testCase.verifyTrue(nwbFile.general_intracellular_ephys.isKey("pipette"))
+        end
+
+        function storesACurrentChannelAsVoltageClampSeries(testCase)
+            recording = patchClampRecording("pA", 2);
+
+            nwbFile = testCase.convert(recording, "PatchClampSweeps", NWBVariableName="Im");
+
+            series = nwbFile.acquisition.get("Im_sweep001");
+            testCase.verifyClass(series, "types.core.VoltageClampSeries")
+            testCase.verifyEqual(series.data_conversion, 1e-12)
+        end
+
+        function rejectsAChannelInAUnitThatIsNeitherVoltageNorCurrent(testCase)
+            testCase.verifyError( ...
+                @() testCase.convert(patchClampRecording("degC", 1), "PatchClampSweeps"), ...
+                "nansen:nwb:converterFailed")
+        end
+    end
+
     methods (Test) % The generic neurodata path
 
         function buildsTheNeurodataTypeNamedByTheDataItem(testCase)
@@ -245,6 +283,17 @@ classdef builtinConverterTest < matlab.unittest.TestCase
             nwbFile = nwbRead(converter.convert());
         end
     end
+end
+
+function recording = patchClampRecording(unit, numSweeps)
+%patchClampRecording - The struct the ABF adapter returns, with made-up sweeps
+
+    recording = struct( ...
+        "Data", cumsum(ones(40, 1, numSweeps), 1), ...
+        "SamplingRate", 1000, ...
+        "ChannelNames", "", ...
+        "ChannelUnits", string(unit), ...
+        "Header", struct());
 end
 
 function names = imageNames(nwbFile)

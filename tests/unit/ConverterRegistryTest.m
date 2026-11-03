@@ -57,18 +57,21 @@ classdef ConverterRegistryTest < matlab.unittest.TestCase
             testCase.verifyTrue(any([descriptors.RequiresPython]))
         end
 
-        function offersTheAbfConverterFirstForAnAbfFile(testCase)
-            % An ABF session is many files NeuroConv takes together, and
-            % the interface reads its electrodes and recording tables from
-            % their headers. The descriptor's defaults are what make that
-            % work without per-item configuration.
+        function offersBothAbfConvertersForAnAbfFile(testCase)
+            % Two converters read ABF: the built-in one, which stores each
+            % sweep the file adapter read, and NeuroConv's interface. Both
+            % match the format, the built-in one first since it needs no
+            % Python, and a data item has to name the one it wants.
             registry = nansen.module.nwb.conversion.ConverterRegistry();
-            sourceInfo = sourceEvidence(Path="/data/sub-01/2026_09_08_0001.abf");
+            sourceInfo = nansen.module.nwb.config.NWBDataItemConfig.emptySourceInfo();
+            sourceInfo.Format = "abf";
 
-            descriptors = registry.findForSourceInfo(sourceInfo);
+            [descriptors, ranks] = registry.findForSourceInfo(sourceInfo);
 
-            testCase.verifyEqual(descriptors(1).Name, "NeuroConvAbfInterface")
-            defaults = descriptors(1).DefaultConverterArgs;
+            topNames = [descriptors(ranks == ranks(1)).Name];
+            testCase.verifyEqual(topNames, ["PatchClampSweeps", "NeuroConvAbfInterface"])
+
+            defaults = registry.get("NeuroConvAbfInterface").DefaultConverterArgs;
             testCase.verifyEqual(string(defaults.InterfaceClassName), "AbfInterface")
             testCase.verifyEqual(string(defaults.SourcePathMode), "siblingFiles")
             testCase.verifyTrue(defaults.UseInterfaceMetadata)
