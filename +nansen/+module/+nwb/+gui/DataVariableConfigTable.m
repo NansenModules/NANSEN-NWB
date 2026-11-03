@@ -622,9 +622,11 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
             if isempty(nwbModuleName); return; end
             % disp(nwbModuleName)
             
-            modulePlaceholder = nansen.module.nwb.internal.getUnsetPlaceholders().NwbModule;
-            if strcmp(nwbModuleName, modulePlaceholder)
-                neuroDataTypes = char(modulePlaceholder);
+            placeholders = nansen.module.nwb.internal.getUnsetPlaceholders();
+            if strcmp(nwbModuleName, placeholders.NwbModule)
+                % Without a module there are no types to offer, and the
+                % type column shows its own label rather than the module's.
+                neuroDataTypes = char(placeholders.NeuroDataType);
             else
                 neuroDataTypes = getTypesForModule(nwbModuleName);
             end

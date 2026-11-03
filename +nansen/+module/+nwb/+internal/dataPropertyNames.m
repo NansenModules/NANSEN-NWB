@@ -13,7 +13,8 @@ function propertyNames = dataPropertyNames()
 
     propertyNames = struct();
     propertyNames.TimeSeries = ["data", "timestamps", "control"];
-    propertyNames.Image = "order_of_images";
+    propertyNames.Image = "data";
+    propertyNames.Images = "order_of_images";
     propertyNames.DynamicTable = ["colnames", "vectordata"];
     propertyNames.RoiResponseSeries = "rois";
 end
