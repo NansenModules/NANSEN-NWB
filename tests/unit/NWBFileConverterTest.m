@@ -40,9 +40,9 @@ classdef NWBFileConverterTest < matlab.unittest.TestCase
     methods (TestMethodSetup)
 
         function useTemporaryOutputFile(testCase)
-            testCase.applyFixture( ...
-                matlab.unittest.fixtures.TemporaryFolderFixture)
-            testCase.OutputPath = fullfile(tempname(), "test.nwb");
+            fixture = testCase.applyFixture( ...
+                matlab.unittest.fixtures.TemporaryFolderFixture);
+            testCase.OutputPath = fullfile(fixture.Folder, "test.nwb");
         end
     end
 
@@ -102,6 +102,116 @@ classdef NWBFileConverterTest < matlab.unittest.TestCase
                 "nansen:nwb:converterFailed")
 
             testCase.verifyFalse(isfile(testCase.OutputPath))
+            testCase.verifyEmpty(dir(fullfile(fileparts(testCase.OutputPath), "*.part.nwb")), ...
+                "No work file may be left beside the output path.")
+        end
+
+        function keepsThePreviousFileWhenAnItemFails(testCase)
+            % Overwriting must not destroy the previous file until the new
+            % one is complete: a failed run is not a reason to lose data.
+            testCase.runConversion(testCase.configurationWith( ...
+                dataItem("speed", "TimetableTimeSeries")));
+
+            config = testCase.configurationWith([ ...
+                dataItem("licks", "TimetableTimeSeries"), ...
+                dataItem("broken", "TestFailingConverter")]);
+            testCase.verifyError(@() testCase.runConversion(config), ...
+                "nansen:nwb:converterFailed")
+
+            nwbFile = nwbRead(testCase.OutputPath);
+            testCase.verifyTrue(nwbFile.acquisition.isKey("speed"))
+            testCase.verifyFalse(nwbFile.acquisition.isKey("licks"))
+        end
+
+        function keepsThePreviousFileWhenTheConfigurationIsRejected(testCase)
+            % A misspelled converter name or a missing start time is found
+            % before the previous file is touched.
+            testCase.runConversion(testCase.configurationWith( ...
+                dataItem("speed", "TimetableTimeSeries")));
+
+            config = testCase.configurationWith(dataItem("speed", "NoSuchConverter"));
+            testCase.verifyError(@() testCase.runConversion(config), ...
+                "nansen:nwb:unknownConverter")
+
+            config = testCase.configurationWith(dataItem("speed", "TimetableTimeSeries"));
+            config.SessionMetadata.session_start_time = datetime(2026, 5, 10);
+            testCase.verifyError(@() testCase.runConversion(config), ...
+                "nansen:nwb:missingTimeZone")
+
+            testCase.verifyTrue(nwbRead(testCase.OutputPath).acquisition.isKey("speed"))
+        end
+
+        function rejectsAConverterThatReturnsItsNeurodataDirectly(testCase)
+            % Returning a neurodata object instead of the file or a result
+            % struct is the natural mistake; it must not pass as "mutated
+            % in place" with the data dropped.
+            config = testCase.configurationWith( ...
+                dataItem("speed", "TestReturnsNeurodataDirectly"));
+
+            try
+                testCase.runConversion(config);
+                testCase.verifyFail("The conversion should have failed.")
+            catch exception
+                testCase.verifyEqual(string(exception.identifier), "nansen:nwb:converterFailed")
+                testCase.assertNotEmpty(exception.cause)
+                testCase.verifyEqual(string(exception.cause{1}.identifier), ...
+                    "nansen:nwb:invalidConverterResult")
+            end
+        end
+    end
+
+    methods (Test) % Resolving metadata links
+
+        function resolvesMetadataBeforeAnInMemoryConverterRuns(testCase)
+            % The resolver turns names of linked instances into objects in
+            % the file. The converter sees the resolved metadata.
+            config = testCase.configurationWith(dataItemWithMetadata( ...
+                "speed", "TestRecordsMetadata", struct("device", "Microscope")));
+            recorder = MetadataRecorder();
+
+            testCase.runConversion(config, MetadataRecorder=recorder);
+
+            testCase.verifyEqual(recorder.TypeNames, "TimeSeries")
+            testCase.verifyClass(recorder.Files{1}, "NwbFile")
+            testCase.verifyEqual(recorder.MetadataSeenByConverter.device, "resolved:Microscope")
+        end
+
+        function doesNotResolveMetadataForAnExternalConverter(testCase)
+            % An external converter takes the configured metadata as is;
+            % NeuroConv resolves its own.
+            config = testCase.configurationWith(dataItemWithMetadata( ...
+                "marker", "TestExternalWriter", struct("device", "Microscope")));
+            recorder = MetadataRecorder();
+
+            testCase.runConversion(config, MetadataRecorder=recorder);
+
+            testCase.verifyEmpty(recorder.TypeNames)
+        end
+
+        function startsAFreshInstanceMapAfterAnExternalConverter(testCase)
+            % The objects built before the external converter belong to
+            % the NwbFile that is re-read afterwards, so they must not be
+            % handed to later items.
+            config = testCase.configurationWith([ ...
+                dataItemWithMetadata("speed", "TestRecordsMetadata", struct("device", "A")), ...
+                dataItem("marker", "TestExternalWriter"), ...
+                dataItemWithMetadata("pupil", "TestRecordsMetadata", struct("device", "B"))]);
+            recorder = MetadataRecorder();
+
+            testCase.runConversion(config, MetadataRecorder=recorder);
+
+            testCase.verifyEqual(recorder.MapSizes, [0, 0], ...
+                "The second resolution must start from an empty map.")
+        end
+
+        function passesMetadataThroughWithoutAResolver(testCase)
+            config = testCase.configurationWith(dataItemWithMetadata( ...
+                "speed", "TestRecordsMetadata", struct("device", "Microscope")));
+            recorder = MetadataRecorder();
+
+            testCase.runConversion(config, MetadataRecorder=recorder, UseResolver=false);
+
+            testCase.verifyEqual(recorder.MetadataSeenByConverter.device, "Microscope")
         end
     end
 
@@ -157,6 +267,20 @@ classdef NWBFileConverterTest < matlab.unittest.TestCase
     end
 
     methods (Test) % Ordering items by what they require
+
+        function picksTheHigherRankedOfTwoMatches(testCase)
+            % A format match beats a class match; only a tie is ambiguous.
+            sourceInfo = nansen.module.nwb.config.NWBDataItemConfig.emptySourceInfo();
+            sourceInfo.Format = "testformat";
+            sourceInfo.MatlabClass = "timetable";
+            item = nansen.module.nwb.config.NWBDataItemConfig( ...
+                VariableName="speed", NWBVariableName="speed", SourceInfo=sourceInfo);
+
+            nwbFile = nwbRead(testCase.runConversion(testCase.configurationWith(item)));
+
+            testCase.verifyTrue(nwbFile.acquisition.isKey("ByFormat"), ...
+                "The converter matching the recorded format must win.")
+        end
 
         function runsAProducerBeforeTheItemRequiringIt(testCase)
             % The consumer is listed first, so only the ordering step can
@@ -275,22 +399,67 @@ classdef NWBFileConverterTest < matlab.unittest.TestCase
                 testCase
                 config
                 options.OnItemError (1,1) string = "stop"
+                options.MetadataRecorder = []
+                options.UseResolver (1,1) logical = true
+            end
+
+            % The recorder stands in for the metadata resolver and is also
+            % handed to the test converters, so a test can see both what
+            % the runner asked to resolve and what the converter received.
+            recorder = options.MetadataRecorder;
+            resolver = [];
+            if ~isempty(recorder) && options.UseResolver
+                resolver = @recorder.resolve;
             end
 
             converter = nansen.module.nwb.conversion.NWBFileConverter(config, ...
                 DataResolver=@(name) testVariable(name), ...
-                Registry=testCase.registryWithTestConverters(), ...
+                MetadataResolver=resolver, ...
+                Registry=testCase.registryWithTestConverters(recorder), ...
                 OnItemError=options.OnItemError);
 
             filePath = converter.convert();
         end
 
-        function registry = registryWithTestConverters(~)
+        function registry = registryWithTestConverters(~, recorder)
             import nansen.module.nwb.conversion.NWBConverterDescriptor
+
+            if nargin < 2
+                recorder = [];
+            end
 
             % A private registry, so registering test converters cannot
             % disturb the shared one other tests use.
             registry = nansen.module.nwb.conversion.ConverterRegistry();
+
+            registry.add(NWBConverterDescriptor( ...
+                Name="TestByFormat", ...
+                DisplayName="Test: matches the format", ...
+                AcceptedFormats="testformat", ...
+                ProducesNWBType="TimeSeries", ...
+                Function=@(context) addTimeSeriesToAcquisition( ...
+                    setfield(context, "Placement", struct("Name", "ByFormat")))))
+
+            registry.add(NWBConverterDescriptor( ...
+                Name="TestByClass", ...
+                DisplayName="Test: matches the class", ...
+                AcceptedClasses="timetable", ...
+                ProducesNWBType="TimeSeries", ...
+                Function=@(context) addTimeSeriesToAcquisition( ...
+                    setfield(context, "Placement", struct("Name", "ByClass")))))
+
+            registry.add(NWBConverterDescriptor( ...
+                Name="TestReturnsNeurodataDirectly", ...
+                AcceptedClasses="*", ...
+                ProducesNWBType="TimeSeries", ...
+                Function=@(context) types.core.TimeSeries('data', (1:4)', ...
+                    'data_unit', 'n/a', 'starting_time', 0, 'starting_time_rate', 1)))
+
+            registry.add(NWBConverterDescriptor( ...
+                Name="TestRecordsMetadata", ...
+                AcceptedClasses="*", ...
+                ProducesNWBType="TimeSeries", ...
+                Function=@(context) recordMetadataAndAdd(context, recorder)))
 
             registry.add(NWBConverterDescriptor( ...
                 Name="TestExternalWriter", ...
@@ -343,6 +512,22 @@ function item = dataItem(variableName, converterName)
         VariableName=variableName, ...
         NWBVariableName=variableName, ...
         ConverterName=converterName);
+end
+
+function item = dataItemWithMetadata(variableName, converterName, metadata)
+%dataItemWithMetadata - Build a data item carrying metadata
+
+    item = dataItem(variableName, converterName);
+    item.Metadata = metadata;
+end
+
+function nwbFile = recordMetadataAndAdd(context, recorder)
+%recordMetadataAndAdd - Converter that reports the metadata it was given
+
+    if ~isempty(recorder)
+        recorder.MetadataSeenByConverter = context.Metadata;
+    end
+    nwbFile = addTimeSeriesToAcquisition(context);
 end
 
 function data = testVariable(~)

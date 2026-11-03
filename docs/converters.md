@@ -49,6 +49,11 @@ An `NwbFile` is a handle, so a converter may also mutate `context.NwbFile` and r
 | `struct("DidWriteFile", true)` | The converter wrote the file itself |
 | `struct("NeuroData", obj)` | The runner places `obj` according to `Placement` |
 | `struct(..., "PlacementOverride", p)` | Honored only if the descriptor allows it |
+| Anything else | Rejected with `nansen:nwb:invalidConverterResult`, so a neurodata object returned by mistake is not silently dropped |
+
+### Linked instances in the metadata
+
+`Metadata` reaches a converter as configured, unless the runner was given a `MetadataResolver`. The NANSEN session method passes `nansen.module.nwb.internal.resolveMetadata`, which turns the names of linked instances entered in the configurator, such as a device or an electrode group, into objects in the file before a converter that works in memory runs. External converters get the metadata as configured.
 
 ## The descriptor
 
@@ -91,7 +96,7 @@ The constructor validates the descriptor, so an inconsistent one fails where it 
 
 Most converters that read a file take a path, so a converter declaring "I accept a file path" would match every file-backed variable in the session. That is exactly where the configurator most needs to discriminate.
 
-The registry ranks matches instead: a converter naming the variable's **format** beats one accepting its **class**, which beats one matching only the **file extension**, which beats one accepting **anything**. Declare a format when your converter reads a particular kind of file, and a class when it takes a MATLAB object.
+The registry ranks matches instead: a converter naming the variable's **format** beats one accepting its **class**, which beats one matching only the **file extension**, which beats one accepting **anything**. When a data item names no converter, the runner takes the single converter at the best rank and reports a tie as ambiguous; a wildcard match never decides. Declare a format when your converter reads a particular kind of file, and a class when it takes a MATLAB object.
 
 ## Registering a lab's converters
 
@@ -118,7 +123,7 @@ Then, once per MATLAB session:
 nansen.module.nwb.registerConverterFolder("/lab/code/nwbconverters")
 ```
 
-Files that do not answer the descriptor request are left alone, so helpers can live beside the converters. After editing a converter, `nansen.module.nwb.refreshConverters()` picks up the change; registered folders survive the refresh.
+Registration calls every function in the folder with the single argument `"descriptor"` and nothing else, so a helper that takes no arguments is never run. Files that do not answer the request are left alone, so helpers can live beside the converters. The folder is added to the MATLAB path and stays there for the session. After editing a converter, `nansen.module.nwb.refreshConverters()` picks up the change; registered folders survive the refresh.
 
 ## Converters that write the file themselves
 

@@ -81,8 +81,12 @@ import nansen.session.SessionMethod
     % Checking the file is worth the Python round trip here: a session
     % export that is missing metadata a repository requires should say so
     % while the user is still looking at it.
+    % Metadata entered in the configurator names linked instances, such
+    % as a device or an electrode group, from the project's metadata
+    % catalog. The resolver turns those names into objects in the file.
     converter = nansen.module.nwb.conversion.NWBFileConverter(config, ...
         DataResolver=@(variableName) sessionObject.loadData(char(variableName)), ...
+        MetadataResolver=@nansen.module.nwb.internal.resolveMetadata, ...
         Validate=params.Validate);
 
     nwbFilePath = converter.convert();

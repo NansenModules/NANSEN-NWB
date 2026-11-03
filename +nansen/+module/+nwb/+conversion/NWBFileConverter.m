@@ -14,6 +14,16 @@ classdef NWBFileConverter < handle
 %   OBJ = NWBFileConverter(...,Registry=REGISTRY) also uses a specific
 %   converter registry rather than the shared one.
 %
+%   OBJ = NWBFileConverter(...,MetadataResolver=RESOLVER) also resolves
+%   the metadata of each item before a converter that works in memory
+%   runs. RESOLVER is a function handle with the signature of
+%   nansen.module.nwb.internal.resolveMetadata: it takes the metadata,
+%   the neurodata type, the NwbFile and a map of the objects resolved so
+%   far, and returns the metadata and the map. A NANSEN session passes
+%   resolveMetadata, which turns the names of linked instances entered
+%   in the configurator into objects in the file. Without a resolver the
+%   metadata reaches the converter as configured.
+%
 %   OBJ = NWBFileConverter(...,OnItemError=MODE) also says what to do
 %   when one item fails. MODE must be:
 %       "stop"     - (default) Raise, leaving the file as it was
@@ -31,11 +41,12 @@ classdef NWBFileConverter < handle
 %       convert - Write the NWB file and return its path
 %
 %   NWBFileConverter properties:
-%       Config       - The configuration being converted
-%       Registry     - Registry the converters are looked up in
-%       DataResolver - How the runner obtains data for a variable
-%       OnItemError  - What to do when one data item fails
-%       Validate     - Whether to check the file against NWB Best Practices
+%       Config           - The configuration being converted
+%       Registry         - Registry the converters are looked up in
+%       DataResolver     - How the runner obtains data for a variable
+%       MetadataResolver - How linked instances in metadata become objects
+%       OnItemError      - What to do when one data item fails
+%       Validate         - Whether to check the file against NWB Best Practices
 %
 %   Example: Convert one timetable without a NANSEN session
 %       config = nansen.module.nwb.config.NWBFileConfiguration( ...
@@ -59,6 +70,7 @@ classdef NWBFileConverter < handle
 
     properties
         DataResolver = []                   % How the runner obtains data for a variable
+        MetadataResolver = []               % How linked instances in metadata become objects
         OnItemError (1,1) string ...
             {mustBeMember(OnItemError, ["stop", "continue"])} = "stop" % What to do when one data item fails
         Validate (1,1) logical = false      % Whether to check the file against NWB Best Practices
@@ -73,6 +85,12 @@ classdef NWBFileConverter < handle
 
         %FailedItems - Items that failed while OnItemError was "continue"
         FailedItems (1,:) string = strings(1, 0)
+
+        %InstanceMap - Objects the metadata resolver built for this file
+        InstanceMap = dictionary
+
+        %WorkFilePath - File being written, when it is not the output file
+        WorkFilePath (1,1) string = ""
     end
 
     methods
@@ -80,6 +98,7 @@ classdef NWBFileConverter < handle
             arguments
                 config
                 options.DataResolver = []
+                options.MetadataResolver = []
                 options.Registry (1,1) nansen.module.nwb.conversion.ConverterRegistry = ...
                     nansen.module.nwb.conversion.ConverterRegistry.instance()
                 options.OnItemError (1,1) string ...
@@ -89,6 +108,7 @@ classdef NWBFileConverter < handle
 
             obj.Config = nansen.module.nwb.config.NWBFileConfiguration.fromAny(config);
             obj.DataResolver = options.DataResolver;
+            obj.MetadataResolver = options.MetadataResolver;
             obj.Registry = options.Registry;
             obj.OnItemError = options.OnItemError;
             obj.Validate = options.Validate;
@@ -101,7 +121,10 @@ classdef NWBFileConverter < handle
             %
             %   The file is created first, from the session, subject and
             %   general metadata, so every converter has a file to add to
-            %   and only one of them writes the file-level metadata.
+            %   and only one of them writes the file-level metadata. When
+            %   overwriting, it is built under a work name and moved over
+            %   the previous file only once every item is in it, so an
+            %   error leaves the previous file as it was.
             %
             %   Items are ordered so that converters producing a type run
             %   before converters requiring it, whatever order the
@@ -118,15 +141,26 @@ classdef NWBFileConverter < handle
             obj.WorkingNwbFile = [];
             obj.HasUnexportedChanges = false;
             obj.FailedItems = strings(1, 0);
+            obj.InstanceMap = dictionary;
+
+            % Everything that can be rejected without touching the file is
+            % checked first, so a configuration error leaves the previous
+            % file as it was.
+            dataItems = obj.orderDataItems(obj.Config.DataItems);
+            if obj.isCreatingFile()
+                obj.Config.SessionMetadata = ...
+                    obj.prepareSessionMetadata(obj.Config.SessionMetadata);
+            end
 
             obj.createOutputFile()
+            workFileCleanup = onCleanup(@() obj.discardWorkFile());
 
-            dataItems = obj.orderDataItems(obj.Config.DataItems);
             for i = 1:numel(dataItems)
                 obj.convertDataItem(dataItems(i))
             end
 
             obj.flushToDisk()
+            obj.commitOutputFile()
 
             if obj.Validate
                 obj.reportBestPracticeFindings()
@@ -171,23 +205,30 @@ classdef NWBFileConverter < handle
             %   metadata is written exactly once and by one writer.
             %
             %   The file only reaches disk when something needs it there:
-            %   before an external converter runs, or at the end. A run
-            %   that fails before then leaves no half-written file behind.
+            %   before an external converter runs, or at the end. When
+            %   overwriting, it is written under a work name beside the
+            %   output path and moved into place by commitOutputFile, so
+            %   the previous file survives a failed run and no half-written
+            %   file is left beside it.
 
-            filePath = obj.Config.OutputPath;
+            outputPath = obj.Config.OutputPath;
 
-            parentFolder = fileparts(filePath);
+            parentFolder = fileparts(outputPath);
             if parentFolder ~= "" && ~isfolder(parentFolder)
                 mkdir(parentFolder)
             end
 
-            if obj.Config.WriteMode == "overwrite" && isfile(filePath)
-                delete(filePath)
+            obj.WorkFilePath = "";
+            if obj.Config.WriteMode == "overwrite"
+                obj.WorkFilePath = workFilePathFor(outputPath);
+                % A work file left by an interrupted run would otherwise be
+                % read as the file to append to.
+                obj.discardWorkFile()
             end
 
             % In append mode the file already carries its own file-level
             % metadata, and the first converter that needs it reads it.
-            if isfile(filePath)
+            if ~obj.isCreatingFile()
                 return
             end
 
@@ -195,15 +236,58 @@ classdef NWBFileConverter < handle
             obj.HasUnexportedChanges = true;
         end
 
-        function nwbFile = buildNwbFile(obj)
-            %buildNwbFile - Build the NwbFile from the file-level metadata
+        function tf = isCreatingFile(obj)
+            %isCreatingFile - Whether this run writes the file-level metadata
 
-            metadata = obj.Config.SessionMetadata;
+            tf = obj.Config.WriteMode == "overwrite" || ~isfile(obj.Config.OutputPath);
+        end
+
+        function filePath = outputFilePath(obj)
+            %outputFilePath - The file converters read and write during the run
+
+            if strlength(obj.WorkFilePath) > 0
+                filePath = obj.WorkFilePath;
+            else
+                filePath = obj.Config.OutputPath;
+            end
+        end
+
+        function commitOutputFile(obj)
+            %commitOutputFile - Move a finished work file over the output path
+
+            if strlength(obj.WorkFilePath) == 0
+                return
+            end
+
+            movefile(obj.WorkFilePath, obj.Config.OutputPath, "f")
+            obj.WorkFilePath = "";
+        end
+
+        function discardWorkFile(obj)
+            %discardWorkFile - Remove the work file, if one is still there
+
+            if strlength(obj.WorkFilePath) > 0 && isfile(obj.WorkFilePath)
+                delete(obj.WorkFilePath)
+            end
+        end
+
+        function metadata = prepareSessionMetadata(obj, metadata)
+            %prepareSessionMetadata - Check and normalize the session metadata
+            %
+            %   Done before the file is touched, so a configuration that
+            %   cannot make a file is rejected while the previous one is
+            %   still intact. The normalized start time is kept on the
+            %   configuration, where converters can measure times from it.
+
             obj.assertRequiredSessionMetadata(metadata)
             metadata.session_start_time = ...
                 obj.normalizeSessionStartTime(metadata.session_start_time);
+        end
 
-            sessionArgs = obj.structToNameValuePairs(metadata);
+        function nwbFile = buildNwbFile(obj)
+            %buildNwbFile - Build the NwbFile from the file-level metadata
+
+            sessionArgs = obj.structToNameValuePairs(obj.Config.SessionMetadata);
             nwbFile = NwbFile(sessionArgs{:});
 
             if ~isempty(fieldnames(obj.Config.SubjectMetadata))
@@ -250,6 +334,7 @@ classdef NWBFileConverter < handle
 
             isExternalWriter = descriptor.ExecutionMode == "external";
 
+            metadata = dataItem.Metadata;
             if isExternalWriter
                 % An external converter reads and writes the file on disk,
                 % so anything still only in memory has to be written first
@@ -257,6 +342,7 @@ classdef NWBFileConverter < handle
                 obj.flushToDisk()
             else
                 obj.ensureNwbFileLoaded()
+                metadata = obj.resolveMetadata(metadata, dataItem, descriptor);
             end
 
             context = struct( ...
@@ -264,9 +350,9 @@ classdef NWBFileConverter < handle
                 "DataItem", dataItem, ...
                 "Descriptor", descriptor, ...
                 "NwbFile", obj.WorkingNwbFile, ...
-                "FilePath", obj.Config.OutputPath, ...
+                "FilePath", obj.outputFilePath(), ...
                 "Data", data, ...
-                "Metadata", dataItem.Metadata, ...
+                "Metadata", metadata, ...
                 "ConverterArgs", converterArgs, ...
                 "Placement", obj.createPlacement(dataItem, descriptor));
 
@@ -275,13 +361,42 @@ classdef NWBFileConverter < handle
             if isExternalWriter
                 obj.assertExternalConverterWroteFile(result, descriptor)
                 % The file on disk moved on without us; read it again
-                % before the next converter mutates it.
+                % before the next converter mutates it. The objects the
+                % resolver built belong to the copy being dropped.
                 obj.WorkingNwbFile = [];
                 obj.HasUnexportedChanges = false;
+                obj.InstanceMap = dictionary;
             else
                 obj.WorkingNwbFile = obj.takeReturnedNwbFile(result, context);
                 obj.HasUnexportedChanges = true;
             end
+        end
+
+        function metadata = resolveMetadata(obj, metadata, dataItem, descriptor)
+            %resolveMetadata - Turn linked-instance names into objects
+            %
+            %   Runs only when a resolver was given and the item carries
+            %   metadata. The type resolved against is the converter's
+            %   produced type, or the item's target type for a converter
+            %   that decides at conversion time.
+
+            if isempty(obj.MetadataResolver) || isempty(fieldnames(metadata))
+                return
+            end
+
+            typeName = descriptor.ProducesNWBType;
+            if typeName == "*"
+                typeName = dataItem.TargetNWBType;
+            end
+            if strlength(strtrim(typeName)) == 0 || startsWith(typeName, "<")
+                return
+            end
+
+            [metadata, obj.InstanceMap] = obj.MetadataResolver( ...
+                metadata, typeName, obj.WorkingNwbFile, obj.InstanceMap);
+
+            % The resolver adds the linked objects to the file as it goes.
+            obj.HasUnexportedChanges = true;
         end
 
         function result = callConverter(~, descriptor, context)
@@ -346,7 +461,7 @@ classdef NWBFileConverter < handle
                 return
             end
 
-            obj.WorkingNwbFile = nwbRead(obj.Config.OutputPath);
+            obj.WorkingNwbFile = nwbRead(obj.outputFilePath());
             obj.HasUnexportedChanges = false;
         end
 
@@ -361,7 +476,7 @@ classdef NWBFileConverter < handle
                 return
             end
 
-            nwbExport(obj.WorkingNwbFile, obj.Config.OutputPath)
+            nwbExport(obj.WorkingNwbFile, obj.outputFilePath())
             obj.HasUnexportedChanges = false;
         end
 
@@ -448,43 +563,11 @@ classdef NWBFileConverter < handle
 
         function descriptor = resolveDescriptor(obj, dataItem)
             %resolveDescriptor - Decide which converter handles an item
+            %
+            %   The rule lives on the registry, where the configurator
+            %   asks the same question before a conversion runs.
 
-            converterName = dataItem.ConverterName;
-            if strlength(converterName) > 0 && converterName ~= "Default"
-                descriptor = obj.Registry.get(converterName);
-                return
-            end
-
-            % Without a named converter, the source evidence has to
-            % identify one on its own. Only an unambiguous match will do:
-            % guessing between two plausible converters would silently
-            % write the wrong thing.
-            [candidates, ranks] = obj.Registry.findForSourceInfo(dataItem.SourceInfo);
-            isSpecific = ranks > 1;
-            candidates = candidates(isSpecific);
-
-            if isscalar(candidates)
-                descriptor = candidates;
-                return
-            end
-
-            % A named target type is enough for the generic converter.
-            if ~obj.isUnsetText(dataItem.TargetNWBType)
-                descriptor = obj.Registry.get("GenericNeurodataType");
-                return
-            end
-
-            if isempty(candidates)
-                error("nansen:nwb:unresolvedConverter", ...
-                    ['No converter matches ''%s''. Set ConverterName on the ', ...
-                     'data item, or set TargetNWBType to build a neurodata ', ...
-                     'type generically.'], dataItem.VariableName)
-            end
-
-            error("nansen:nwb:unresolvedConverter", ...
-                ['Several converters match ''%s'': %s. Set ConverterName on ', ...
-                 'the data item to choose one.'], dataItem.VariableName, ...
-                strjoin([candidates.Name], ", "))
+            descriptor = obj.Registry.resolveForItem(dataItem);
         end
 
         function placement = createPlacement(~, dataItem, descriptor)
@@ -564,9 +647,20 @@ classdef NWBFileConverter < handle
                 return
             end
 
-            if ~isstruct(result)
+            if isempty(result)
                 nwbFile = context.NwbFile;
                 return
+            end
+
+            % Anything else is a converter returning the wrong thing,
+            % most likely its neurodata object directly. Treating that as
+            % "mutated in place" would drop the data without a word.
+            if ~isstruct(result)
+                error("nansen:nwb:invalidConverterResult", ...
+                    ['The converter ''%s'' returned a %s. A converter ', ...
+                     'returns the NwbFile, nothing, or a struct with ', ...
+                     'NwbFile, NeuroData or DidWriteFile; see ', ...
+                     'docs/converters.md.'], context.Descriptor.Name, class(result))
             end
 
             if isfield(result, "NwbFile") && isa(result.NwbFile, "NwbFile")
@@ -629,7 +723,11 @@ classdef NWBFileConverter < handle
             %normalizeSessionStartTime - Require a zoned session start time
 
             if isstring(value) || ischar(value)
-                value = datetime(string(value));
+                parsed = nansen.module.nwb.internal.iso8601ToDatetime(value);
+                if isempty(parsed)
+                    parsed = datetime(string(value));
+                end
+                value = parsed;
             end
 
             if ~isdatetime(value) || ~isscalar(value)
@@ -684,11 +782,12 @@ classdef NWBFileConverter < handle
             end
         end
 
-        function tf = isUnsetText(value)
-            %isUnsetText - True for blank text or a configurator placeholder
-
-            value = strtrim(string(value));
-            tf = ismissing(value) || value == "" || startsWith(value, "<");
-        end
     end
+end
+
+function filePath = workFilePathFor(outputPath)
+%workFilePathFor - Name of the file a new NWB file is built under
+
+    [folder, name, extension] = fileparts(outputPath);
+    filePath = string(fullfile(folder, name + ".part" + extension));
 end

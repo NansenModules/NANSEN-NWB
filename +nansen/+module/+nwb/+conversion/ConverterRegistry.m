@@ -26,6 +26,7 @@ classdef ConverterRegistry < handle
 %       findByDataType     - Find converters accepting a MATLAB class
 %       findByNWBType      - Find converters producing a neurodata type
 %       findByNWBModule    - Find converters suited to a processing module
+%       resolveForItem     - Decide which converter handles a data item
 %       registerFolder     - Register every converter in a folder
 %
 %   See also nansen.module.nwb.conversion.NWBConverterDescriptor,
@@ -216,11 +217,77 @@ classdef ConverterRegistry < handle
             descriptors = allDescriptors(isMatch);
         end
 
+        function descriptor = resolveForItem(obj, dataItem)
+            %resolveForItem - Decide which converter handles a data item
+            %   DESCRIPTOR = resolveForItem(OBJ,dataItem) returns the
+            %   descriptor the conversion runner would use for dataItem,
+            %   an NWBDataItemConfig: the converter it names, else the
+            %   single best match for its source evidence, else the generic
+            %   converter when it names a target type.
+            %
+            %   The configurator shows this to say what a conversion would
+            %   do with an item before it runs, so the two cannot disagree.
+            %
+            %   Errors:
+            %     nansen:nwb:unknownConverter - the named converter is not
+            %                     registered.
+            %     nansen:nwb:unresolvedConverter - no converter matches, or
+            %                     several match equally well.
+
+            arguments
+                obj
+                dataItem (1,1) nansen.module.nwb.config.NWBDataItemConfig
+            end
+
+            converterName = dataItem.ConverterName;
+            if strlength(converterName) > 0 && converterName ~= "Default"
+                descriptor = obj.get(converterName);
+                return
+            end
+
+            % Without a named converter, the source evidence has to
+            % identify one on its own. Matches are ranked, format above
+            % class above a guess from the file extension, so only a tie
+            % at the best rank is ambiguous. A wildcard match is no
+            % evidence at all and never decides.
+            [candidates, ranks] = obj.findForSourceInfo(dataItem.SourceInfo);
+            isSpecific = ranks > obj.RANK_WILDCARD;
+            candidates = candidates(isSpecific);
+            ranks = ranks(isSpecific);
+            if ~isempty(candidates)
+                candidates = candidates(ranks == ranks(1));
+            end
+
+            if isscalar(candidates)
+                descriptor = candidates;
+                return
+            end
+
+            % A named target type is enough for the generic converter.
+            if ~isUnsetText(dataItem.TargetNWBType)
+                descriptor = obj.get("GenericNeurodataType");
+                return
+            end
+
+            if isempty(candidates)
+                error("nansen:nwb:unresolvedConverter", ...
+                    ['No converter matches ''%s''. Set ConverterName on the ', ...
+                     'data item, or set TargetNWBType to build a neurodata ', ...
+                     'type generically.'], dataItem.VariableName)
+            end
+
+            error("nansen:nwb:unresolvedConverter", ...
+                ['Several converters match ''%s'' equally well: %s. Set ', ...
+                 'ConverterName on the data item to choose one.'], ...
+                dataItem.VariableName, strjoin([candidates.Name], ", "))
+        end
+
         function registerFolder(obj, folderPath)
             %registerFolder - Register every converter in a folder
             %   registerFolder(OBJ,folderPath) adds folderPath to the
-            %   search path and registers every function in it that
-            %   returns a converter descriptor.
+            %   search path, where it stays for the session, and registers
+            %   every function in it that returns a converter descriptor
+            %   when called with the single argument "descriptor".
 
             arguments
                 obj
@@ -351,18 +418,16 @@ classdef ConverterRegistry < handle
         function descriptor = tryLoadCustomDescriptor(~, functionName)
             %tryLoadCustomDescriptor - Ask a function for its descriptor
 
+            % Discovery has to call the function, since the descriptor is
+            % the function's own answer. Only the one-argument form is
+            % tried, so a helper that takes no arguments is never run.
             descriptor = [];
             try
                 descriptor = feval(functionName, "descriptor");
             catch
-                % A converter function that does not implement the
-                % descriptor request is simply not a converter; the folder
-                % may hold helpers alongside them.
-                try
-                    descriptor = feval(functionName);
-                catch
-                    descriptor = [];
-                end
+                % A function that does not accept the request is a helper
+                % living beside the converters, not a converter.
+                descriptor = [];
             end
 
             isDescriptor = isa(descriptor, ...
@@ -541,6 +606,13 @@ classdef ConverterRegistry < handle
             values = reshape(values(values ~= "" & ~ismissing(values)), 1, []);
         end
     end
+end
+
+function tf = isUnsetText(value)
+%isUnsetText - True for blank text or a configurator placeholder
+
+    value = strtrim(string(value));
+    tf = ismissing(value) || value == "" || startsWith(value, "<");
 end
 
 function value = getEvidence(sourceInfo, fieldName)
