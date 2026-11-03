@@ -1,63 +1,65 @@
 function configureNwbFile()
-%configureNwbFile - Open the NWB configuration for the current project
-%   configureNwbFile() opens the configurator on the current project's
-%   NWB conversion configuration, creating one from the project's data
-%   variables if the project has none yet.
+%configureNwbFile - Open the NWB configurator for the current project
+%   configureNwbFile() opens the configurator on the project's conversion
+%   configuration, a JSON file in the project's nwb configuration folder.
+%   A project with several asks which to open. A project that still has
+%   only a pilot ".mat" configuration has it converted on opening; saving
+%   writes ".json" beside it. A project with neither starts an empty
+%   configuration under the default name.
 %
-%   The project must have data variables defined; without them there is
-%   nothing to configure and the function reports that instead.
-%
-%   See also nansen.module.nwb.gui.NWBConfigurator,
-%   nansen.module.nwb.file.initializeNWBFileConfiguration
+%   See also nansen.module.nwb.gui.NWBConfiguratorApp,
+%   nansen.module.nwb.config.convertLegacyConfiguration
 
-    import nansen.module.nwb.file.initializeNWBFileConfiguration
+    import nansen.module.nwb.config.loadConfiguration
+    import nansen.module.nwb.config.convertLegacyConfiguration
 
     currentProject = nansen.getCurrentProject();
-    configurationFolderPath = currentProject.getConfigurationFolder('Subfolder', 'nwb');
-    configurationFilePath = fullfile(configurationFolderPath, 'nwb_conversion_configuration.mat');
+    configurationFolder = currentProject.getConfigurationFolder('Subfolder', 'nwb');
+    defaultFilePath = fullfile(configurationFolder, "nwb_conversion_configuration.json");
 
-    L = dir(fullfile( configurationFolderPath, '*.mat' ) );
-    if isempty(L)
-        % Todo: Open dialog for entering file name and description plus
-        % other options.
-        configurationCatalog = initializeNWBFileConfiguration();
-        if isempty(configurationCatalog)
-            errordlg(['This project does not contain any data variables.', ...
-                'Please configure data variables before configuring an NWB conversion.'])
+    % The metadata defaults live in the same folder but are not a
+    % conversion configuration.
+    jsonFiles = dir(fullfile(configurationFolder, "*.json"));
+    jsonFiles = jsonFiles(~strcmp({jsonFiles.name}, "nwb_metadata_defaults.json"));
+    matFiles = dir(fullfile(configurationFolder, "*.mat"));
+
+    if ~isempty(jsonFiles)
+        filePath = chooseFile(jsonFiles);
+        if strlength(filePath) == 0
             return
         end
-        % Todo: Save configuration catalog here or later?
-    else
-        if isscalar(L)
-            configurationFilePath = fullfile(L(1).folder, L(1).name);
-        else
-            [selectedIndex, wasConfirmed] = listdlg( ...
-                'ListString', {L.name}, ...
-                'SelectionMode', 'single', ...
-                'Name', 'Select NWB Configuration', ...
-                'PromptString', 'Select an NWB conversion configuration to load:');
-
-            if ~wasConfirmed || isempty(selectedIndex)
-                return
-            end
-
-            configurationFilePath = fullfile(L(selectedIndex).folder, L(selectedIndex).name);
+        config = loadConfiguration(filePath);
+    elseif ~isempty(matFiles)
+        filePath = chooseFile(matFiles);
+        if strlength(filePath) == 0
+            return
         end
-
-        S = load(configurationFilePath);
-        configurationCatalog = S.nwbConfigurationData;
+        loaded = load(filePath);
+        config = convertLegacyConfiguration(loaded.nwbConfigurationData.DataItems);
+    else
+        filePath = defaultFilePath;
+        config = nansen.module.nwb.config.NWBFileConfiguration();
     end
 
-    variableModel = nansen.VariableModel();
-    if variableModel.NumVariables == 0
-        errordlg([...
-            'No data variables are present on this project. One or more ', ...
-            'data variables are needed to configure NWB conversion. Please ', ...
-            'add data variables and try again.'], 'Aborted NWB configuration.')
+    nansen.module.nwb.gui.NWBConfiguratorApp(config, FilePath=filePath)
+end
+
+function filePath = chooseFile(files)
+%chooseFile - The one file, or the one the user picks; "" when cancelled
+
+    if isscalar(files)
+        filePath = string(fullfile(files(1).folder, files(1).name));
+        return
     end
 
-    % Todo: Pass filepath where to save configuration
-    % If this is a catalog, it should be a persistent catalog ant it will
-    % alread have a filepath.
-    nansen.module.nwb.gui.NWBConfigurator(configurationCatalog, 'FilePath', configurationFilePath)
+    [selectedIndex, wasConfirmed] = listdlg( ...
+        'ListString', {files.name}, ...
+        'SelectionMode', 'single', ...
+        'Name', 'Select NWB Configuration', ...
+        'PromptString', 'Select an NWB conversion configuration to open:');
+
+    filePath = "";
+    if wasConfirmed && ~isempty(selectedIndex)
+        filePath = string(fullfile(files(selectedIndex).folder, files(selectedIndex).name));
+    end
 end
