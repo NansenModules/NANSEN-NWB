@@ -42,6 +42,26 @@ function nwbFile = convertRoiSignals(context)
         context.NwbFile, args, size(roiResponseSeries.data, 1));
 
     responseType = string(getConverterArg(args, "ResponseType", "Fluorescence"));
+    interfaceName = string(getConverterArg(args, "InterfaceName", responseType));
+    ophysModule = nansen.module.nwb.file.getProcessingModule( ...
+        context.NwbFile, "ophys", "Optical physiology processing module");
+
+    % Several signal items (planes, channels, raw and neuropil) share one
+    % interface, so an existing one is added to rather than replaced.
+    if ophysModule.nwbdatainterface.isKey(interfaceName)
+        responseInterface = ophysModule.nwbdatainterface.get(interfaceName);
+    else
+        responseInterface = createResponseInterface(responseType);
+    end
+    responseInterface.roiresponseseries.set(char(signalName), roiResponseSeries);
+    ophysModule.nwbdatainterface.set(char(interfaceName), responseInterface);
+
+    nwbFile = context.NwbFile;
+end
+
+function responseInterface = createResponseInterface(responseType)
+%createResponseInterface - The interface NWB uses for a kind of ROI response
+
     switch responseType
         case "Fluorescence"
             responseInterface = types.core.Fluorescence();
@@ -53,14 +73,6 @@ function nwbFile = convertRoiSignals(context)
                  'ConverterArgs.ResponseType to "Fluorescence" or ', ...
                  '"DeltaFOverF".'], responseType)
     end
-    responseInterface.roiresponseseries.set(char(signalName), roiResponseSeries);
-
-    interfaceName = string(getConverterArg(args, "InterfaceName", responseType));
-    ophysModule = nansen.module.nwb.file.getProcessingModule( ...
-        context.NwbFile, "ophys", "Optical physiology processing module");
-    ophysModule.nwbdatainterface.set(char(interfaceName), responseInterface);
-
-    nwbFile = context.NwbFile;
 end
 
 function roiTableRegion = getRoiTableRegion(nwbFile, args, numRois)

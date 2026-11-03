@@ -30,10 +30,14 @@ function nwbFile = placeNeurodata(nwbFile, neuroData, placement, defaultName)
     end
 
     % A converter may return several named objects from one data item.
+    % Each carries its own name; the configured name would otherwise apply
+    % to all of them and only the last would survive.
     if isstruct(neuroData) && all(isfield(neuroData, {'name', 'data'}))
+        elementPlacement = placement;
+        elementPlacement.Name = "";
         for i = 1:numel(neuroData)
             nwbFile = nansen.module.nwb.conversion.placeNeurodata( ...
-                nwbFile, neuroData(i).data, placement, string(neuroData(i).name));
+                nwbFile, neuroData(i).data, elementPlacement, string(neuroData(i).name));
         end
         return
     end

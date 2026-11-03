@@ -107,11 +107,11 @@ function neuroData = convertToNeuroDataType(metadata, data, neuroDataType)
 
             else
                 % Anything else is handed to the type as its data, with the
-                % metadata supplying whatever else the type needs. Data
-                % that carries no time of its own has to be given one, so
-                % the metadata must name either timestamps or a starting
-                % time and rate.
-                if ~hasTimeReference(metadata)
+                % metadata supplying whatever else the type needs. A time
+                % series has no time of its own here, so the metadata must
+                % name either timestamps or a starting time and rate. A
+                % type without time, such as an image, needs neither.
+                if isTimeSeriesType(fcn) && ~hasTimeReference(metadata)
                     error('nansen:nwb:missingTimeReference', ...
                         ['%s data has no time information of its own, so ', ...
                          'the metadata must supply it. Set either ', ...
@@ -126,6 +126,14 @@ function neuroData = convertToNeuroDataType(metadata, data, neuroDataType)
 
     % Neurodata type
     % nwbData = feval(sprintf('types.core.%s', neuroDataType), nvPairs{:});
+end
+
+function tf = isTimeSeriesType(typeConstructor)
+%isTimeSeriesType - True if the constructor builds a TimeSeries or a subtype
+
+    typeName = string(func2str(typeConstructor));
+    tf = typeName == "types.core.TimeSeries" || ...
+        any(string(superclasses(typeName)) == "types.core.TimeSeries");
 end
 
 function tf = hasTimeReference(metadata)

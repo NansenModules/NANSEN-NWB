@@ -7,7 +7,9 @@ function nwbFile = convertTimetableToTimeIntervals(context)
 %   The row times give each interval's start. The stop times come from a
 %   variable holding either stop times or durations, named in the
 %   converter arguments; without one the intervals run to the next row's
-%   start, and the last row is dropped because nothing bounds it.
+%   start, and the last row is dropped because nothing bounds it. Times
+%   given as datetimes are stored as seconds since the configuration's
+%   session_start_time, which NWB measures every time from.
 %
 %   Every remaining timetable variable becomes a column of the table, so
 %   trial type, outcome and the rest travel with the intervals.
@@ -21,6 +23,9 @@ function nwbFile = convertTimetableToTimeIntervals(context)
 %     nansen:nwb:invalidConverterInput - CONTEXT.Data is not a timetable.
 %     nansen:nwb:invalidConverterArg - a named variable is not in the
 %                     timetable, or both stop and duration were named.
+%     nansen:nwb:missingSessionStartTime - times are datetimes and the
+%                     configuration has no session_start_time to measure
+%                     them from.
 %
 %   See also nansen.module.nwb.conversion.builtin.convertTimetableToTimeSeries,
 %   nansen.module.nwb.conversion.placeNeurodata
@@ -50,7 +55,8 @@ function nwbFile = convertTimetableToTimeIntervals(context)
     end
 
     [startTimes, stopTimes, data] = intervalBounds( ...
-        data, stopTimeVariable, durationVariable, context.DataItem.VariableName);
+        data, stopTimeVariable, durationVariable, ...
+        context.DataItem.VariableName, sessionStartTime(context));
 
     description = string(getConverterArg(args, "Description", ...
         "Intervals converted from " + context.DataItem.VariableName));
@@ -80,21 +86,21 @@ function nwbFile = convertTimetableToTimeIntervals(context)
         context.NwbFile, timeIntervals, context.Placement, defaultName);
 end
 
-function [startTimes, stopTimes, data] = intervalBounds(data, stopTimeVariable, durationVariable, variableName)
+function [startTimes, stopTimes, data] = intervalBounds(data, stopTimeVariable, durationVariable, variableName, sessionStart)
 %intervalBounds - Work out where each interval starts and stops
 
-    startTimes = toSeconds(data.Properties.RowTimes);
+    startTimes = toSeconds(data.Properties.RowTimes, sessionStart, variableName);
 
     if strlength(stopTimeVariable) > 0
         assertHasVariable(data, stopTimeVariable, variableName)
-        stopTimes = toSeconds(data.(stopTimeVariable));
+        stopTimes = toSeconds(data.(stopTimeVariable), sessionStart, variableName);
         data = removevars(data, stopTimeVariable);
         return
     end
 
     if strlength(durationVariable) > 0
         assertHasVariable(data, durationVariable, variableName)
-        stopTimes = startTimes + toSeconds(data.(durationVariable));
+        stopTimes = startTimes + toSeconds(data.(durationVariable), sessionStart, variableName);
         data = removevars(data, durationVariable);
         return
     end
@@ -135,22 +141,48 @@ function assertHasVariable(data, variableName, itemName)
 
     if ~any(string(data.Properties.VariableNames) == variableName)
         error("nansen:nwb:invalidConverterArg", ...
-            ['''%s'' has no variable named ''%s''. Its variables are: %s.'], ...
+            '''%s'' has no variable named ''%s''. Its variables are: %s.', ...
             itemName, variableName, ...
             strjoin(string(data.Properties.VariableNames), ", "))
     end
 end
 
-function seconds_ = toSeconds(values)
-%toSeconds - Express times as seconds, whatever they arrive as
+function seconds_ = toSeconds(values, sessionStart, itemName)
+%toSeconds - Express times as seconds since the session start
+%
+%   Durations and numbers are taken as seconds already. Datetimes are
+%   measured from the session start, so that the starts and the stops of
+%   one table, and the tables of one file, share one origin.
 
     if isduration(values)
         seconds_ = seconds(values);
     elseif isdatetime(values)
-        seconds_ = seconds(values - values(1));
+        if isempty(sessionStart)
+            error("nansen:nwb:missingSessionStartTime", ...
+                ['''%s'' holds datetime values, which are stored as seconds ', ...
+                 'since the session start, but the configuration has no ', ...
+                 'session_start_time to measure them from.'], itemName)
+        end
+        % A column without a zone is taken to be in the session's zone,
+        % which is the only one the data item records.
+        if values.TimeZone == ""
+            values.TimeZone = sessionStart.TimeZone;
+        end
+        seconds_ = seconds(values - sessionStart);
     else
         seconds_ = double(values);
     end
 
     seconds_ = seconds_(:);
+end
+
+function sessionStart = sessionStartTime(context)
+%sessionStartTime - The zoned session start the runner put on the configuration
+
+    sessionStart = datetime.empty;
+    metadata = context.Config.SessionMetadata;
+    if isfield(metadata, "session_start_time") && isdatetime(metadata.session_start_time) ...
+            && isscalar(metadata.session_start_time) && metadata.session_start_time.TimeZone ~= ""
+        sessionStart = metadata.session_start_time;
+    end
 end

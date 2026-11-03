@@ -127,6 +127,22 @@ classdef builtinConverterTest < matlab.unittest.TestCase
             testCase.verifyEqual(loadData(intervals.vectordata.get("correct"))', [1 0])
         end
 
+        function measuresDatetimesFromTheSessionStart(testCase)
+            % NWB measures every time from session_start_time, and the
+            % starts and stops of one table must share that origin.
+            sessionStart = datetime(2026, 5, 10, TimeZone="UTC");
+            data = timetable(sessionStart + seconds([10; 20]), ...
+                sessionStart + seconds([15; 25]), VariableNames="stopTime");
+
+            nwbFile = testCase.convert(data, "TimetableTimeIntervals", ...
+                NWBVariableName="epochs", PrimaryGroup="Intervals", ...
+                ConverterArgs=struct("StopTimeVariable", "stopTime"));
+
+            intervals = intervalsNamed(nwbFile, "epochs");
+            testCase.verifyEqual(loadData(intervals.start_time)', [10 20])
+            testCase.verifyEqual(loadData(intervals.stop_time)', [15 25])
+        end
+
         function rejectsAStopTimeVariableThatIsNotThere(testCase)
             data = timetable(seconds([0; 10]), (1:2)', VariableNames="value");
 
@@ -177,6 +193,20 @@ classdef builtinConverterTest < matlab.unittest.TestCase
             testCase.verifyTrue(nwbFile.acquisition.isKey("Signal"))
             testCase.verifyEqual(string(nwbFile.acquisition.get("Signal").data_unit), ...
                 "volts")
+        end
+
+        function storesEachVariableOfATimetableUnderItsOwnName(testCase)
+            % The generic path returns one object per timetable variable;
+            % each must keep its own name rather than the item's.
+            data = timetable(seconds((0:4)'), (1:5)', (6:10)', ...
+                VariableNames=["speed", "pupil"]);
+
+            nwbFile = testCase.convert(data, "GenericNeurodataType", ...
+                NWBVariableName="Signals", TargetNWBType="TimeSeries", ...
+                Metadata=struct("data_unit", "n/a"));
+
+            testCase.verifyEqual(sort(string(nwbFile.acquisition.keys())), ...
+                ["pupil", "speed"])
         end
 
         function rejectsAnItemThatNamesNoTargetType(testCase)
