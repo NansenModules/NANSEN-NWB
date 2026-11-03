@@ -96,6 +96,18 @@ classdef checkNWBConfigurationTest < matlab.unittest.TestCase
             testCase.verifyEqual(placeholders.NeuroDataType, "<Select a neurodata type>")
         end
 
+        function typeCellHoldingTheModuleLabelIsUnset(testCase)
+        % The table offers the module label in the type column while no
+        % module is chosen, so a saved configuration can hold it there.
+
+            item = createConfigurationItem(NeuroDataType="<Select an NWB module>");
+
+            warnings = validateConfiguration(item);
+
+            testCase.verifyNumElements(warnings, 1)
+            testCase.verifySubstring(warnings{1}, "Neurodata type is not set")
+        end
+
         function realValueBeginningWithAngleBracketIsNotUnset(testCase)
         % A value is a placeholder only if it equals one, not because it
         % happens to start with '<'.
