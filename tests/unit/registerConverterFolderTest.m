@@ -57,6 +57,26 @@ classdef registerConverterFolderTest < matlab.unittest.TestCase
             testCase.verifyEqual(registry.names(), "myLabConverter")
         end
 
+        function doesNotRunAHelperThatTakesNoArguments(testCase)
+            % Discovery calls each file with the argument "descriptor"; a
+            % helper that takes no arguments must not be run as a fallback,
+            % whatever it does when called.
+            folderPath = testCase.folderWithConverter("myLabConverter");
+            markerPath = fullfile(folderPath, "helper-was-run.txt");
+            writelines([ ...
+                "function clearEverything()", ...
+                "    fid = fopen('" + markerPath + "', 'w'); fclose(fid);", ...
+                "end"], fullfile(folderPath, "clearEverything.m"))
+            registry = nansen.module.nwb.conversion.ConverterRegistry( ...
+                IncludeBuiltin=false);
+
+            registry.registerFolder(folderPath)
+
+            testCase.verifyFalse(isfile(markerPath), ...
+                "The zero-argument helper was executed during discovery.")
+            testCase.verifyEqual(registry.names(), "myLabConverter")
+        end
+
         function makesACustomConverterAvailableForMatchingData(testCase)
             folderPath = testCase.folderWithConverter("myLabConverter");
             registry = nansen.module.nwb.conversion.ConverterRegistry( ...
@@ -102,6 +122,11 @@ classdef registerConverterFolderTest < matlab.unittest.TestCase
                 matlab.unittest.fixtures.TemporaryFolderFixture);
             folderPath = string(fixture.Folder);
 
+            % registerFolder adds the folder to the path for the session,
+            % and the fixture deletes the folder afterwards; the entry
+            % must go with it.
+            testCase.addTeardown(@() removeFromPath(folderPath))
+
             writelines([ ...
                 "function result = " + converterName + "(context)"
                 "%" + converterName + " - Test converter for a lab folder"
@@ -126,4 +151,12 @@ function folderPath = repositoryRoot()
 %repositoryRoot - Path of the repository holding this test
 
     folderPath = fileparts(fileparts(fileparts(mfilename("fullpath"))));
+end
+
+function removeFromPath(folderPath)
+%removeFromPath - Take a folder off the path, if it is on it
+
+    if contains(string(path()), folderPath)
+        rmpath(folderPath)
+    end
 end
