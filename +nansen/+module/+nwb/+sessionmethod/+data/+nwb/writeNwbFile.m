@@ -21,6 +21,10 @@ function varargout = writeNwbFile(sessionObject, varargin)
 %   from the first data item a NeuroConv interface converts, since such
 %   an interface reads the recording's header. Set 'PythonExecutable' to
 %   the Python that has NeuroConv when MATLAB is not configured for it.
+%   A project that knows better, because its files hold the start time
+%   in a form NeuroConv does not read, sets 'SessionStartTimeFcn' to a
+%   function of the session object returning a zoned datetime; it is
+%   asked first.
 %
 %   The method itself only assembles the configuration for this session and
 %   hands it to the conversion runner. Everything about how data becomes
@@ -79,7 +83,9 @@ import nansen.session.SessionMethod
     % A session folder names a date but often no time; the recording's
     % header does, and a NeuroConv interface reads it.
     sessionStartTime = datetime.empty;
-    if ~hasTimeOfDay(sessionObject)
+    if ~isempty(params.SessionStartTimeFcn)
+        sessionStartTime = params.SessionStartTimeFcn(sessionObject);
+    elseif ~hasTimeOfDay(sessionObject)
         sessionStartTime = startTimeFromRecording(sessionObject, dataItems, ...
             params.PythonExecutable);
     end
@@ -122,6 +128,7 @@ function params = getDefaultParameters()
     params.WriteMode = 'Overwrite'; % 'Overwrite' | 'Append'
     params.Validate = true; % Check the written file against NWB Best Practices
     params.PythonExecutable = ""; % Python with NeuroConv, when MATLAB is not configured for it
+    params.SessionStartTimeFcn = []; % Function of the session returning a zoned start time
 end
 
 function tf = hasTimeOfDay(sessionObject)

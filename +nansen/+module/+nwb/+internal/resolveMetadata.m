@@ -32,7 +32,14 @@ function [metadata, instanceMap] = resolveMetadata(metadata, neuroDataType, nwbF
         linkName = links(i).name;
         linkType = links(i).type; % Note: comes without namespace name, i.e types.core
         linkClassName = getFullTypeName( linkType );
-        
+
+        % Metadata need not name every link of the type: a converter that
+        % creates the linked object itself, such as the electrode of a
+        % patch-clamp series, leaves the field out.
+        if ~isfield(metadata, linkName)
+            continue
+        end
+
         linkInstanceName = metadata.(linkName);
 
         if isempty(linkInstanceName)
