@@ -12,6 +12,18 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
 %
 %   See also: nansen.module.nwb.session.NWBSessionConfigBuilder
 
+    properties (TestParameter)
+        % Ways a session table spells an age, and the ISO 8601 duration
+        % NWB wants for each.
+        ageText = struct( ...
+            'months', struct('Text', "6 month", 'Expected', "P6M"), ...
+            'days', struct('Text', "90 days", 'Expected', "P90D"), ...
+            'weeks', struct('Text', "12 weeks", 'Expected', "P12W"), ...
+            'years', struct('Text', "2 years", 'Expected', "P2Y"), ...
+            'isoAlready', struct('Text', "P90D", 'Expected', "P90D"), ...
+            'range', struct('Text', "6-8 weeks", 'Expected', "P6W/P8W"))
+    end
+
     methods (TestClassSetup)
 
         function addModuleToPath(testCase)
@@ -321,6 +333,53 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
                 hours(9) + minutes(15))
         end
 
+        function usesAnExplicitSessionStartTime(testCase)
+            % A session folder names a date but often no time; the
+            % recording's header does, and the caller passes it in.
+            session = sessionStub();
+            session.Time = '';
+            startTime = datetime(2017, 5, 18, 10, 42, 7, TimeZone="+02:00");
+
+            config = buildFor(session, SessionStartTime=startTime);
+
+            testCase.verifyEqual(config.SessionMetadata.session_start_time, startTime)
+        end
+
+        function anExplicitSessionStartTimeWinsOverTheSessionsOwn(testCase)
+            session = sessionStub();
+            startTime = datetime(2026, 5, 10, 9, 0, 0, TimeZone="UTC");
+
+            config = buildFor(session, SessionStartTime=startTime);
+
+            testCase.verifyEqual(config.SessionMetadata.session_start_time, startTime)
+        end
+
+        function rejectsAnExplicitSessionStartTimeWithoutAZone(testCase)
+            testCase.verifyError( ...
+                @() buildFor(sessionStub(), SessionStartTime=datetime(2026, 5, 10, 9, 0, 0)), ...
+                "nansen:nwb:missingTimeZone")
+        end
+
+        function writesTheSessionsAgeAsAnIsoDuration(testCase, ageText)
+            config = buildFor(sessionStub(), SubjectAge=ageText.Text);
+
+            testCase.verifyEqual(string(config.SubjectMetadata.age), ageText.Expected)
+        end
+
+        function theSessionsAgeWinsOverTheRecords(testCase)
+            % The session carries the subject's state at that session,
+            % which is more specific than the record.
+            config = buildFor(sessionStub(), SubjectAge="6 month", ...
+                SubjectRecord=struct("AgeDays", 30));
+
+            testCase.verifyEqual(string(config.SubjectMetadata.age), "P6M")
+        end
+
+        function rejectsAnAgeItCannotRead(testCase)
+            testCase.verifyError(@() buildFor(sessionStub(), SubjectAge="adult"), ...
+                "nansen:nwb:invalidSubjectAge")
+        end
+
         function rejectsAMissingSubjectIdentifier(testCase)
             % A missing string is not empty and has no length to compare.
             session = sessionStub();
@@ -343,6 +402,8 @@ function config = buildFor(session, options)
         options.MetadataDefaults = struct()
         options.OutputPath (1,1) string = ""
         options.OutputPathFcn = function_handle.empty
+        options.SessionStartTime datetime = datetime.empty
+        options.SubjectAge (1,1) string = ""
     end
 
     config = nansen.module.nwb.session.NWBSessionConfigBuilder.buildConfig( ...
@@ -351,7 +412,9 @@ function config = buildFor(session, options)
         SubjectRecord=options.SubjectRecord, ...
         MetadataDefaults=options.MetadataDefaults, ...
         OutputPath=options.OutputPath, ...
-        OutputPathFcn=options.OutputPathFcn);
+        OutputPathFcn=options.OutputPathFcn, ...
+        SessionStartTime=options.SessionStartTime, ...
+        SubjectAge=options.SubjectAge);
 end
 
 function record = subjectRecordStub()

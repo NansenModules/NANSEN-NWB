@@ -63,11 +63,28 @@ classdef NWBSessionConfigBuilder
             %   location. Give either OutputPath or OutputPathFcn, not
             %   both.
             %
+            %   CONFIG = buildConfig(...,SessionStartTime=T) also sets the
+            %   session start time to the zoned datetime T instead of
+            %   combining the session's Date and Time. A session whose
+            %   folder records no time of day gets it from the recording
+            %   itself this way.
+            %
+            %   CONFIG = buildConfig(...,SubjectAge=TEXT) also fills the
+            %   subject's age from TEXT when the subject record supplies
+            %   none, as a session table does when it carries the
+            %   subject's state at the time of the session. TEXT is an
+            %   ISO 8601 duration such as "P90D", a value and unit such
+            %   as "6 month" or "90 days", or a range such as "6-8 weeks".
+            %
             %   Errors:
             %     nansen:nwb:missingSessionIdentifier - the session has no
             %                     subject or session ID.
             %     nansen:nwb:ambiguousOutputPath - both OutputPath and
             %                     OutputPathFcn were given.
+            %     nansen:nwb:missingTimeZone - SessionStartTime has no time
+            %                     zone.
+            %     nansen:nwb:invalidSubjectAge - SubjectAge is not a
+            %                     duration this function can read.
 
             arguments
                 sessionObject (1,1)
@@ -80,6 +97,8 @@ classdef NWBSessionConfigBuilder
                 options.MetadataDefaults = struct()
                 options.OutputPath (1,1) string = ""
                 options.OutputPathFcn = function_handle.empty
+                options.SessionStartTime datetime = datetime.empty
+                options.SubjectAge (1,1) string = ""
             end
 
             import nansen.module.nwb.session.NWBSessionConfigBuilder
@@ -107,10 +126,17 @@ classdef NWBSessionConfigBuilder
                     subjectMetadata);
             end
 
+            % An age recorded on the session describes the subject at that
+            % session, which is more specific than anything the subject
+            % record holds, so it wins.
+            if strlength(strtrim(options.SubjectAge)) > 0
+                subjectMetadata.age = ageTextToIso8601(options.SubjectAge);
+            end
+
             config = nansen.module.nwb.config.NWBFileConfiguration( ...
                 OutputPath=NWBSessionConfigBuilder.resolveOutputPath(sessionObject, options), ...
                 SessionMetadata=NWBSessionConfigBuilder.sessionMetadata( ...
-                    sessionObject, projectName, options.TimeZone), ...
+                    sessionObject, projectName, options.TimeZone, options.SessionStartTime), ...
                 SubjectMetadata=subjectMetadata, ...
                 GeneralMetadata=NWBSessionConfigBuilder.generalMetadata(sessionObject), ...
                 DataItems=dataItems, ...
@@ -292,7 +318,7 @@ classdef NWBSessionConfigBuilder
             end
         end
 
-        function metadata = sessionMetadata(sessionObject, projectName, timeZone)
+        function metadata = sessionMetadata(sessionObject, projectName, timeZone, explicitStartTime)
             %sessionMetadata - NWBFile-level metadata for the session
 
             import nansen.module.nwb.session.NWBSessionConfigBuilder
@@ -301,9 +327,33 @@ classdef NWBSessionConfigBuilder
             metadata.identifier = strjoin([projectName, ...
                 string(sessionObject.subjectID), string(sessionObject.sessionID)], "_");
             metadata.session_description = string(sessionObject.Description);
-            metadata.session_start_time = ...
-                NWBSessionConfigBuilder.sessionStartTime(sessionObject, timeZone);
+            if isempty(explicitStartTime)
+                metadata.session_start_time = ...
+                    NWBSessionConfigBuilder.sessionStartTime(sessionObject, timeZone);
+            else
+                metadata.session_start_time = ...
+                    NWBSessionConfigBuilder.zonedStartTime(explicitStartTime);
+            end
             metadata.general_session_id = string(sessionObject.sessionID);
+        end
+
+        function startTime = zonedStartTime(startTime)
+            %zonedStartTime - Require an explicit start time to carry a zone
+            %
+            %   A time read from a recording's header carries the offset
+            %   the recording software wrote, or none; one without a zone
+            %   cannot be placed on an absolute timeline and is refused
+            %   here rather than written as if it were.
+
+            if ~isscalar(startTime) || isnat(startTime)
+                error("nansen:nwb:invalidSessionStartTime", ...
+                    "SessionStartTime must be one datetime, not NaT.")
+            end
+            if startTime.TimeZone == ""
+                error("nansen:nwb:missingTimeZone", ...
+                    ['SessionStartTime has no time zone. Set one, for ', ...
+                     'example datetime(t, TimeZone="local").'])
+            end
         end
 
         function metadata = subjectMetadata(sessionObject)
@@ -426,6 +476,62 @@ function value = readRecordField(record, fieldName)
     catch
         % A property whose get method fails carries no usable value.
         value = [];
+    end
+end
+
+function isoDuration = ageTextToIso8601(ageText)
+%ageTextToIso8601 - Express an age as an ISO 8601 duration
+%
+%   NWB records a subject's age as an ISO 8601 duration, "P90D", or a
+%   range of two, "P6W/P8W". A session table records it the way the
+%   source did: "6 month", "90 days", "6-8 weeks". Whole numbers only; a
+%   fraction cannot be written in a duration without inventing precision.
+
+    text = strtrim(ageText);
+
+    if startsWith(text, "P")
+        isoDuration = text;
+        return
+    end
+
+    % A range and a single value are matched by separate patterns: an
+    % optional named group is absent from the result for string input,
+    % which makes it awkward to test for.
+    rangeMatch = regexp(text, '^(?<low>\d+)\s*-\s*(?<high>\d+)\s*(?<unit>[A-Za-z]+)$', ...
+        'names', 'once');
+    if ~isempty(rangeMatch)
+        unitLetter = ageUnitLetter(lower(rangeMatch.unit), ageText);
+        isoDuration = "P" + rangeMatch.low + unitLetter + "/P" + rangeMatch.high + unitLetter;
+        return
+    end
+
+    singleMatch = regexp(text, '^(?<value>\d+)\s*(?<unit>[A-Za-z]+)$', 'names', 'once');
+    if isempty(singleMatch)
+        error("nansen:nwb:invalidSubjectAge", ...
+            ['''%s'' is not an age this module can write. Give an ISO 8601 ', ...
+             'duration such as "P90D", or a value and unit such as ', ...
+             '"6 month", "90 days" or "6-8 weeks".'], ageText)
+    end
+
+    isoDuration = "P" + singleMatch.value + ageUnitLetter(lower(singleMatch.unit), ageText);
+end
+
+function letter = ageUnitLetter(unit, ageText)
+%ageUnitLetter - The ISO 8601 designator for a unit word
+
+    switch unit
+        case {"day", "days", "d"}
+            letter = "D";
+        case {"week", "weeks", "wk", "wks", "w"}
+            letter = "W";
+        case {"month", "months", "mo", "mos"}
+            letter = "M";
+        case {"year", "years", "yr", "yrs", "y"}
+            letter = "Y";
+        otherwise
+            error("nansen:nwb:invalidSubjectAge", ...
+                ['''%s'' names the unit ''%s'', which is not days, weeks, ', ...
+                 'months or years.'], ageText, unit)
     end
 end
 
