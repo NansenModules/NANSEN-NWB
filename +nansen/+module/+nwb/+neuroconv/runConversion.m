@@ -67,14 +67,14 @@ function runConversion(interfaceClassName, sourceArg, nwbFilePath, metadata, opt
              'not both. Set only one of Overwrite and AppendOnDiskNwbFile.'])
     end
 
+    import nansen.module.nwb.neuroconv.internal.configurePython
+    import nansen.module.nwb.neuroconv.internal.createInterface
+    import nansen.module.nwb.neuroconv.internal.structToPyargs
+
     configurePython(options.PythonExecutable, options.ExecutionMode)
 
     try
-        dataInterfaces = py.importlib.import_module("neuroconv.datainterfaces");
-        interfaceClass = py.getattr(dataInterfaces, char(interfaceClassName));
-
-        sourceNvPairs = structToPyargs(sourceArg);
-        interface = interfaceClass(pyargs(sourceNvPairs{:}));
+        interface = createInterface(interfaceClassName, sourceArg);
 
         metadataValue = nansen.module.nwb.neuroconv.toPythonValue(metadata);
         if options.UseInterfaceMetadata
@@ -108,30 +108,6 @@ function runConversion(interfaceClassName, sourceArg, nwbFilePath, metadata, opt
     end
 end
 
-function configurePython(pythonExecutable, executionMode)
-%configurePython - Point MATLAB at the requested Python, if it can
-
-    if strlength(pythonExecutable) == 0
-        return
-    end
-
-    environment = pyenv();
-
-    if string(environment.Status) == "NotLoaded"
-        pyenv("Version", pythonExecutable, "ExecutionMode", executionMode);
-        return
-    end
-
-    % MATLAB loads one Python per session, so a second, different
-    % interpreter cannot be honored without a restart.
-    if string(environment.Executable) ~= pythonExecutable
-        error("nansen:nwb:pythonAlreadyLoaded", ...
-            ['Python is already loaded in this MATLAB session from ''%s'', ', ...
-             'so ''%s'' cannot be used. Restart MATLAB to switch ', ...
-             'interpreters.'], string(environment.Executable), pythonExecutable)
-    end
-end
-
 function merged = mergeWithInterfaceMetadata(interface, callerMetadata, isAppending)
 %mergeWithInterfaceMetadata - Lay the caller's metadata over the interface's
 %
@@ -149,17 +125,5 @@ function merged = mergeWithInterfaceMetadata(interface, callerMetadata, isAppend
         % start time that must not compete with what the file already has.
         merged.update(py.dict(pyargs("NWBFile", py.dict())));
         merged.pop("Subject", py.None);
-    end
-end
-
-function nvPairs = structToPyargs(S)
-%structToPyargs - Flatten a struct into name-value pairs for pyargs
-
-    fieldNames = fieldnames(S);
-    nvPairs = cell(1, 2*numel(fieldNames));
-
-    for i = 1:numel(fieldNames)
-        nvPairs{2*i - 1} = fieldNames{i};
-        nvPairs{2*i} = nansen.module.nwb.neuroconv.toPythonValue(S.(fieldNames{i}));
     end
 end
