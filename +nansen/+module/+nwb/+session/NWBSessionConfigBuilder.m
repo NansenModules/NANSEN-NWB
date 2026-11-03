@@ -364,7 +364,7 @@ classdef NWBSessionConfigBuilder
                     sessionObject.sessionID, class(sessionObject.Date))
             end
 
-            sessionStartTime = sessionObject.Date + duration(char(sessionObject.Time));
+            sessionStartTime = sessionObject.Date + sessionTimeOfDay(sessionObject);
             sessionStartTime.TimeZone = timeZone;
         end
 
@@ -431,9 +431,53 @@ end
 
 function tf = isBlank(value)
 %isBlank - True if a value holds no usable text
+%
+%   A missing string counts: strlength of one is NaN, which no comparison
+%   catches, and strjoin refuses it further down.
 
     text = strtrim(string(value));
-    tf = isempty(text) || ~isscalar(text) || strlength(text) == 0;
+    tf = isempty(text) || ~isscalar(text) || ismissing(text) || strlength(text) == 0;
+end
+
+function timeOfDay = sessionTimeOfDay(sessionObject)
+%sessionTimeOfDay - The session's time of day as a duration
+%
+%   DataLocationModel.getTime returns NaT when the time could not be
+%   parsed, and the raw substring when "Experiment Time" has no string
+%   format configured. Neither is a time of day, and both are reported
+%   here rather than by a parse error further down that does not name
+%   the session.
+
+    value = sessionObject.Time;
+
+    if isdatetime(value)
+        if ~isscalar(value) || isnat(value)
+            throwUnparsedTime(sessionObject, "NaT")
+        end
+        timeOfDay = timeofday(value);
+        return
+    end
+
+    if isduration(value)
+        timeOfDay = value;
+        return
+    end
+
+    try
+        timeOfDay = duration(string(value));
+    catch
+        throwUnparsedTime(sessionObject, string(value))
+    end
+end
+
+function throwUnparsedTime(sessionObject, shownValue)
+%throwUnparsedTime - Report a session time that is not a time of day
+
+    error("nansen:nwb:unparsedSessionTime", ...
+        ['Session ''%s'' has a time of ''%s'', which is not a time of day, ', ...
+         'so session_start_time cannot be determined. Configure a string ', ...
+         'format for the "Experiment Time" metadata variable so that it ', ...
+         'is parsed as a time.'], sessionObject.sessionID, shownValue)
 end
 
 function sex = mapBiologicalSex(value)

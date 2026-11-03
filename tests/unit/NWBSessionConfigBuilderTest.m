@@ -292,6 +292,43 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
             testCase.verifyError(@() buildFor(session), ...
                 "nansen:nwb:unparsedSessionDate")
         end
+
+        function rejectsATimeThatCouldNotBeParsed(testCase)
+            % DataLocationModel.getTime returns NaT when the time could not
+            % be parsed; isempty does not catch it.
+            session = sessionStub();
+            session.Time = NaT;
+
+            testCase.verifyError(@() buildFor(session), ...
+                "nansen:nwb:unparsedSessionTime")
+        end
+
+        function rejectsATimeThatIsNotATimeOfDay(testCase)
+            session = sessionStub();
+            session.Time = 'morning';
+
+            testCase.verifyError(@() buildFor(session), ...
+                "nansen:nwb:unparsedSessionTime")
+        end
+
+        function takesTheTimeOfDayFromADatetime(testCase)
+            session = sessionStub();
+            session.Time = datetime(2000, 1, 1, 9, 15, 0);
+
+            config = buildFor(session);
+
+            testCase.verifyEqual(timeofday(config.SessionMetadata.session_start_time), ...
+                hours(9) + minutes(15))
+        end
+
+        function rejectsAMissingSubjectIdentifier(testCase)
+            % A missing string is not empty and has no length to compare.
+            session = sessionStub();
+            session.subjectID = string(missing);
+
+            testCase.verifyError(@() buildFor(session), ...
+                "nansen:nwb:missingSessionIdentifier")
+        end
     end
 end
 
