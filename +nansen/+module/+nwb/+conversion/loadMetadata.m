@@ -17,8 +17,13 @@ function metadataNameValuePairs = loadMetadata(nwbType, options)
         options.Name % If there are many instances for one type...
     end
     metadataNameValuePairs = {};
-    
+
+    % Without a current project there is no stored metadata to read, which
+    % is the standalone case rather than an error.
     project = nansen.getCurrentProject();
+    if isempty(project)
+        return
+    end
     metadataFolder = project.getMetadataFolder('nwb');
     
     L = dir(fullfile(metadataFolder, '*.json'));
