@@ -33,6 +33,35 @@ classdef NWBFileConfigurationTest < matlab.unittest.TestCase
             testCase.verifyEqual(restored.DataItems(1).VariableName, "speed")
         end
 
+        function roundTripsAZonedSessionStartTime(testCase)
+            % jsonencode writes a datetime in display format without its
+            % zone, and the runner refuses an unzoned start time, so the
+            % configuration has to carry the offset itself.
+            original = configurationWith(dataItem("speed"));
+            original.SessionMetadata.session_start_time = ...
+                datetime(2026, 5, 10, 14, 30, 15, TimeZone="Europe/Oslo");
+
+            restored = saveAndLoad(testCase, original);
+
+            restoredStart = restored.SessionMetadata.session_start_time;
+            testCase.verifyClass(restoredStart, "datetime")
+            testCase.verifyEqual(restoredStart, original.SessionMetadata.session_start_time)
+            testCase.verifyEqual(string(restoredStart.TimeZone), "+02:00")
+        end
+
+        function keepsAnUnzonedSessionStartTimeUnzoned(testCase)
+            % An unzoned time is not given a zone on the way through: the
+            % runner is where it is refused, with the message that says
+            % how to fix it.
+            original = configurationWith(dataItem("speed"));
+            original.SessionMetadata.session_start_time = datetime(2026, 5, 10);
+
+            restored = saveAndLoad(testCase, original);
+
+            testCase.verifyClass(restored.SessionMetadata.session_start_time, "datetime")
+            testCase.verifyEqual(string(restored.SessionMetadata.session_start_time.TimeZone), "")
+        end
+
         function roundTripsAConfigurationWithSeveralItems(testCase)
             original = configurationWith([dataItem("speed"), dataItem("licks")]);
 

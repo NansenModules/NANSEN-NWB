@@ -121,9 +121,12 @@ classdef NWBFileConfiguration
             S = struct();
             S.Version = obj.Version;
             S.OutputPath = obj.OutputPath;
-            S.SessionMetadata = obj.SessionMetadata;
-            S.SubjectMetadata = obj.SubjectMetadata;
-            S.GeneralMetadata = obj.GeneralMetadata;
+            % JSON has no datetime. One is written as ISO 8601 text with
+            % its UTC offset, which fromStruct reads back; jsonencode on
+            % its own would write it in display format without the zone.
+            S.SessionMetadata = encodeDatetimes(obj.SessionMetadata);
+            S.SubjectMetadata = encodeDatetimes(obj.SubjectMetadata);
+            S.GeneralMetadata = encodeDatetimes(obj.GeneralMetadata);
             S.WriteMode = obj.WriteMode;
 
             if isempty(obj.DataItems)
@@ -172,7 +175,7 @@ classdef NWBFileConfiguration
             obj = NWBFileConfiguration( ...
                 "Version", uint32(S.Version), ...
                 "OutputPath", string(S.OutputPath), ...
-                "SessionMetadata", S.SessionMetadata, ...
+                "SessionMetadata", decodeSessionStartTime(S.SessionMetadata), ...
                 "SubjectMetadata", S.SubjectMetadata, ...
                 "GeneralMetadata", S.GeneralMetadata, ...
                 "DataItems", NWBDataItemConfig.fromAny(S.DataItems), ...
@@ -215,5 +218,39 @@ classdef NWBFileConfiguration
                 end
             end
         end
+    end
+end
+
+function S = encodeDatetimes(S)
+%encodeDatetimes - Write every datetime field of a section as ISO 8601 text
+
+    fieldNames = fieldnames(S);
+    for i = 1:numel(fieldNames)
+        value = S.(fieldNames{i});
+        if isdatetime(value) && isscalar(value)
+            S.(fieldNames{i}) = nansen.module.nwb.internal.datetimeToIso8601(value);
+        end
+    end
+end
+
+function S = decodeSessionStartTime(S)
+%decodeSessionStartTime - Read session_start_time back as a datetime
+%
+%   Only this field is parsed. It is the one NWB requires as a timestamp,
+%   and parsing every text field that looks like one would turn a
+%   description into a date.
+
+    if ~isfield(S, "session_start_time")
+        return
+    end
+
+    value = S.session_start_time;
+    if ~(ischar(value) || (isstring(value) && isscalar(value)))
+        return
+    end
+
+    parsed = nansen.module.nwb.internal.iso8601ToDatetime(value);
+    if ~isempty(parsed)
+        S.session_start_time = parsed;
     end
 end
