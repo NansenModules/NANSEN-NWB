@@ -223,7 +223,8 @@ classdef ConverterRegistry < handle
             %   descriptor the conversion runner would use for dataItem,
             %   an NWBDataItemConfig: the converter it names, else the
             %   single best match for its source evidence, else the generic
-            %   converter when it names a target type.
+            %   converter when it names a target type. A target type also
+            %   narrows the matches to the converters that produce it.
             %
             %   The configurator shows this to say what a conversion would
             %   do with an item before it runs, so the two cannot disagree.
@@ -254,6 +255,17 @@ classdef ConverterRegistry < handle
             isSpecific = ranks > obj.RANK_WILDCARD;
             candidates = candidates(isSpecific);
             ranks = ranks(isSpecific);
+
+            % A converter producing another type than the item names cannot
+            % be what the item wants, however well it matches the source.
+            if ~isUnsetText(dataItem.TargetNWBType) && ~isempty(candidates)
+                producedTypes = [candidates.ProducesNWBType];
+                producesTarget = producedTypes == dataItem.TargetNWBType ...
+                    | producedTypes == "*";
+                candidates = candidates(producesTarget);
+                ranks = ranks(producesTarget);
+            end
+
             if ~isempty(candidates)
                 candidates = candidates(ranks == ranks(1));
             end

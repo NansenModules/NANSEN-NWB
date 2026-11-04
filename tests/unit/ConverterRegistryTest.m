@@ -146,6 +146,36 @@ classdef ConverterRegistryTest < matlab.unittest.TestCase
             testCase.verifyEqual(descriptors(1).Name, "FormatConverter")
         end
 
+        function letsTheTargetTypeBreakATie(testCase)
+            import nansen.module.nwb.conversion.NWBConverterDescriptor
+            registry = testCase.registryWithRankingConverters();
+            registry.add(NWBConverterDescriptor( ...
+                Name="IntervalConverter", ...
+                AcceptedClasses="timetable", ...
+                ProducesNWBType="TimeIntervals", ...
+                Function=@(context) context.NwbFile))
+            item = nansen.module.nwb.config.NWBDataItemConfig( ...
+                VariableName="trials", TargetNWBType="TimeIntervals", ...
+                SourceInfo=sourceEvidence(MatlabClass="timetable"));
+
+            descriptor = registry.resolveForItem(item);
+
+            testCase.verifyEqual(descriptor.Name, "IntervalConverter")
+        end
+
+        function passesOverAMatchThatProducesAnotherType(testCase)
+            % RoiSignals is the only converter for the class, but it does
+            % not build the type the item asks for.
+            registry = nansen.module.nwb.conversion.ConverterRegistry();
+            item = nansen.module.nwb.config.NWBDataItemConfig( ...
+                VariableName="dff", TargetNWBType="TimeSeries", ...
+                SourceInfo=sourceEvidence(MatlabClass="RoiSignalArray"));
+
+            descriptor = registry.resolveForItem(item);
+
+            testCase.verifyEqual(descriptor.Name, "GenericNeurodataType")
+        end
+
         function matchesTheTypesNansenFileAdaptersRecord(testCase)
             % NANSEN records a file adapter's DataType constant, such as
             % "ImageStack", rather than the MATLAB class it returns.
