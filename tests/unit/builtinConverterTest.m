@@ -187,14 +187,9 @@ classdef builtinConverterTest < matlab.unittest.TestCase
     methods (Test) % ROI masks
 
         function convertsRoiMasksIntoAPlaneSegmentation(testCase)
-            roiGroup = struct("FovImageSize", [16, 16], ...
-                "roiArray", struct( ...
-                    "coordinates", {[1, 1; 2, 2], [5, 5; 5, 6; 6, 6]}, ...
-                    "pixelweights", {[1; 1], [0.5; 1; 0.5]}));
-
             % The imaging plane and optical channel the converter creates
             % need NWB's required fields.
-            nwbFile = testCase.convert(roiGroup, "RoiGroupPlaneSegmentation", ...
+            nwbFile = testCase.convert(roiGroupStandIn(), "RoiGroupPlaneSegmentation", ...
                 ConverterArgs=struct( ...
                     "ImagingPlaneMetadata", struct("excitation_lambda", 920, ...
                         "indicator", "GCaMP6s", "location", "V1"), ...
@@ -206,6 +201,27 @@ classdef builtinConverterTest < matlab.unittest.TestCase
             testCase.verifyNumElements(loadData(planeSegmentation.id), 2)
             testCase.verifyTrue(nwbFile.general_optophysiology.Count > 0, ...
                 "The imaging plane the segmentation links to should be in the file.")
+        end
+
+        function namesTheImagingPlanePropertiesNwbRequires(testCase)
+            % matnwb checks them only at export, after every item ran, and
+            % its error names neither the item nor the argument to set.
+            converterArgs = struct("ImagingPlaneMetadata", struct("location", "V1"), ...
+                "OpticalChannelMetadata", struct("description", "green", ...
+                    "emission_lambda", 525));
+
+            try
+                testCase.convert(roiGroupStandIn(), "RoiGroupPlaneSegmentation", ...
+                    ConverterArgs=converterArgs);
+                testCase.verifyFail("A plane without an indicator should be rejected.")
+            catch exception
+                testCase.verifyEqual(string(exception.identifier), "nansen:nwb:converterFailed")
+                cause = exception.cause{1};
+                testCase.verifyEqual(string(cause.identifier), "nansen:nwb:missingRequiredMetadata")
+                testCase.verifySubstring(cause.message, "excitation_lambda, indicator")
+            end
+            testCase.verifyFalse(isfile(testCase.OutputPath), ...
+                "Nothing should have been written.")
         end
     end
 
@@ -324,6 +340,15 @@ classdef builtinConverterTest < matlab.unittest.TestCase
                 .get("Fluorescence").roiresponseseries.get("RoiSignals_MeanF");
         end
     end
+end
+
+function roiGroup = roiGroupStandIn()
+%roiGroupStandIn - A struct with the two ROI group properties convertRoiGroup reads
+
+    roiGroup = struct("FovImageSize", [16, 16], ...
+        "roiArray", struct( ...
+            "coordinates", {[1, 1; 2, 2], [5, 5; 5, 6; 6, 6]}, ...
+            "pixelweights", {[1; 1], [0.5; 1; 0.5]}));
 end
 
 function seedFileWithPlaneSegmentation(filePath, numRois)
