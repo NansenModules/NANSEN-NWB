@@ -87,8 +87,9 @@ import nansen.session.SessionMethod
 
     % When overwriting, the new file is built under a work name and moved
     % over the previous file only once it is complete, so an error part
-    % way through leaves the previous file in place and no half-written
-    % one beside it. Appending works on the file itself.
+    % way through, or a data item that fails to convert, leaves the
+    % previous file in place and no half-written one beside it. Appending
+    % works on the file itself.
     isOverwriting = strcmp(params.WriteMode, 'Overwrite');
     if isOverwriting
         nwbFilePath = workFilePath(targetFilePath);
@@ -120,6 +121,8 @@ import nansen.session.SessionMethod
 
     % Create a map for holding resolved metadata / neurodata types.
     instanceMap = dictionary;
+
+    failedVariableNames = strings(1, 0);
 
     %% Todo Add general metadata like dataset info, subjects etc.:
     
@@ -157,6 +160,7 @@ import nansen.session.SessionMethod
                         metadata, data, nwbDataType);
             catch ME
                 warning('Could not add %s to nwb file: Caused by\n %s\n', variableName, ME.message);
+                failedVariableNames(end+1) = string(variableName); %#ok<AGROW>
                 continue
             end
         else
@@ -226,6 +230,18 @@ import nansen.session.SessionMethod
         % nwbFile.(primaryGroupName).set(nwbVariableName, nwbData);
 
         % nwbFile = nansen.module.nwb.convert.writeDataToFile(nwbFile, data, metadata, customConversinFcn); % anything else???
+    end
+
+    % A file missing an item the configuration lists is not complete, so
+    % it does not replace the previous file. The work file is removed by
+    % the cleanup above.
+    if isOverwriting && ~isempty(failedVariableNames)
+        error("nansen:nwb:itemsFailed", ...
+            ['%d of %d data items could not be converted: %s. The new ', ...
+             'file was not written, so ''%s'' is as it was. The warnings ', ...
+             'above give the cause for each item.'], ...
+            numel(failedVariableNames), numel(configurationCatalog.DataItems), ...
+            strjoin(failedVariableNames, ", "), targetFilePath)
     end
 
     % Export pending changes once, after the last data item. NwbFile.export
