@@ -755,7 +755,7 @@ classdef NWBConfiguratorApp < handle
                 obj.fillTypeDropdown(state.NWBModule, state.TargetNWBType)
             end
 
-            obj.GroupDropdown.Value = char(state.PrimaryGroup);
+            obj.fillGroupDropdown(state.PrimaryGroup)
             obj.GroupDropdown.Enable = hasSelection && ~state.PlacementOwnedByConverter;
             isProcessing = state.PrimaryGroup == "Processing";
             obj.showRow([obj.PlacementModuleRow, obj.PlacementModuleDropdown], isProcessing)
@@ -770,6 +770,20 @@ classdef NWBConfiguratorApp < handle
 
             obj.StatusLabel.Text = upper(extractBefore(state.Status + " ", 2)) ...
                 + extractAfter(state.Status + " ", 1) + newline + state.Message;
+        end
+
+        function fillGroupDropdown(obj, currentGroup)
+            % A group that is not an NWB group, such as a lower-case one
+            % from a pilot configuration, is shown so the item can be
+            % opened and given a valid one; the status reports it.
+            groupNames = nansen.module.nwb.conversion.NWBConverterDescriptor.VALID_PRIMARY_GROUPS;
+            if strlength(currentGroup) > 0 && ~any(groupNames == currentGroup)
+                groupNames = [currentGroup, groupNames];
+            end
+            obj.GroupDropdown.Items = cellstr(groupNames);
+            if strlength(currentGroup) > 0
+                obj.GroupDropdown.Value = char(currentGroup);
+            end
         end
 
         function fillModuleDropdown(obj, dropdown, currentModule)
@@ -1046,6 +1060,14 @@ classdef NWBConfiguratorApp < handle
             if descriptor.Name == obj.GENERIC_CONVERTER && isUnsetText(item.TargetNWBType)
                 resolution.Status = "set target type";
                 resolution.Message = "The generic converter builds the type named in Target type, which is not set.";
+                return
+            end
+
+            validGroups = nansen.module.nwb.conversion.NWBConverterDescriptor.VALID_PRIMARY_GROUPS;
+            if ~any(validGroups == item.PrimaryGroup)
+                resolution.Status = "unknown group";
+                resolution.Message = "'" + item.PrimaryGroup + "' is not an NWB group. Choose one of: " ...
+                    + strjoin(validGroups, ", ") + ".";
                 return
             end
 

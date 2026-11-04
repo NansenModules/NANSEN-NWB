@@ -153,6 +153,18 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
             testCase.verifyEqual(choices(2).Name, "NotRegistered")
         end
 
+        function opensAnItemWhoseGroupIsNotAnNwbGroup(testCase, ListBackend)
+            % A pilot configuration can hold a lower-case group name.
+            item = speedItem();
+            item.PrimaryGroup = "acquisition";
+            app = testCase.createApp(configurationWith(item), ListBackend);
+
+            state = app.panelState();
+
+            testCase.verifyEqual(state.PrimaryGroup, "acquisition")
+            testCase.verifyEqual(state.Status, "unknown group")
+        end
+
         function reportsAnAmbiguousItem(testCase, ListBackend)
             % pupil records only its class, which two converters accept.
             app = testCase.createApp(configurationWith(pupilItem()), ListBackend);
