@@ -224,6 +224,19 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
             testCase.verifyFalse(app.IsDirty)
         end
 
+        function countsAPilotConfigurationAsUnsaved(testCase, ListBackend)
+            % Until it is saved, the runner keeps converting the .mat
+            % file on every export, and closing must offer to save it.
+            folder = testCase.temporaryFolder();
+            app = testCase.createApp(configurationWith(speedItem()), ListBackend, ...
+                FilePath=fullfile(folder, "nwb_conversion_configuration.mat"));
+
+            testCase.verifyTrue(app.IsDirty)
+
+            app.saveConfiguration()
+            testCase.verifyFalse(app.IsDirty)
+        end
+
         function rejectsSavingWithoutAFilePath(testCase, ListBackend)
             app = testCase.createApp(configurationWith(speedItem()), ListBackend);
 

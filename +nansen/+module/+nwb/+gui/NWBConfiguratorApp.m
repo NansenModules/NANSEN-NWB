@@ -138,7 +138,16 @@ classdef NWBConfiguratorApp < handle
             obj.VariableNames = unique([obj.VariableNames, configuredNames], "stable");
 
             obj.buildLabelMap()
-            obj.SavedState = obj.currentState();
+
+            % A pilot .mat configuration has not been saved in the JSON
+            % form the runner reads, so it starts out with something to
+            % save, and closing asks whether to.
+            [~, ~, extension] = fileparts(obj.FilePath);
+            if lower(string(extension)) == ".mat"
+                obj.SavedState = "";
+            else
+                obj.SavedState = obj.currentState();
+            end
 
             obj.createComponents(options.Visible)
 
