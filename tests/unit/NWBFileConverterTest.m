@@ -393,6 +393,19 @@ classdef NWBFileConverterTest < matlab.unittest.TestCase
             testCase.verifyTrue(nwbFile.acquisition.isKey("speed"), ...
                 "The items that did convert should still be in the file.")
         end
+
+        function skipsAnItemNoConverterResolvesWhenAskedToContinue(testCase)
+            config = testCase.configurationWith([ ...
+                dataItem("orphan", "NoSuchConverter"), ...
+                dataItem("speed", "TimetableTimeSeries")]);
+
+            testCase.verifyError( ...
+                @() testCase.runConversion(config, OnItemError="continue"), ...
+                "nansen:nwb:itemsFailed")
+
+            nwbFile = nwbRead(testCase.OutputPath);
+            testCase.verifyTrue(nwbFile.acquisition.isKey("speed"))
+        end
     end
 
     methods (Access = private)
