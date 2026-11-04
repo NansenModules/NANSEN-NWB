@@ -77,6 +77,20 @@ classdef registerConverterFolderTest < matlab.unittest.TestCase
             testCase.verifyEqual(registry.names(), "myLabConverter")
         end
 
+        function registeringAFolderTwiceDoesNothing(testCase)
+            % A project's startup code registers its folder again each
+            % time the project is opened in the same MATLAB session.
+            folderPath = testCase.folderWithConverter("myLabConverter");
+            registry = nansen.module.nwb.conversion.ConverterRegistry( ...
+                IncludeBuiltin=false);
+
+            registry.registerFolder(folderPath)
+            registry.registerFolder(folderPath)
+
+            testCase.verifyEqual(registry.names(), "myLabConverter")
+            testCase.verifyNumElements(registry.ConverterFolders, 1)
+        end
+
         function makesACustomConverterAvailableForMatchingData(testCase)
             folderPath = testCase.folderWithConverter("myLabConverter");
             registry = nansen.module.nwb.conversion.ConverterRegistry( ...

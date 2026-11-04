@@ -14,11 +14,14 @@ function config = convertLegacyConfiguration(legacyItems, options)
 %   configuration is either converted and saved as JSON, or rebuilt in
 %   the configurator.
 %
-%   A pilot item naming its own converter function cannot be carried
-%   over, because the new registry needs a descriptor saying what the
-%   converter accepts and produces. Those items are converted without a
-%   converter and reported, so they can be pointed at a registered
-%   converter afterwards.
+%   A pilot item naming a converter function the registry has an
+%   equivalent for gets that converter: convertGeneralTwoPhotonSeries
+%   becomes TwoPhotonImageStack. Any other converter function cannot be
+%   carried over, because the registry needs a descriptor saying what the
+%   converter accepts and produces. Those items keep the function's name
+%   as their ConverterName and are reported, so the runner and the
+%   configurator report the converter as unknown instead of choosing
+%   another one for it.
 %
 %   Example: Convert a saved pilot configuration
 %       loaded = load("nwbConfiguration.mat");
@@ -37,6 +40,11 @@ function config = convertLegacyConfiguration(legacyItems, options)
     placeholders = nansen.module.nwb.internal.getUnsetPlaceholders();
     dataItems = nansen.module.nwb.config.NWBDataItemConfig.empty(0, 1);
     itemsWithOwnConverter = string.empty;
+
+    % Pilot converter functions, by their name without the namespace, and
+    % the registered converter that does the same conversion.
+    registeredEquivalents = dictionary( ...
+        "convertGeneralTwoPhotonSeries", "TwoPhotonImageStack");
 
     for i = 1:numel(legacyItems)
         legacyItem = legacyItems(i);
@@ -60,7 +68,16 @@ function config = convertLegacyConfiguration(legacyItems, options)
 
         converterFunction = readText(legacyItem, "Converter");
         if strlength(converterFunction) > 0 && converterFunction ~= "Default"
-            itemsWithOwnConverter(end+1) = item.VariableName; %#ok<AGROW>
+            % The pilot configurator saved the namespace-qualified name.
+            nameParts = split(converterFunction, ".");
+            functionName = nameParts(end);
+
+            if isKey(registeredEquivalents, functionName)
+                item.ConverterName = registeredEquivalents(functionName);
+            else
+                item.ConverterName = converterFunction;
+                itemsWithOwnConverter(end+1) = item.VariableName; %#ok<AGROW>
+            end
         end
 
         dataItems(end+1, 1) = item; %#ok<AGROW>
@@ -69,8 +86,9 @@ function config = convertLegacyConfiguration(legacyItems, options)
     if ~isempty(itemsWithOwnConverter)
         warning("nansen:nwb:legacyConverterNotCarriedOver", ...
             ['%s named their own converter function, which the registry ', ...
-             'cannot use without a descriptor. Register the converter with ', ...
-             'registerConverterFolder and set ConverterName on those items.'], ...
+             'cannot use without a descriptor, so they will not convert. ', ...
+             'Register a converter with registerConverterFolder, or choose ', ...
+             'a registered one for those items in the configurator.'], ...
             strjoin(itemsWithOwnConverter, ", "))
     end
 

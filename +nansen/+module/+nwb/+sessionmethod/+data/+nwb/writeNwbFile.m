@@ -24,6 +24,11 @@ function varargout = writeNwbFile(sessionObject, varargin)
 %   the session's own date and time are read in. Set 'PythonExecutable'
 %   to the Python that has NeuroConv when MATLAB is not configured for it.
 %
+%   By default a data item that fails to convert stops the export and
+%   leaves the previous file as it was. Set 'OnItemError' to "continue" to
+%   convert the other items, write the file without the failed ones, and
+%   raise nansen:nwb:itemsFailed at the end.
+%
 %   The method itself only assembles the configuration for this session and
 %   hands it to the conversion runner. Everything about how data becomes
 %   neurodata lives in the converters, and everything about how the file is
@@ -105,6 +110,7 @@ import nansen.session.SessionMethod
     converter = nansen.module.nwb.conversion.NWBFileConverter(config, ...
         DataResolver=@(variableName) sessionObject.loadData(char(variableName)), ...
         MetadataResolver=@nansen.module.nwb.internal.resolveMetadata, ...
+        OnItemError=params.OnItemError, ...
         Validate=params.Validate);
 
     nwbFilePath = converter.convert();
@@ -124,6 +130,7 @@ function params = getDefaultParameters()
     params.WriteMode = 'Overwrite'; % 'Overwrite' | 'Append'
     params.Validate = true; % Check the written file against NWB Best Practices
     params.PythonExecutable = ""; % Python with NeuroConv, when MATLAB is not configured for it
+    params.OnItemError = "stop"; % "stop" | "continue": what a failing data item does
 end
 
 function tf = hasTimeOfDay(sessionObject)

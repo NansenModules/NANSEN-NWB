@@ -58,10 +58,11 @@ classdef ConverterRegistryTest < matlab.unittest.TestCase
         end
 
         function offersTheAbfConverterFirstForAnAbfFile(testCase)
-            % An ABF session is many files NeuroConv takes together, and
-            % the interface reads its electrodes and recording tables from
-            % their headers. The descriptor's defaults are what make that
-            % work without per-item configuration.
+            % The interface reads its electrodes and recording tables from
+            % the file headers, and is given only the session's own file,
+            % so sessions sharing a folder keep their recordings apart.
+            % The descriptor's defaults are what make that work without
+            % per-item configuration.
             registry = nansen.module.nwb.conversion.ConverterRegistry();
             sourceInfo = sourceEvidence(Path="/data/sub-01/2026_09_08_0001.abf");
 
@@ -70,7 +71,7 @@ classdef ConverterRegistryTest < matlab.unittest.TestCase
             testCase.verifyEqual(descriptors(1).Name, "NeuroConvAbfInterface")
             defaults = descriptors(1).DefaultConverterArgs;
             testCase.verifyEqual(string(defaults.InterfaceClassName), "AbfInterface")
-            testCase.verifyEqual(string(defaults.SourcePathMode), "siblingFiles")
+            testCase.verifyEqual(string(defaults.SourcePathMode), "fileList")
             testCase.verifyTrue(defaults.UseInterfaceMetadata)
         end
     end
@@ -139,6 +140,73 @@ classdef ConverterRegistryTest < matlab.unittest.TestCase
             descriptors = registry.findForSourceInfo(sourceEvidence());
 
             testCase.verifyNumElements(descriptors, numel(registry.list()))
+        end
+    end
+
+    methods (Test) % Narrowing matches by class and target type
+
+        function ignoresAFormatMatchForAClassTheConverterRejects(testCase)
+            % A converter that names the classes it takes cannot take data
+            % of another class, whatever format the file is in.
+            import nansen.module.nwb.conversion.NWBConverterDescriptor
+            registry = testCase.registryWithRankingConverters();
+            registry.add(NWBConverterDescriptor( ...
+                Name="FormatAndClassConverter", ...
+                AcceptedFormats="scanimage", ...
+                AcceptedClasses="nansen.stack.ImageStack", ...
+                ProducesNWBType="TwoPhotonSeries", ...
+                Function=@(context) context.NwbFile))
+
+            descriptors = registry.findForSourceInfo( ...
+                sourceEvidence(MatlabClass="timetable", Format="scanimage"));
+
+            testCase.verifyFalse(any([descriptors.Name] == "FormatAndClassConverter"))
+            testCase.verifyEqual(descriptors(1).Name, "FormatConverter")
+        end
+
+        function letsTheTargetTypeBreakATie(testCase)
+            import nansen.module.nwb.conversion.NWBConverterDescriptor
+            registry = testCase.registryWithRankingConverters();
+            registry.add(NWBConverterDescriptor( ...
+                Name="IntervalConverter", ...
+                AcceptedClasses="timetable", ...
+                ProducesNWBType="TimeIntervals", ...
+                Function=@(context) context.NwbFile))
+            item = nansen.module.nwb.config.NWBDataItemConfig( ...
+                VariableName="trials", TargetNWBType="TimeIntervals", ...
+                SourceInfo=sourceEvidence(MatlabClass="timetable"));
+
+            descriptor = registry.resolveForItem(item);
+
+            testCase.verifyEqual(descriptor.Name, "IntervalConverter")
+        end
+
+        function passesOverAMatchThatProducesAnotherType(testCase)
+            % RoiSignals is the only converter for the class, but it does
+            % not build the type the item asks for.
+            registry = nansen.module.nwb.conversion.ConverterRegistry();
+            item = nansen.module.nwb.config.NWBDataItemConfig( ...
+                VariableName="dff", TargetNWBType="TimeSeries", ...
+                SourceInfo=sourceEvidence(MatlabClass="RoiSignalArray"));
+
+            descriptor = registry.resolveForItem(item);
+
+            testCase.verifyEqual(descriptor.Name, "GenericNeurodataType")
+        end
+
+        function matchesTheTypesNansenFileAdaptersRecord(testCase)
+            % NANSEN records a file adapter's DataType constant, such as
+            % "ImageStack", rather than the MATLAB class it returns.
+            registry = nansen.module.nwb.conversion.ConverterRegistry();
+            stackItem = nansen.module.nwb.config.NWBDataItemConfig( ...
+                VariableName="TwoPhotonSeries_Original", ...
+                SourceInfo=sourceEvidence(MatlabClass="ImageStack", Format="ImageStack"));
+            signalItem = nansen.module.nwb.config.NWBDataItemConfig( ...
+                VariableName="RoiSignals_MeanF", ...
+                SourceInfo=sourceEvidence(MatlabClass="RoiSignalArray", Format="RoiSignalArray"));
+
+            testCase.verifyEqual(registry.resolveForItem(stackItem).Name, "TwoPhotonImageStack")
+            testCase.verifyEqual(registry.resolveForItem(signalItem).Name, "RoiSignals")
         end
     end
 
