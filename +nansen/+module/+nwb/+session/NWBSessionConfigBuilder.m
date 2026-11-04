@@ -343,16 +343,22 @@ classdef NWBSessionConfigBuilder
             %resolveSessionPlaceholders - Fill "${session.<name>}" from the session
             %
             %   A text that holds such a placeholder comes back as a string
-            %   with the session's property in its place; a struct is
-            %   resolved field by field. Anything else is returned as it is,
-            %   so numeric and cell arguments keep their type.
+            %   with the session's property in its place; a struct, or each
+            %   element of a struct array, is resolved field by field.
+            %   Anything else is returned as it is, so numeric and cell
+            %   arguments keep their type.
 
             import nansen.module.nwb.session.NWBSessionConfigBuilder
 
             if isstruct(value)
-                for fieldName = string(fieldnames(value))'
-                    value.(fieldName) = NWBSessionConfigBuilder ...
-                        .resolveSessionPlaceholders(value.(fieldName), sessionObject);
+                % A struct array, such as a JSON list of objects, is
+                % resolved one element at a time: value.(name) on the
+                % whole array is a comma-separated list, not one value.
+                for elementIndex = 1:numel(value)
+                    for fieldName = string(fieldnames(value))'
+                        value(elementIndex).(fieldName) = NWBSessionConfigBuilder ...
+                            .resolveSessionPlaceholders(value(elementIndex).(fieldName), sessionObject);
+                    end
                 end
             elseif (ischar(value) || isstring(value)) && isscalar(string(value))
                 text = string(value);
@@ -398,9 +404,12 @@ classdef NWBSessionConfigBuilder
 
             saveFolder = sessionObject.getSessionFolder('', 'create');
 
-            % The filename follows the BIDS and DANDI convention.
+            % The filename follows the BIDS and DANDI convention. The IDs
+            % are converted to text first because NANSEN does not type
+            % them: sprintf would write a numeric ID as the character with
+            % that code rather than as digits.
             fileName = sprintf("sub-%s_ses-%s.nwb", ...
-                sessionObject.subjectID, sessionObject.sessionID);
+                string(sessionObject.subjectID), string(sessionObject.sessionID));
             outputPath = string(fullfile(saveFolder, fileName));
         end
 

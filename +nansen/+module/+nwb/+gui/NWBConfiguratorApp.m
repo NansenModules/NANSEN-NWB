@@ -55,6 +55,7 @@ classdef NWBConfiguratorApp < handle
 
     properties (Constant, Access = private)
         AUTO_LABEL = "Auto (let the runner decide)"
+        UNREGISTERED_SUFFIX = " (not registered)"
         GENERIC_CONVERTER = "GenericNeurodataType"
         NO_MODULE_LABEL = "(none)"
         FIGURE_SIZE = [1180, 660]
@@ -432,12 +433,16 @@ classdef NWBConfiguratorApp < handle
             state.NeedsPython = resolution.Status == "needs Python";
 
             if strlength(item.ConverterName) > 0
-                descriptor = obj.Registry.get(item.ConverterName);
-                state.ConverterLabel = obj.labelFor(descriptor);
-                state.Description = descriptor.Description;
-                state.IsGeneric = descriptor.Name == obj.GENERIC_CONVERTER;
-                state.PlacementOwnedByConverter = descriptor.PlacementPolicy == "converter" ...
-                    && ~descriptor.AllowsPlacementOverride;
+                state.ConverterLabel = obj.labelForName(item.ConverterName);
+                % An unregistered converter leaves the description empty;
+                % the status says the converter is unknown.
+                if obj.isRegistered(item.ConverterName)
+                    descriptor = obj.Registry.get(item.ConverterName);
+                    state.Description = descriptor.Description;
+                    state.IsGeneric = descriptor.Name == obj.GENERIC_CONVERTER;
+                    state.PlacementOwnedByConverter = descriptor.PlacementPolicy == "converter" ...
+                        && ~descriptor.AllowsPlacementOverride;
+                end
             elseif ~isempty(resolution.Descriptor)
                 state.Description = "Resolved to " + resolution.Descriptor.DisplayName ...
                     + ": " + resolution.Descriptor.Description;
@@ -452,7 +457,9 @@ classdef NWBConfiguratorApp < handle
             %   dropdown lists them: the converters matching the
             %   variable's source evidence first, best match first, then
             %   every other converter. The first entry leaves the choice
-            %   to the runner.
+            %   to the runner. A converter the item names that is not
+            %   registered follows it, so the dropdown can show the
+            %   item's current value.
 
             choices = struct("Label", obj.AUTO_LABEL, "Name", "", "IsSuggested", false);
 
@@ -461,6 +468,11 @@ classdef NWBConfiguratorApp < handle
                 item = obj.selectedItem();
                 [matches, ranks] = obj.Registry.findForSourceInfo(item.SourceInfo);
                 suggested = matches(ranks > 1);
+
+                if strlength(item.ConverterName) > 0 && ~obj.isRegistered(item.ConverterName)
+                    choices(end+1) = struct("Label", obj.labelForName(item.ConverterName), ...
+                        "Name", item.ConverterName, "IsSuggested", false);
+                end
             end
 
             for i = 1:numel(suggested)
@@ -498,7 +510,7 @@ classdef NWBConfiguratorApp < handle
                 Variable(i) = item.VariableName;
                 NWBName(i) = item.NWBVariableName;
                 if strlength(item.ConverterName) > 0
-                    Converter(i) = obj.labelFor(obj.Registry.get(item.ConverterName));
+                    Converter(i) = obj.labelForName(item.ConverterName);
                 else
                     Converter(i) = obj.AUTO_LABEL;
                 end
@@ -1059,6 +1071,25 @@ classdef NWBConfiguratorApp < handle
             sourceWords = dictionary(["builtin", "neuroconv", "custom"], ...
                 ["built-in", "NeuroConv", "custom"]);
             label = descriptor.DisplayName + " (" + sourceWords(descriptor.Source) + ")";
+        end
+
+        function label = labelForName(obj, converterName)
+            %labelForName - The label of a converter, registered or not
+            %   A configuration can name a converter this session has not
+            %   registered, such as a custom converter whose folder is not
+            %   registered yet. It is shown by its name, so that the
+            %   configuration still opens and the item can be given
+            %   another converter.
+
+            if obj.isRegistered(converterName)
+                label = obj.labelFor(obj.Registry.get(converterName));
+            else
+                label = converterName + obj.UNREGISTERED_SUFFIX;
+            end
+        end
+
+        function tf = isRegistered(obj, converterName)
+            tf = any(obj.Registry.names() == converterName);
         end
 
         function labels = converterLabels(obj)

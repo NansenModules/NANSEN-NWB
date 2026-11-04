@@ -48,6 +48,18 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
             testCase.verifyEqual(fileName + extension, "sub-mouse01_ses-20260510.nwb")
         end
 
+        function writesNumericIdentifiersAsDigitsInTheFileName(testCase)
+            % NANSEN does not type subjectID or sessionID.
+            session = sessionStub();
+            session.subjectID = 5;
+            session.sessionID = 12;
+
+            config = buildFor(session);
+
+            [~, fileName, extension] = fileparts(config.OutputPath);
+            testCase.verifyEqual(fileName + extension, "sub-5_ses-12.nwb")
+        end
+
         function combinesTheSessionDateAndTimeWithATimeZone(testCase)
             config = buildFor(sessionStub(), TimeZone="UTC");
 
@@ -309,6 +321,22 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
 
             testCase.verifyEqual(config.DataItems(1).ConverterArgs, ...
                 struct("ChannelIndex", [1 2], "Note", 'plain text'))
+        end
+
+        function fillsPlaceholdersInEachElementOfAStructArray(testCase)
+            % jsondecode reads a list of objects with the same fields as a
+            % struct array.
+            item = dataItem("abf");
+            item.ConverterArgs = struct("Electrodes", struct( ...
+                "name", {"e1", "e2"}, "cell", {"${session.cell_id}", "fixed"}));
+            session = sessionStub(Columns=struct("cell_id", '170518_1'));
+
+            config = buildFor(session, DataItems=item);
+
+            electrodes = config.DataItems(1).ConverterArgs.Electrodes;
+            testCase.verifySize(electrodes, [1, 2])
+            testCase.verifyEqual([electrodes.cell], ["170518_1", "fixed"])
+            testCase.verifyEqual([electrodes.name], ["e1", "e2"])
         end
 
         function rejectsAPlaceholderTheSessionCannotFill(testCase)
