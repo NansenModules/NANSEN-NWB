@@ -28,7 +28,9 @@ classdef NWBSessionConfigBuilder
             %   configuration for converting sessionObject, with the
             %   file-level metadata filled in from the session and the
             %   source of each item in dataItems described from the
-            %   project's variable model.
+            %   project's variable model. A source field the variable
+            %   model leaves empty keeps the value the item was configured
+            %   with.
             %
             %   CONFIG = buildConfig(...,TimeZone=ZONE) also says which
             %   time zone the session's date and time are in. It defaults
@@ -125,8 +127,8 @@ classdef NWBSessionConfigBuilder
 
             dataItems = nansen.module.nwb.config.NWBDataItemConfig.fromAny(dataItems);
             for i = 1:numel(dataItems)
-                dataItems(i).SourceInfo = ...
-                    NWBSessionConfigBuilder.sourceInfoForItem(sessionObject, dataItems(i));
+                dataItems(i).SourceInfo = mergeSourceInfo(dataItems(i).SourceInfo, ...
+                    NWBSessionConfigBuilder.sourceInfoForItem(sessionObject, dataItems(i)));
                 dataItems(i).ConverterArgs = ...
                     NWBSessionConfigBuilder.resolveSessionPlaceholders( ...
                     dataItems(i).ConverterArgs, sessionObject);
@@ -554,6 +556,26 @@ classdef NWBSessionConfigBuilder
                      'so they can be detected from the session folder, ', ...
                      'before writing an NWB file.'], strjoin(missingNames, " and "))
             end
+        end
+    end
+end
+
+function sourceInfo = mergeSourceInfo(configuredInfo, sessionInfo)
+%mergeSourceInfo - The session's source evidence, with configured values filling gaps
+%
+%   The variable model knows the file a variable comes from in this
+%   session, so its values win. A file the model does not know about,
+%   such as one a hand-written configuration points at, keeps its
+%   configured path and format.
+
+    sourceInfo = sessionInfo;
+    for fieldName = string(fieldnames(sessionInfo))'
+        % Path holds one or more paths, so a field is blank when it holds
+        % no text at all.
+        sessionValue = string(sourceInfo.(fieldName));
+        isBlank = isempty(sessionValue) || all(strlength(sessionValue) == 0);
+        if isBlank && isfield(configuredInfo, fieldName)
+            sourceInfo.(fieldName) = configuredInfo.(fieldName);
         end
     end
 end

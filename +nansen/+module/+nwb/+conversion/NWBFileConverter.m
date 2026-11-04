@@ -174,7 +174,7 @@ classdef NWBFileConverter < handle
                 error("nansen:nwb:itemsFailed", ...
                     ['%d of %d data items could not be converted: %s. The ', ...
                      'file ''%s'' holds everything that did convert.'], ...
-                    numel(obj.FailedItems), numel(dataItems), ...
+                    numel(obj.FailedItems), numel(obj.Config.DataItems), ...
                     strjoin(obj.FailedItems, ", "), obj.Config.OutputPath)
             end
 
@@ -486,10 +486,19 @@ classdef NWBFileConverter < handle
 
         function dataItems = orderDataItems(obj, dataItems)
             %orderDataItems - Put producers before the items requiring them
+            %
+            %   An item no converter resolves stops the run, or with
+            %   OnItemError "continue" is reported as failed and left out.
+
+            dataItems = obj.dropUnresolvedItems(dataItems);
 
             descriptors = arrayfun(@(item) obj.resolveDescriptor(item), ...
                 dataItems, "UniformOutput", false);
             producedTypes = cellfun(@(d) d.ProducesNWBType, descriptors);
+
+            % A converter that produces "*" builds the type its item names.
+            producesAnyType = producedTypes == "*";
+            producedTypes(producesAnyType) = [dataItems(producesAnyType).TargetNWBType];
 
             % Appending to a file that already exists may satisfy a
             % requirement no item in this run produces.
@@ -520,6 +529,31 @@ classdef NWBFileConverter < handle
             end
 
             dataItems = dataItems(order);
+        end
+
+        function dataItems = dropUnresolvedItems(obj, dataItems)
+            %dropUnresolvedItems - Leave out items no converter resolves, if allowed
+
+            if obj.OnItemError ~= "continue"
+                return
+            end
+
+            isResolved = true(size(dataItems));
+            for i = 1:numel(dataItems)
+                try
+                    obj.resolveDescriptor(dataItems(i));
+                catch cause
+                    if ~ismember(string(cause.identifier), ...
+                            ["nansen:nwb:unknownConverter", "nansen:nwb:unresolvedConverter"])
+                        rethrow(cause)
+                    end
+                    warning("nansen:nwb:converterFailed", ...
+                        "Skipping ''%s'': %s", dataItems(i).VariableName, cause.message)
+                    obj.FailedItems(end+1) = dataItems(i).VariableName;
+                    isResolved(i) = false;
+                end
+            end
+            dataItems = dataItems(isResolved);
         end
 
         function tf = areRequirementsMet(~, descriptor, satisfiedTypes, allProducedTypes, isAppending)

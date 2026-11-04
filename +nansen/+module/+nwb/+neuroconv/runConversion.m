@@ -29,6 +29,13 @@ function runConversion(interfaceClassName, sourceArg, nwbFilePath, metadata, opt
 %   Subject dropped after the merge, since whoever created the file wrote
 %   its own metadata.
 %
+%   runConversion(...,AlignToStartTime=T) also shifts the interface's data
+%   so that their times count from the datetime T, the session_start_time
+%   of the file being appended to. An interface times its data from the
+%   start of its own recording, which it reports in get_metadata; a start
+%   written without a UTC offset is taken to be in T's time zone, and one
+%   without a date, as from an ABF 1 header, to be on T's date.
+%
 %   This is the only place in the module that calls Python. Everything
 %   else, including the registry and the configurator, works whether or
 %   not Python is available.
@@ -38,6 +45,8 @@ function runConversion(interfaceClassName, sourceArg, nwbFilePath, metadata, opt
 %                     The Python traceback is attached as the cause.
 %     nansen:nwb:invalidWriteMode - both Overwrite and
 %                     AppendOnDiskNwbFile were requested.
+%     nansen:nwb:recordingBeforeSessionStart - the interface's recording
+%                     started before AlignToStartTime.
 %
 %   Example: Append a ScanImage recording to an existing file
 %       nansen.module.nwb.neuroconv.runConversion( ...
@@ -59,6 +68,7 @@ function runConversion(interfaceClassName, sourceArg, nwbFilePath, metadata, opt
         options.AppendOnDiskNwbFile (1,1) logical = false
         options.RunConversionArgs (1,1) struct = struct()
         options.UseInterfaceMetadata (1,1) logical = false
+        options.AlignToStartTime datetime {mustBeScalarOrEmpty} = datetime.empty
     end
 
     if options.Overwrite && options.AppendOnDiskNwbFile
@@ -75,6 +85,10 @@ function runConversion(interfaceClassName, sourceArg, nwbFilePath, metadata, opt
 
     try
         interface = createInterface(interfaceClassName, sourceArg);
+
+        if ~isempty(options.AlignToStartTime)
+            alignToStartTime(interface, options.AlignToStartTime)
+        end
 
         metadataValue = nansen.module.nwb.neuroconv.toPythonValue(metadata);
         if options.UseInterfaceMetadata
@@ -98,6 +112,9 @@ function runConversion(interfaceClassName, sourceArg, nwbFilePath, metadata, opt
 
         interface.run_conversion(pyargs(runConversionNvPairs{:}));
     catch cause
+        if cause.identifier == "nansen:nwb:recordingBeforeSessionStart"
+            rethrow(cause)
+        end
         % The Python traceback is the useful part, so it is kept as the
         % cause rather than flattened into the message.
         exception = MException("nansen:nwb:neuroconvFailed", ...
@@ -106,6 +123,66 @@ function runConversion(interfaceClassName, sourceArg, nwbFilePath, metadata, opt
             interfaceClassName, nwbFilePath);
         throw(addCause(exception, cause))
     end
+end
+
+function alignToStartTime(interface, fileStartTime)
+%alignToStartTime - Shift an interface's times to count from the file's start
+%
+%   Appending drops the start time the interface reports, so without the
+%   shift its data would sit early on the file's timeline by the time
+%   between the file's start and the recording's.
+
+    nwbFileSection = interface.get_metadata().get("NWBFile");
+    if isequal(nwbFileSection, py.None)
+        return
+    end
+    pythonStart = nwbFileSection.get("session_start_time");
+    if isequal(pythonStart, py.None)
+        return
+    end
+
+    if isa(pythonStart, "py.str")
+        startText = string(pythonStart);
+    else
+        startText = string(pythonStart.isoformat());
+    end
+    interfaceStart = nansen.module.nwb.internal.iso8601ToDatetime(startText);
+    if isempty(interfaceStart)
+        warning("nansen:nwb:unalignedRecording", ...
+            ['The interface reports its start as ''%s'', which could not be ', ...
+             'read, so its data are not aligned to the file''s start.'], startText)
+        return
+    end
+    if interfaceStart.TimeZone == ""
+        interfaceStart.TimeZone = fileStartTime.TimeZone;
+    end
+
+    % An ABF 1 header holds a time of day but no date, which NeuroConv
+    % reports on 1900-01-01. That time of day is taken on the file's date.
+    if year(interfaceStart) < 1970
+        interfaceStart = dateshift(fileStartTime, "start", "day") ...
+            + timeofday(interfaceStart);
+    end
+
+    offsetSeconds = seconds(interfaceStart - fileStartTime);
+    if offsetSeconds == 0
+        return
+    end
+    if offsetSeconds < 0
+        error("nansen:nwb:recordingBeforeSessionStart", ...
+            ['The recording started at %s, before the file''s ', ...
+             'session_start_time %s. Set the session''s date and time to ', ...
+             'when the recording started, or earlier.'], ...
+            string(interfaceStart), string(fileStartTime))
+    end
+    if ~py.hasattr(interface, "set_aligned_starting_time")
+        warning("nansen:nwb:unalignedRecording", ...
+            ['The interface cannot shift its timestamps, so its data start ', ...
+             '%g s early on the file''s timeline.'], offsetSeconds)
+        return
+    end
+
+    interface.set_aligned_starting_time(offsetSeconds);
 end
 
 function merged = mergeWithInterfaceMetadata(interface, callerMetadata, isAppending)

@@ -8,15 +8,23 @@ function nwbFile = convertPatchClampSweeps(context)
 %
 %   CONTEXT.Data is the struct the SHAREbrain ABF file adapter returns:
 %   Data (samples x channels x sweeps, or samples x channels for one
-%   sweep), SamplingRate, ChannelNames and ChannelUnits. A channel in
-%   volts or millivolts becomes a CurrentClampSeries and one in amperes,
-%   nanoamperes or picoamperes a VoltageClampSeries. The samples are
-%   stored as recorded, with data_conversion set so that they read as
-%   volts or amperes, the units NWB requires.
+%   sweep), SamplingRate, ChannelNames, ChannelUnits and Header. The
+%   samples are stored as recorded, with data_conversion set so that they
+%   read as volts or amperes, the units NWB requires.
 %
-%   An ABF 1 file records no start time per sweep, so every sweep starts
-%   at 0 relative to the session start, at the recording's sampling rate,
-%   and the comment of each series says so.
+%   The clamp mode decides what each channel is. In current clamp a
+%   channel in volts or millivolts is the recorded response, a
+%   CurrentClampSeries in acquisition, and a channel in amperes,
+%   nanoamperes or picoamperes the injected current, a
+%   CurrentClampStimulusSeries in stimulus_presentation. Voltage clamp is
+%   the other way round, with VoltageClampSeries and
+%   VoltageClampStimulusSeries.
+%
+%   Each sweep starts at the time Header.sweepStartInPts gives it, which
+%   abfload reads from the file's synch array. A file without one, such
+%   as an ABF 1 file recorded in a fixed-length mode, records no start
+%   time per sweep: every sweep then starts at 0 and the comment of each
+%   series says so.
 %
 %   Converter arguments:
 %       DeviceMetadata      - name, description and manufacturer of the
@@ -27,13 +35,22 @@ function nwbFile = convertPatchClampSweeps(context)
 %       StimulusDescription - what stimulus_description says; defaults to
 %                             "not described"
 %       ChannelIndex        - channels to store; every channel by default
+%       ClampMode           - "current" or "voltage"; by default the mode
+%                             whose response is in the unit of the first
+%                             channel stored
 %
 %   CONTEXT.Metadata goes into every series: description, comments, gain
-%   and the other properties of a patch-clamp series.
+%   and the other properties of a patch-clamp series. The properties this
+%   converter computes, such as data_conversion, electrode and
+%   sweep_number, are taken from the recording, and the same fields in
+%   CONTEXT.Metadata are ignored with a warning. Fields left empty, as in
+%   a metadata template, are not passed on.
 %
 %   Errors:
 %     nansen:nwb:invalidConverterInput - CONTEXT.Data is not such a
 %                     struct, or a channel's unit is not one of the above.
+%     nansen:nwb:invalidConverterArg - ClampMode is not "current" or
+%                     "voltage".
 %
 %   See also nansen.module.sharebrain.fileadapter.ABF,
 %   nansen.module.nwb.conversion.ConverterRegistry
@@ -55,45 +72,119 @@ function nwbFile = convertPatchClampSweeps(context)
     numSweeps = size(samples, 3);
 
     args = context.ConverterArgs;
-    channelIndex = getConverterArg(args, "ChannelIndex", 1:numChannels);
+    channelIndex = reshape(getConverterArg(args, "ChannelIndex", 1:numChannels), 1, []);
     stimulusDescription = string(getConverterArg(args, "StimulusDescription", "not described"));
+
+    channelUnits = string(recording.ChannelUnits);
+    clampMode = string(getConverterArg(args, "ClampMode", ...
+        defaultClampMode(channelUnits(channelIndex(1)), context.DataItem.VariableName)));
+    if ~any(clampMode == ["current", "voltage"])
+        error("nansen:nwb:invalidConverterArg", ...
+            'ClampMode must be "current" or "voltage", but was "%s".', clampMode)
+    end
+
+    sweepStartTimes = sweepStartTimesOf(recording, numSweeps);
 
     nwbFile = context.NwbFile;
     device = getOrCreateDevice(nwbFile, getConverterArg(args, "DeviceMetadata", struct()));
     electrode = getOrCreateElectrode(nwbFile, ...
         getConverterArg(args, "ElectrodeMetadata", struct()), device);
 
-    metadataNvPairs = namedargs2cell(charStrings(context.Metadata));
-    comments = "Sweep start times are not recorded in the file; every sweep starts at 0.";
-    if isfield(context.Metadata, "comments")
-        comments = string(context.Metadata.comments) + " " + comments;
-        metadataNvPairs = namedargs2cell(charStrings(rmfield(context.Metadata, "comments")));
+    seriesMetadata = itemMetadata(context.Metadata);
+    comments = "";
+    if isempty(sweepStartTimes)
+        comments = "Sweep start times are not recorded in the file; every sweep starts at 0.";
+        sweepStartTimes = zeros(1, numSweeps);
+    end
+    if isfield(seriesMetadata, "comments")
+        comments = strtrim(string(seriesMetadata.comments) + " " + comments);
+        seriesMetadata = rmfield(seriesMetadata, "comments");
+    end
+    metadataNvPairs = namedargs2cell(charStrings(seriesMetadata));
+    if strlength(comments) > 0
+        metadataNvPairs = [{'comments', char(comments)}, metadataNvPairs];
     end
 
     baseName = string(context.Placement.Name);
     channelNames = string(recording.ChannelNames);
-    channelUnits = string(recording.ChannelUnits);
 
-    for channel = reshape(channelIndex, 1, [])
-        [seriesConstructor, storedUnit, conversion] = seriesForUnit( ...
-            channelUnits(channel), context.DataItem.VariableName);
+    for channel = channelIndex
+        [seriesConstructor, storedUnit, conversion, isStimulus] = seriesForUnit( ...
+            channelUnits(channel), clampMode, context.DataItem.VariableName);
+        if isStimulus
+            targetGroup = nwbFile.stimulus_presentation;
+        else
+            targetGroup = nwbFile.acquisition;
+        end
 
         for sweep = 1:numSweeps
             series = seriesConstructor( ...
                 'data', squeeze(samples(:, channel, sweep)), ...
                 'data_unit', storedUnit, ...
                 'data_conversion', conversion, ...
-                'starting_time', 0, ...
+                'starting_time', sweepStartTimes(sweep), ...
                 'starting_time_rate', recording.SamplingRate, ...
                 'electrode', types.untyped.SoftLink(electrode), ...
                 'sweep_number', uint32(sweep), ...
                 'stimulus_description', char(stimulusDescription), ...
-                'comments', char(comments), ...
                 metadataNvPairs{:});
 
-            nwbFile.acquisition.set(char(seriesName(baseName, channelNames, channel, ...
+            targetGroup.set(char(seriesName(baseName, channelNames, channel, ...
                 numChannels, sweep)), series);
         end
+    end
+end
+
+function metadata = itemMetadata(metadata)
+%itemMetadata - The item's metadata without what the converter computes
+%
+%   The configurator fills an item's metadata from the template of
+%   PatchClampSeries, which holds data_conversion = 1 and an empty
+%   electrode. Passed after the computed values, those would label
+%   millivolts as volts and unlink the electrode.
+
+    computedNames = ["data", "data_unit", "data_conversion", "starting_time", ...
+        "starting_time_rate", "timestamps", "electrode", "sweep_number", ...
+        "stimulus_description"];
+
+    for fieldName = string(fieldnames(metadata))'
+        value = metadata.(fieldName);
+        if isempty(value) || (isstring(value) && all(strlength(value) == 0))
+            metadata = rmfield(metadata, fieldName);
+        elseif any(computedNames == fieldName)
+            warning("nansen:nwb:metadataIgnored", ...
+                ['%s is taken from the recording, so the value in the ', ...
+                 'item''s metadata is ignored.'], fieldName)
+            metadata = rmfield(metadata, fieldName);
+        end
+    end
+end
+
+function clampMode = defaultClampMode(unit, variableName)
+%defaultClampMode - The clamp mode whose response is recorded in a unit
+
+    [~, ~, ~, isStimulusInCurrentClamp] = seriesForUnit(unit, "current", variableName);
+    if isStimulusInCurrentClamp
+        clampMode = "voltage";
+    else
+        clampMode = "current";
+    end
+end
+
+function startTimes = sweepStartTimesOf(recording, numSweeps)
+%sweepStartTimesOf - Sweep start times in seconds, or empty when not recorded
+%
+%   abfload gives sweepStartInPts in samples of one channel from the
+%   start of the recording, read from the file's synch array.
+
+    startTimes = [];
+    if ~isfield(recording, "Header") || ~isstruct(recording.Header) ...
+            || ~isfield(recording.Header, "sweepStartInPts")
+        return
+    end
+    startInSamples = double(recording.Header.sweepStartInPts(:))';
+    if numel(startInSamples) == numSweeps
+        startTimes = startInSamples / recording.SamplingRate;
     end
 end
 
@@ -115,30 +206,47 @@ function assertRecording(recording, variableName)
     end
 end
 
-function [constructor, storedUnit, conversion] = seriesForUnit(unit, variableName)
+function [constructor, storedUnit, conversion, isStimulus] = seriesForUnit(unit, clampMode, variableName)
 %seriesForUnit - The series class and the conversion a channel's unit calls for
 %
-%   A membrane potential is recorded in current clamp and a current in
-%   voltage clamp, so the unit decides the series. NWB stores the first
-%   in volts and the second in amperes; data_conversion carries the
-%   factor from the recorded unit.
+%   In current clamp the potential is the response and the current the
+%   stimulus; in voltage clamp it is the other way round. NWB stores
+%   potentials in volts and currents in amperes; data_conversion carries
+%   the factor from the recorded unit.
 
     switch strtrim(unit)
         case "V"
-            constructor = @types.core.CurrentClampSeries; storedUnit = 'volts'; conversion = 1;
+            isVoltage = true; conversion = 1;
         case "mV"
-            constructor = @types.core.CurrentClampSeries; storedUnit = 'volts'; conversion = 1e-3;
+            isVoltage = true; conversion = 1e-3;
         case "A"
-            constructor = @types.core.VoltageClampSeries; storedUnit = 'amperes'; conversion = 1;
+            isVoltage = false; conversion = 1;
         case "nA"
-            constructor = @types.core.VoltageClampSeries; storedUnit = 'amperes'; conversion = 1e-9;
+            isVoltage = false; conversion = 1e-9;
         case "pA"
-            constructor = @types.core.VoltageClampSeries; storedUnit = 'amperes'; conversion = 1e-12;
+            isVoltage = false; conversion = 1e-12;
         otherwise
             error("nansen:nwb:invalidConverterInput", ...
                 ['A channel of ''%s'' is recorded in ''%s'', which is neither ', ...
                  'a voltage (V, mV) nor a current (A, nA, pA), so it cannot ', ...
                  'be stored as a clamp series.'], variableName, unit)
+    end
+
+    if isVoltage
+        storedUnit = 'volts';
+    else
+        storedUnit = 'amperes';
+    end
+
+    isStimulus = isVoltage == (clampMode == "voltage");
+    if clampMode == "current" && ~isStimulus
+        constructor = @types.core.CurrentClampSeries;
+    elseif clampMode == "current"
+        constructor = @types.core.CurrentClampStimulusSeries;
+    elseif ~isStimulus
+        constructor = @types.core.VoltageClampSeries;
+    else
+        constructor = @types.core.VoltageClampStimulusSeries;
     end
 end
 

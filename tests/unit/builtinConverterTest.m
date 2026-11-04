@@ -8,10 +8,11 @@ classdef builtinConverterTest < matlab.unittest.TestCase
 %   the converters are actually used under.
 %
 %   The ROI signal tests append to a file seeded with a plane
-%   segmentation built directly in matnwb. The ROI mask and image stack
-%   converters are covered by ConverterRegistry and runner tests rather
-%   than here, because they need ROI group and image stack objects that
-%   only NANSEN produces.
+%   segmentation built directly in matnwb. The ROI mask test passes a
+%   struct with the two properties of a NANSEN ROI group the converter
+%   reads. TwoPhotonImageStack is not covered: it writes through NANSEN's
+%   NWBExporter, which builds matnwb.types.core objects, a namespace the
+%   matnwb 2.11 core does not define.
 %
 %   These tests need matnwb on the MATLAB path with generated core types.
 %   They are filtered when it is unavailable.
@@ -214,10 +215,96 @@ classdef builtinConverterTest < matlab.unittest.TestCase
             testCase.verifyEqual(series.data_conversion, 1e-12)
         end
 
+        function ignoresComputedFieldsInTheItemMetadata(testCase)
+            % The configurator's PatchClampSeries template holds
+            % data_conversion = 1 and an empty electrode.
+            metadata = struct("data_conversion", 1, "electrode", '', ...
+                "gain", [], "description", "steps");
+
+            nwbFile = testCase.verifyWarning( ...
+                @() testCase.convert(patchClampRecording("mV", 1), "PatchClampSweeps", ...
+                    NWBVariableName="Vm", Metadata=metadata), ...
+                "nansen:nwb:metadataIgnored");
+
+            series = nwbFile.acquisition.get("Vm_sweep001");
+            testCase.verifyEqual(series.data_conversion, 1e-3)
+            testCase.verifyEqual(string(series.description), "steps")
+            testCase.verifyClass(series.electrode, "types.untyped.SoftLink")
+        end
+
+        function storesTheInjectedCurrentAsTheStimulusInCurrentClamp(testCase)
+            % A current-clamp file also records the current monitor.
+            recording = patchClampRecording(["mV", "pA"], 1);
+
+            nwbFile = testCase.convert(recording, "PatchClampSweeps", NWBVariableName="cell");
+
+            testCase.verifyClass(nwbFile.acquisition.get("cell_ch1_sweep001"), ...
+                "types.core.CurrentClampSeries")
+            testCase.verifyFalse(nwbFile.acquisition.isKey("cell_ch2_sweep001"))
+            testCase.verifyClass(nwbFile.stimulus_presentation.get("cell_ch2_sweep001"), ...
+                "types.core.CurrentClampStimulusSeries")
+        end
+
+        function followsTheClampModeTheItemNames(testCase)
+            recording = patchClampRecording(["mV", "pA"], 1);
+
+            nwbFile = testCase.convert(recording, "PatchClampSweeps", NWBVariableName="cell", ...
+                ConverterArgs=struct("ClampMode", "voltage"));
+
+            testCase.verifyClass(nwbFile.acquisition.get("cell_ch2_sweep001"), ...
+                "types.core.VoltageClampSeries")
+            testCase.verifyClass(nwbFile.stimulus_presentation.get("cell_ch1_sweep001"), ...
+                "types.core.VoltageClampStimulusSeries")
+        end
+
+        function startsEachSweepAtItsRecordedTime(testCase)
+            % abfload gives the sweep starts in samples of one channel.
+            recording = patchClampRecording("mV", 3);
+            recording.Header = struct("sweepStartInPts", [0; 5000; 10000]);
+
+            nwbFile = testCase.convert(recording, "PatchClampSweeps", NWBVariableName="Vm");
+
+            startTimes = arrayfun(@(sweep) nwbFile.acquisition.get( ...
+                sprintf("Vm_sweep%03d", sweep)).starting_time, 1:3);
+            testCase.verifyEqual(startTimes, [0, 5, 10])
+        end
+
+        function rejectsAnUnknownClampMode(testCase)
+            testCase.verifyError( ...
+                @() testCase.convert(patchClampRecording("mV", 1), "PatchClampSweeps", ...
+                    ConverterArgs=struct("ClampMode", "whole-cell")), ...
+                "nansen:nwb:converterFailed")
+        end
+
         function rejectsAChannelInAUnitThatIsNeitherVoltageNorCurrent(testCase)
             testCase.verifyError( ...
                 @() testCase.convert(patchClampRecording("degC", 1), "PatchClampSweeps"), ...
                 "nansen:nwb:converterFailed")
+        end
+    end
+
+    methods (Test) % ROI masks
+
+        function convertsRoiMasksIntoAPlaneSegmentation(testCase)
+            roiGroup = struct("FovImageSize", [16, 16], ...
+                "roiArray", struct( ...
+                    "coordinates", {[1, 1; 2, 2], [5, 5; 5, 6; 6, 6]}, ...
+                    "pixelweights", {[1; 1], [0.5; 1; 0.5]}));
+
+            % The imaging plane and optical channel the converter creates
+            % need NWB's required fields.
+            nwbFile = testCase.convert(roiGroup, "RoiGroupPlaneSegmentation", ...
+                ConverterArgs=struct( ...
+                    "ImagingPlaneMetadata", struct("excitation_lambda", 920, ...
+                        "indicator", "GCaMP6s", "location", "V1"), ...
+                    "OpticalChannelMetadata", struct("description", "green", ...
+                        "emission_lambda", 525)));
+
+            planeSegmentation = nwbFile.processing.get("ophys").nwbdatainterface ...
+                .get("ImageSegmentation").planesegmentation.get("PlaneSegmentation");
+            testCase.verifyNumElements(loadData(planeSegmentation.id), 2)
+            testCase.verifyTrue(nwbFile.general_optophysiology.Count > 0, ...
+                "The imaging plane the segmentation links to should be in the file.")
         end
     end
 
@@ -338,14 +425,15 @@ classdef builtinConverterTest < matlab.unittest.TestCase
     end
 end
 
-function recording = patchClampRecording(unit, numSweeps)
+function recording = patchClampRecording(units, numSweeps)
 %patchClampRecording - The struct the ABF adapter returns, with made-up sweeps
 
+    units = string(units);
     recording = struct( ...
-        "Data", cumsum(ones(40, 1, numSweeps), 1), ...
+        "Data", cumsum(ones(40, numel(units), numSweeps), 1), ...
         "SamplingRate", 1000, ...
         "ChannelNames", "", ...
-        "ChannelUnits", string(unit), ...
+        "ChannelUnits", units, ...
         "Header", struct());
 end
 
