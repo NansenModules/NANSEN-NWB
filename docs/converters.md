@@ -40,6 +40,8 @@ An `NwbFile` is a handle, so a converter may also mutate `context.NwbFile` and r
 
 `Metadata` is what gets written into the NWB file. `ConverterArgs` is what the converter needs to do its job. Keeping them apart is why a channel index or a plane name does not end up in the file as if it were experimental metadata.
 
+A converter argument can take its value from the session being converted. A string value `${session.<name>}` is replaced by that property of the session object before the converter runs, so a column of the session table such as `cell_id` becomes a per-session argument: `"ElectrodeMetadata": {"cell_id": "${session.cell_id}"}` gives each file's intracellular electrode the cell recorded for that session. Placeholders may also sit inside a longer text, as in `"cell ${session.cell_id} of ${session.subjectID}"`, and are resolved in nested structs. The result is always text. A name the session does not have, or one whose value is empty, stops the conversion with `nansen:nwb:unknownSessionPlaceholder`, since a silently empty argument would hide the gap.
+
 ### The result
 
 | Return | Meaning |

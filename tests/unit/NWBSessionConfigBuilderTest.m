@@ -269,6 +269,69 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
         end
     end
 
+    methods (Test) % Converter arguments taken from the session
+
+        function fillsAConverterArgumentFromASessionColumn(testCase)
+        % A column of the session table, such as the cell a patch-clamp
+        % session recorded, is a per-session value no fixed configuration
+        % can hold.
+
+            item = dataItem("abf");
+            item.ConverterArgs = struct("ElectrodeMetadata", ...
+                struct("cell_id", "${session.cell_id}", "name", "electrode-0"));
+            session = sessionStub(Columns=struct("cell_id", '170518_1'));
+
+            config = buildFor(session, DataItems=item);
+
+            electrode = config.DataItems(1).ConverterArgs.ElectrodeMetadata;
+            testCase.verifyEqual(electrode.cell_id, "170518_1")
+            testCase.verifyEqual(electrode.name, "electrode-0")
+        end
+
+        function fillsPlaceholdersInsideAText(testCase)
+            item = dataItem("abf");
+            item.ConverterArgs = struct("StimulusDescription", ...
+                "steps into cell ${session.cell_id} of ${session.subjectID}");
+            session = sessionStub(Columns=struct("cell_id", '170518_1'));
+
+            config = buildFor(session, DataItems=item);
+
+            testCase.verifyEqual( ...
+                config.DataItems(1).ConverterArgs.StimulusDescription, ...
+                "steps into cell 170518_1 of mouse01")
+        end
+
+        function leavesArgumentsWithoutPlaceholdersAlone(testCase)
+            item = dataItem("abf");
+            item.ConverterArgs = struct("ChannelIndex", [1 2], "Note", 'plain text');
+
+            config = buildFor(sessionStub(), DataItems=item);
+
+            testCase.verifyEqual(config.DataItems(1).ConverterArgs, ...
+                struct("ChannelIndex", [1 2], "Note", 'plain text'))
+        end
+
+        function rejectsAPlaceholderTheSessionCannotFill(testCase)
+        % An argument left empty would reach the file unnoticed, so a
+        % missing session property stops the build.
+
+            item = dataItem("abf");
+            item.ConverterArgs = struct("cell_id", "${session.no_such_column}");
+
+            testCase.verifyError(@() buildFor(sessionStub(), DataItems=item), ...
+                "nansen:nwb:unknownSessionPlaceholder")
+        end
+
+        function rejectsAPlaceholderWithAnEmptyValue(testCase)
+            item = dataItem("abf");
+            item.ConverterArgs = struct("cell_id", "${session.cell_id}");
+            session = sessionStub(Columns=struct("cell_id", ''));
+
+            testCase.verifyError(@() buildFor(session, DataItems=item), ...
+                "nansen:nwb:unknownSessionPlaceholder")
+        end
+    end
+
     methods (Test) % Rejecting sessions that cannot identify a file
 
         function rejectsASessionWithNoSubjectIdentifier(testCase)
@@ -447,6 +510,7 @@ function session = sessionStub(options)
     arguments
         options.FileAdapter (1,1) string = "Suite2p"
         options.FilePathFails (1,1) logical = false
+        options.Columns (1,1) struct = struct()
     end
 
     session = struct();
@@ -468,6 +532,12 @@ function session = sessionStub(options)
         session.getDataFilePath = @(variableName) deal( ...
             fullfile('/data/session', [variableName '.mat']), ...
             struct("DataType", "timetable", "FileAdapter", char(options.FileAdapter)));
+    end
+
+    % Further columns of the session table, which NANSEN exposes as
+    % properties of the session object.
+    for columnName = string(fieldnames(options.Columns))'
+        session.(columnName) = options.Columns.(columnName);
     end
 end
 

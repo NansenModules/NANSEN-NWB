@@ -78,6 +78,13 @@ classdef NWBSessionConfigBuilder
             %   ISO 8601 duration such as "P90D", a value and unit such
             %   as "6 month" or "90 days", or a range such as "6-8 weeks".
             %
+            %   A converter argument whose value is, or contains, the text
+            %   "${session.<name>}" takes that property of the session
+            %   object in its place, so a column of the session table
+            %   becomes a per-session argument, such as the cell_id of an
+            %   intracellular electrode. Nested structs are resolved too;
+            %   a resolved value is always a string.
+            %
             %   Errors:
             %     nansen:nwb:missingSessionIdentifier - the session has no
             %                     subject or session ID.
@@ -87,6 +94,9 @@ classdef NWBSessionConfigBuilder
             %                     zone.
             %     nansen:nwb:invalidSubjectAge - SubjectAge is not a
             %                     duration this function can read.
+            %     nansen:nwb:unknownSessionPlaceholder - a converter
+            %                     argument names a session property that
+            %                     does not exist or has no value.
 
             arguments
                 sessionObject (1,1)
@@ -117,6 +127,9 @@ classdef NWBSessionConfigBuilder
             for i = 1:numel(dataItems)
                 dataItems(i).SourceInfo = ...
                     NWBSessionConfigBuilder.sourceInfoForItem(sessionObject, dataItems(i));
+                dataItems(i).ConverterArgs = ...
+                    NWBSessionConfigBuilder.resolveSessionPlaceholders( ...
+                    dataItems(i).ConverterArgs, sessionObject);
             end
 
             subjectMetadata = NWBSessionConfigBuilder.subjectMetadata(sessionObject);
@@ -325,6 +338,29 @@ classdef NWBSessionConfigBuilder
     end
 
     methods (Static, Access = private)
+
+        function value = resolveSessionPlaceholders(value, sessionObject)
+            %resolveSessionPlaceholders - Fill "${session.<name>}" from the session
+            %
+            %   A text that holds such a placeholder comes back as a string
+            %   with the session's property in its place; a struct is
+            %   resolved field by field. Anything else is returned as it is,
+            %   so numeric and cell arguments keep their type.
+
+            import nansen.module.nwb.session.NWBSessionConfigBuilder
+
+            if isstruct(value)
+                for fieldName = string(fieldnames(value))'
+                    value.(fieldName) = NWBSessionConfigBuilder ...
+                        .resolveSessionPlaceholders(value.(fieldName), sessionObject);
+                end
+            elseif (ischar(value) || isstring(value)) && isscalar(string(value))
+                text = string(value);
+                if contains(text, "${session.")
+                    value = substituteSessionPlaceholders(text, sessionObject);
+                end
+            end
+        end
 
         function outputPath = resolveOutputPath(sessionObject, options)
             %resolveOutputPath - Decide where this session's file is written
@@ -668,5 +704,45 @@ function sex = mapBiologicalSex(value)
         sex = value;
     else
         sex = "U";
+    end
+end
+
+function text = substituteSessionPlaceholders(text, sessionObject)
+%substituteSessionPlaceholders - Replace every "${session.<name>}" in a text
+
+    placeholders = regexp(text, '\$\{session\.(?<name>\w+)\}', 'names');
+
+    for k = 1:numel(placeholders)
+        name = placeholders(k).name;
+        text = replace(text, "${session." + name + "}", ...
+            sessionPropertyText(sessionObject, name));
+    end
+end
+
+function text = sessionPropertyText(sessionObject, name)
+%sessionPropertyText - A session property as one text, or an error
+%
+%   The session is a NANSEN session object, whose table columns are
+%   properties, or a struct standing in for one. A property that is
+%   missing or empty is an error rather than empty text: an argument
+%   silently left blank would reach the file unnoticed.
+
+    if isstruct(sessionObject)
+        hasProperty = isfield(sessionObject, name);
+    else
+        hasProperty = isprop(sessionObject, name);
+    end
+
+    text = string.empty;
+    if hasProperty
+        text = string(sessionObject.(name));
+    end
+
+    if ~(isscalar(text) && strlength(text) > 0)
+        error("nansen:nwb:unknownSessionPlaceholder", ...
+            ['The converter argument placeholder "${session.%s}" cannot be ', ...
+             'filled: session ''%s'' has no property %s with a value. Add ', ...
+             'the column to the session table or remove the placeholder.'], ...
+            name, sessionObject.sessionID, name)
     end
 end
