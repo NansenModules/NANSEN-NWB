@@ -58,10 +58,11 @@ classdef ConverterRegistryTest < matlab.unittest.TestCase
         end
 
         function offersTheAbfConverterFirstForAnAbfFile(testCase)
-            % An ABF session is many files NeuroConv takes together, and
-            % the interface reads its electrodes and recording tables from
-            % their headers. The descriptor's defaults are what make that
-            % work without per-item configuration.
+            % The interface reads its electrodes and recording tables from
+            % the file headers, and is given only the session's own file,
+            % so sessions sharing a folder keep their recordings apart.
+            % The descriptor's defaults are what make that work without
+            % per-item configuration.
             registry = nansen.module.nwb.conversion.ConverterRegistry();
             sourceInfo = sourceEvidence(Path="/data/sub-01/2026_09_08_0001.abf");
 
@@ -70,7 +71,7 @@ classdef ConverterRegistryTest < matlab.unittest.TestCase
             testCase.verifyEqual(descriptors(1).Name, "NeuroConvAbfInterface")
             defaults = descriptors(1).DefaultConverterArgs;
             testCase.verifyEqual(string(defaults.InterfaceClassName), "AbfInterface")
-            testCase.verifyEqual(string(defaults.SourcePathMode), "siblingFiles")
+            testCase.verifyEqual(string(defaults.SourcePathMode), "fileList")
             testCase.verifyTrue(defaults.UseInterfaceMetadata)
         end
     end

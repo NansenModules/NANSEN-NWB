@@ -135,6 +135,17 @@ classdef neuroconvBridgeTest < matlab.unittest.TestCase
                 "nansen:nwb:missingConverterArg")
         end
 
+        function givesTheAbfInterfaceOnlyTheSessionsOwnFile(testCase)
+            % Sessions that share a folder must not take each other's
+            % recordings.
+            registry = nansen.module.nwb.conversion.ConverterRegistry();
+            defaults = registry.get("NeuroConvAbfInterface").DefaultConverterArgs;
+
+            sourceArg = resolveFor("/data/170518_1a.ABF", defaults);
+
+            testCase.verifyEqual(string(sourceArg.file_paths), "/data/170518_1a.ABF")
+        end
+
         function reportsAnUnknownSourcePathMode(testCase)
             testCase.verifyError( ...
                 @() resolveFor("/data/rec.tif", ...
