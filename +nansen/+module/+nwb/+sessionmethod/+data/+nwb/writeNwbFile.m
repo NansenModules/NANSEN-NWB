@@ -19,8 +19,10 @@ function varargout = writeNwbFile(sessionObject, varargin)
 %
 %   A session whose folder records no time of day gets its start time
 %   from the first data item a NeuroConv interface converts, since such
-%   an interface reads the recording's header. Set 'PythonExecutable' to
-%   the Python that has NeuroConv when MATLAB is not configured for it.
+%   an interface reads the recording's header. A header time without a
+%   UTC offset is taken to be in the 'TimeZone' parameter's zone, the zone
+%   the session's own date and time are read in. Set 'PythonExecutable'
+%   to the Python that has NeuroConv when MATLAB is not configured for it.
 %
 %   The method itself only assembles the configuration for this session and
 %   hands it to the conversion runner. Everything about how data becomes
@@ -81,7 +83,7 @@ import nansen.session.SessionMethod
     sessionStartTime = datetime.empty;
     if ~hasTimeOfDay(sessionObject)
         sessionStartTime = startTimeFromRecording(sessionObject, dataItems, ...
-            params.PythonExecutable);
+            params.PythonExecutable, params.TimeZone);
     end
 
     config = nansen.module.nwb.session.NWBSessionConfigBuilder.buildConfig( ...
@@ -144,12 +146,17 @@ function ageText = sessionSubjectAge(sessionObject)
     end
 end
 
-function sessionStartTime = startTimeFromRecording(sessionObject, dataItems, pythonExecutable)
+function sessionStartTime = startTimeFromRecording(sessionObject, dataItems, pythonExecutable, timeZone)
 %startTimeFromRecording - Ask the first NeuroConv item's interface when it started
 %
 %   Returns an empty datetime when no item is converted by a NeuroConv
 %   interface or none reports a start time; the builder then reports the
 %   missing time with what to configure.
+%
+%   A header that wrote no UTC offset records the wall-clock time of the
+%   acquisition computer. That time is given timeZone, the zone the
+%   session's own date and time are read in, because the builder refuses
+%   a start time without one.
 
     import nansen.module.nwb.session.NWBSessionConfigBuilder
 
@@ -190,6 +197,9 @@ function sessionStartTime = startTimeFromRecording(sessionObject, dataItems, pyt
         end
 
         if ~isempty(sessionStartTime)
+            if sessionStartTime.TimeZone == ""
+                sessionStartTime.TimeZone = timeZone;
+            end
             return
         end
     end

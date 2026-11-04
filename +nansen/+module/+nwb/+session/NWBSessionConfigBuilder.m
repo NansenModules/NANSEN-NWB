@@ -362,9 +362,12 @@ classdef NWBSessionConfigBuilder
 
             saveFolder = sessionObject.getSessionFolder('', 'create');
 
-            % The filename follows the BIDS and DANDI convention.
+            % The filename follows the BIDS and DANDI convention. The IDs
+            % are converted to text first because NANSEN does not type
+            % them: sprintf would write a numeric ID as the character with
+            % that code rather than as digits.
             fileName = sprintf("sub-%s_ses-%s.nwb", ...
-                sessionObject.subjectID, sessionObject.sessionID);
+                string(sessionObject.subjectID), string(sessionObject.sessionID));
             outputPath = string(fullfile(saveFolder, fileName));
         end
 
