@@ -7,7 +7,10 @@ function nwbFile = convertRoiGroupToPlaneSegmentation(context)
 %
 %   The optophysiology metadata the segmentation links to is created when
 %   the file does not already carry it, so ROI masks can be the first
-%   ophys item converted.
+%   ophys item converted. It then needs the properties NWB requires: a
+%   description and emission_lambda for the optical channel, and an
+%   excitation_lambda, indicator and location for the imaging plane,
+%   from the converter arguments or the project's stored metadata.
 %
 %   Converter arguments:
 %       IsCell                 - Logical vector marking which ROIs are cells
@@ -25,6 +28,8 @@ function nwbFile = convertRoiGroupToPlaneSegmentation(context)
 %   Errors:
 %     nansen:nwb:missingImagingPlane - the named imaging plane is not in
 %                     the file's optophysiology metadata.
+%     nansen:nwb:missingRequiredMetadata - the optophysiology metadata to
+%                     create lacks a property NWB requires.
 %
 %   See also nansen.module.nwb.conversion.ophys.convertRoiGroup,
 %   nansen.module.nwb.conversion.builtin.convertRoiSignals
