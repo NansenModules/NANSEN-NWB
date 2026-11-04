@@ -180,35 +180,43 @@ import nansen.session.SessionMethod
             continue
         end
 
+        % Every member of nansen.module.nwb.enum.PrimaryGroupName, which the
+        % configurator offers, has a group here.
         switch variableConfiguration.PrimaryGroupName
             case 'Acquisition'
-                if isa(neuroData, 'struct')
-                    for j = 1:numel(neuroData)
-                        nwbFile.acquisition.set(neuroData(j).name, neuroData(j).data);
-                    end
-                else
-                    nwbFile.acquisition.set(variableName, neuroData);
-                end
+                targetGroup = nwbFile.acquisition;
 
             case 'Processing'
                 moduleName = variableConfiguration.NwbModule;
                 % Create or get processing module based on nwb module
                 processingModule = nansen.module.nwb.file.getProcessingModule(nwbFile, moduleName, 'No Description');
-                if isa(neuroData, 'struct')
-                    for j = 1:numel(neuroData)
-                        processingModule.nwbdatainterface.set(...
-                            neuroData(j).name, neuroData(j).data);
-                    end
-                else
-                    processingModule.nwbdatainterface.set(variableName, neuroData);
-                end
-                % Add to processing module
+                targetGroup = processingModule.nwbdatainterface;
+
+            case 'Analysis'
+                targetGroup = nwbFile.analysis;
+
+            case 'Intervals'
+                targetGroup = nwbFile.intervals;
+
+            case 'Stimulus'
+                targetGroup = nwbFile.stimulus_presentation;
 
             otherwise
                 error("nansen:nwb:unsupportedPrimaryGroup", ...
                     ['''%s'' is configured for the group ''%s'', which this ', ...
-                     'method cannot write to. Use Acquisition or Processing.'], ...
+                     'method cannot write to. Use Acquisition, Processing, ', ...
+                     'Analysis, Intervals or Stimulus.'], ...
                     variableName, variableConfiguration.PrimaryGroupName)
+        end
+
+        % types.untyped.Set is a handle class, so adding to targetGroup
+        % adds to the NwbFile.
+        if isa(neuroData, 'struct')
+            for j = 1:numel(neuroData)
+                targetGroup.set(neuroData(j).name, neuroData(j).data);
+            end
+        else
+            targetGroup.set(variableName, neuroData);
         end
 
         hasUnexportedChanges = true;
