@@ -433,7 +433,8 @@ classdef NWBConfiguratorApp < handle
             state.ConverterName = item.ConverterName;
             state.NWBModule = item.NWBModule;
             state.TargetNWBType = item.TargetNWBType;
-            state.PrimaryGroup = item.PrimaryGroup;
+            [state.PrimaryGroup, state.NWBModule] = ...
+                obj.effectivePlacement(item, resolution.Descriptor);
             state.NWBName = item.NWBVariableName;
             state.HasMetadata = ~isempty(fieldnames(item.Metadata));
             state.HasConverterArgs = ~isempty(fieldnames(item.ConverterArgs));
@@ -449,13 +450,13 @@ classdef NWBConfiguratorApp < handle
                     descriptor = obj.Registry.get(item.ConverterName);
                     state.Description = descriptor.Description;
                     state.IsGeneric = descriptor.Name == obj.GENERIC_CONVERTER;
-                    state.PlacementOwnedByConverter = descriptor.PlacementPolicy == "converter" ...
-                        && ~descriptor.AllowsPlacementOverride;
+                    state.PlacementOwnedByConverter = ownsPlacement(descriptor);
                 end
             elseif ~isempty(resolution.Descriptor)
                 state.Description = "Resolved to " + resolution.Descriptor.DisplayName ...
                     + ": " + resolution.Descriptor.Description;
                 state.IsGeneric = resolution.Descriptor.Name == obj.GENERIC_CONVERTER;
+                state.PlacementOwnedByConverter = ownsPlacement(resolution.Descriptor);
             end
         end
 
@@ -529,9 +530,10 @@ classdef NWBConfiguratorApp < handle
                         Produces(i) = item.TargetNWBType;
                     end
                 end
-                Placement(i) = item.PrimaryGroup;
-                if item.PrimaryGroup == "Processing" && strlength(item.NWBModule) > 0
-                    Placement(i) = Placement(i) + "/" + item.NWBModule;
+                [primaryGroup, moduleName] = obj.effectivePlacement(item, resolution.Descriptor);
+                Placement(i) = primaryGroup;
+                if primaryGroup == "Processing" && strlength(moduleName) > 0
+                    Placement(i) = Placement(i) + "/" + moduleName;
                 end
                 Status(i) = resolution.Status;
             end
@@ -1063,10 +1065,11 @@ classdef NWBConfiguratorApp < handle
                 return
             end
 
+            [primaryGroup, moduleName] = obj.effectivePlacement(item, descriptor);
             validGroups = nansen.module.nwb.conversion.NWBConverterDescriptor.VALID_PRIMARY_GROUPS;
-            if ~any(validGroups == item.PrimaryGroup)
+            if ~any(validGroups == primaryGroup)
                 resolution.Status = "unknown group";
-                resolution.Message = "'" + item.PrimaryGroup + "' is not an NWB group. Choose one of: " ...
+                resolution.Message = "'" + primaryGroup + "' is not an NWB group. Choose one of: " ...
                     + strjoin(validGroups, ", ") + ".";
                 return
             end
@@ -1077,8 +1080,32 @@ classdef NWBConfiguratorApp < handle
                 return
             end
 
+            placementText = primaryGroup;
+            if primaryGroup == "Processing" && strlength(moduleName) > 0
+                placementText = placementText + "/" + moduleName;
+            end
             resolution.Message = "Converts with " + descriptor.DisplayName + " to " ...
-                + resolvedType(descriptor, item) + " in " + item.PrimaryGroup + ".";
+                + resolvedType(descriptor, item) + " in " + placementText + ".";
+        end
+
+        function [primaryGroup, moduleName] = effectivePlacement(~, item, descriptor)
+            %effectivePlacement - Where the runner puts an item's output
+            %   The item's group and module, unless the converter it
+            %   resolves to owns placement, in which case the group is the
+            %   converter's, as in NWBFileConverter.createPlacement, and
+            %   the module the first one the converter is tagged for.
+
+            primaryGroup = item.PrimaryGroup;
+            moduleName = item.NWBModule;
+            if isempty(descriptor) || ~ownsPlacement(descriptor)
+                return
+            end
+
+            primaryGroup = descriptor.PrimaryGroup;
+            moduleTags = descriptor.NWBModuleTags(descriptor.NWBModuleTags ~= "*");
+            if ~isempty(moduleTags)
+                moduleName = moduleTags(1);
+            end
         end
 
         function tf = pythonAvailable(obj)
@@ -1177,6 +1204,12 @@ function typeName = resolvedType(descriptor, item)
     if typeName == "*"
         typeName = item.TargetNWBType;
     end
+end
+
+function tf = ownsPlacement(descriptor)
+%ownsPlacement - Whether a converter, not the item, decides placement
+
+    tf = descriptor.PlacementPolicy == "converter" && ~descriptor.AllowsPlacementOverride;
 end
 
 function word = statusWord(isSet)
