@@ -9,7 +9,12 @@ function nwbFile = convertRoiSignals(context)
 %   is how NWB distinguishes raw ROI fluorescence from a normalized
 %   signal.
 %
+%   CONTEXT.Data is a timetable with one column per ROI, or a double or
+%   single matrix of samples by ROIs, the form NANSEN saves the
+%   RoiSignals_* variables in. A matrix needs SamplingRate.
+%
 %   Converter arguments:
+%       SamplingRate           - Samples per second of a matrix, in Hz
 %       ResponseType           - "Fluorescence" (default) or "DeltaFOverF"
 %       InterfaceName          - Name of the wrapping interface
 %       ImageSegmentationName  - ImageSegmentation holding the ROI table
@@ -37,7 +42,8 @@ function nwbFile = convertRoiSignals(context)
         signalName = context.DataItem.VariableName;
     end
 
-    roiResponseSeries = nansen.module.nwb.conversion.ophys.convertRoiResponses(context.Data);
+    roiResponseSeries = nansen.module.nwb.conversion.ophys.convertRoiResponses( ...
+        context.Data, SamplingRate=getConverterArg(args, "SamplingRate", []));
     roiResponseSeries.rois = getRoiTableRegion( ...
         context.NwbFile, args, size(roiResponseSeries.data, 1));
 
