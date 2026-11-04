@@ -51,6 +51,18 @@ function [S, info, isRequired] = getTypeMetadataStruct(typeName)
 
     deprecatedProperties = getDeprecatedPropertyNames();
 
+    % A property is left out when the type or any class it extends lists
+    % it. The class that declares the property is not enough to look it
+    % up by: matnwb declares Image.data on hdmf_common.Data, which
+    % VectorData and other types that carry metadata in data extend too.
+    hierarchyNames = [string(typeShortName), ...
+        string(cellfun(@utility.string.getSimpleClassName, ...
+            superclasses(typeName), 'UniformOutput', false))'];
+    excludedPropertyNames = strings(1, 0);
+    for className = hierarchyNames(isfield(dataProperties, hierarchyNames))
+        excludedPropertyNames = [excludedPropertyNames, dataProperties.(className)]; %#ok<AGROW>
+    end
+
     [S, info, isRequired] = deal( struct );
     for i = 1:numProperties
 
@@ -67,16 +79,13 @@ function [S, info, isRequired] = getTypeMetadataStruct(typeName)
             continue
         end
 
+        if any(excludedPropertyNames == thisPropertyName)
+            continue
+        end
+
         % Get the defining class.
         definingClass = propertyList(i).DefiningClass.Name;
-        
-        % Check lookup table if property should be ignored.
         definingClassShortName = utility.string.getSimpleClassName(definingClass);
-        if isfield(dataProperties, definingClassShortName)
-            if any(strcmp(dataProperties.(definingClassShortName), thisPropertyName))
-                continue
-            end
-        end
 
         propertyDescription = propertyList(i).Description;
         if contains(propertyDescription, 'DEPRECATED')

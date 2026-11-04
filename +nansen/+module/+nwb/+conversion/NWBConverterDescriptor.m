@@ -354,7 +354,8 @@ classdef NWBConverterDescriptor
                 end
             end
 
-            validPathModes = ["file", "path", "folder", "parentFolder", "fileList", "siblingFiles"];
+            validPathModes = ["file", "path", "folder", "parentFolder", "grandparentFolder", ...
+                "fileList", "siblingFiles"];
             if ~any(string(args.SourcePathMode) == validPathModes)
                 obj.fail("SourcePathMode must be one of: %s.", strjoin(validPathModes, ", "))
             end

@@ -153,6 +153,33 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
             testCase.verifyEqual(choices(2).Name, "NotRegistered")
         end
 
+        function opensAnItemWhoseGroupIsNotAnNwbGroup(testCase, ListBackend)
+            % A pilot configuration can hold a lower-case group name.
+            item = speedItem();
+            item.PrimaryGroup = "acquisition";
+            app = testCase.createApp(configurationWith(item), ListBackend);
+
+            state = app.panelState();
+
+            testCase.verifyEqual(state.PrimaryGroup, "acquisition")
+            testCase.verifyEqual(state.Status, "unknown group")
+        end
+
+        function showsWhereAConverterThatOwnsPlacementPutsTheOutput(testCase, ListBackend)
+            % frames resolves to ProcessingOne on its own, and that
+            % converter writes to Processing/ophys whatever the item says.
+            item = framesItem();
+            item.PrimaryGroup = "Acquisition";
+            app = testCase.createApp(configurationWith(item), ListBackend);
+
+            state = app.panelState();
+
+            testCase.verifyEqual(app.listTable().Placement, "Processing/ophys")
+            testCase.verifyEqual(state.PrimaryGroup, "Processing")
+            testCase.verifyTrue(state.PlacementOwnedByConverter)
+            testCase.verifySubstring(state.Message, "in Processing/ophys")
+        end
+
         function reportsAnAmbiguousItem(testCase, ListBackend)
             % pupil records only its class, which two converters accept.
             app = testCase.createApp(configurationWith(pupilItem()), ListBackend);
@@ -224,6 +251,19 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
             testCase.verifyFalse(app.IsDirty)
         end
 
+        function countsAPilotConfigurationAsUnsaved(testCase, ListBackend)
+            % Until it is saved, the runner keeps converting the .mat
+            % file on every export, and closing must offer to save it.
+            folder = testCase.temporaryFolder();
+            app = testCase.createApp(configurationWith(speedItem()), ListBackend, ...
+                FilePath=fullfile(folder, "nwb_conversion_configuration.mat"));
+
+            testCase.verifyTrue(app.IsDirty)
+
+            app.saveConfiguration()
+            testCase.verifyFalse(app.IsDirty)
+        end
+
         function rejectsSavingWithoutAFilePath(testCase, ListBackend)
             app = testCase.createApp(configurationWith(speedItem()), ListBackend);
 
@@ -273,6 +313,15 @@ function item = speedItem()
     sourceInfo.MatlabClass = "timetable";
     item = nansen.module.nwb.config.NWBDataItemConfig( ...
         VariableName="speed", NWBVariableName="speed", SourceInfo=sourceInfo);
+end
+
+function item = framesItem()
+%framesItem - An item whose source names only a class ProcessingOne accepts
+
+    sourceInfo = nansen.module.nwb.config.NWBDataItemConfig.emptySourceInfo();
+    sourceInfo.MatlabClass = "nothing.Matches";
+    item = nansen.module.nwb.config.NWBDataItemConfig( ...
+        VariableName="frames", NWBVariableName="frames", SourceInfo=sourceInfo);
 end
 
 function item = pupilItem()

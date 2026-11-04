@@ -8,10 +8,11 @@ classdef builtinConverterTest < matlab.unittest.TestCase
 %   the converters are actually used under.
 %
 %   The ROI signal tests append to a file seeded with a plane
-%   segmentation built directly in matnwb. The ROI mask and image stack
-%   converters are covered by ConverterRegistry and runner tests rather
-%   than here, because they need ROI group and image stack objects that
-%   only NANSEN produces.
+%   segmentation built directly in matnwb. The ROI mask test passes a
+%   struct with the two properties of a NANSEN ROI group the converter
+%   reads. TwoPhotonImageStack is not covered: it writes through NANSEN's
+%   NWBExporter, which builds matnwb.types.core objects, a namespace the
+%   matnwb 2.11 core does not define.
 %
 %   These tests need matnwb on the MATLAB path with generated core types.
 %   They are filtered when it is unavailable.
@@ -218,6 +219,31 @@ classdef builtinConverterTest < matlab.unittest.TestCase
             testCase.verifyError( ...
                 @() testCase.convert(patchClampRecording("degC", 1), "PatchClampSweeps"), ...
                 "nansen:nwb:converterFailed")
+        end
+    end
+
+    methods (Test) % ROI masks
+
+        function convertsRoiMasksIntoAPlaneSegmentation(testCase)
+            roiGroup = struct("FovImageSize", [16, 16], ...
+                "roiArray", struct( ...
+                    "coordinates", {[1, 1; 2, 2], [5, 5; 5, 6; 6, 6]}, ...
+                    "pixelweights", {[1; 1], [0.5; 1; 0.5]}));
+
+            % The imaging plane and optical channel the converter creates
+            % need NWB's required fields.
+            nwbFile = testCase.convert(roiGroup, "RoiGroupPlaneSegmentation", ...
+                ConverterArgs=struct( ...
+                    "ImagingPlaneMetadata", struct("excitation_lambda", 920, ...
+                        "indicator", "GCaMP6s", "location", "V1"), ...
+                    "OpticalChannelMetadata", struct("description", "green", ...
+                        "emission_lambda", 525)));
+
+            planeSegmentation = nwbFile.processing.get("ophys").nwbdatainterface ...
+                .get("ImageSegmentation").planesegmentation.get("PlaneSegmentation");
+            testCase.verifyNumElements(loadData(planeSegmentation.id), 2)
+            testCase.verifyTrue(nwbFile.general_optophysiology.Count > 0, ...
+                "The imaging plane the segmentation links to should be in the file.")
         end
     end
 

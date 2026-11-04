@@ -136,6 +136,29 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
             testCase.verifyEmpty(config.DataItems(1).SourceInfo.Path)
         end
 
+        function keepsAConfiguredSourceTheSessionDoesNotKnow(testCase)
+            % A hand-written configuration can point at a file the
+            % variable model has no entry for.
+            item = dataItem("rawMovie");
+            item.SourceInfo.Path = "/raw/rec.tif";
+            item.SourceInfo.Format = "tiff";
+
+            config = buildFor(sessionStub(FilePathFails=true), DataItems=item);
+
+            testCase.verifyEqual(config.DataItems(1).SourceInfo.Path, "/raw/rec.tif")
+            testCase.verifyEqual(config.DataItems(1).SourceInfo.Format, "tiff")
+        end
+
+        function prefersWhatTheSessionReportsOverTheConfiguredSource(testCase)
+            item = dataItem("roiSignals");
+            item.SourceInfo.Path = "/elsewhere/old.mat";
+
+            config = buildFor(sessionStub(), DataItems=item);
+
+            testCase.verifyEqual(config.DataItems(1).SourceInfo.Path, ...
+                "/data/session/roiSignals.mat")
+        end
+
         function doesNotLoadDataWhileBuildingAConfiguration(testCase)
             % A session's recordings are far larger than memory, so a
             % configurator that loaded them to pick a converter would be
