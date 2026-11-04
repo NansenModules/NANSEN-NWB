@@ -36,6 +36,18 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
             testCase.verifyEqual(fileName + extension, "sub-mouse01_ses-20260510.nwb")
         end
 
+        function writesNumericIdentifiersAsDigitsInTheFileName(testCase)
+            % NANSEN does not type subjectID or sessionID.
+            session = sessionStub();
+            session.subjectID = 5;
+            session.sessionID = 12;
+
+            config = buildFor(session);
+
+            [~, fileName, extension] = fileparts(config.OutputPath);
+            testCase.verifyEqual(fileName + extension, "sub-5_ses-12.nwb")
+        end
+
         function combinesTheSessionDateAndTimeWithATimeZone(testCase)
             config = buildFor(sessionStub(), TimeZone="UTC");
 
