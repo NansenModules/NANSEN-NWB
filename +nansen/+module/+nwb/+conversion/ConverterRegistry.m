@@ -300,13 +300,23 @@ classdef ConverterRegistry < handle
             %   search path, where it stays for the session, and registers
             %   every function in it that returns a converter descriptor
             %   when called with the single argument "descriptor".
+            %
+            %   Registering a folder that is already registered does
+            %   nothing; instance(Refresh=true) picks up changed files.
 
             arguments
                 obj
                 folderPath (1,1) string {mustBeFolder}
             end
 
-            obj.ConverterFolders(end+1) = folderPath;
+            % dir lists a folder's entries with the folder's absolute path,
+            % so a relative and an absolute spelling compare equal.
+            folderListing = dir(folderPath);
+            folderPath = string(folderListing(1).folder);
+            if any(obj.ConverterFolders == folderPath)
+                return
+            end
+
             addpath(folderPath)
 
             files = dir(fullfile(folderPath, "*.m"));
@@ -318,6 +328,10 @@ classdef ConverterRegistry < handle
                     obj.add(descriptor)
                 end
             end
+
+            % Listed only once every converter in it registered, so a
+            % folder that fails is not registered again on every refresh.
+            obj.ConverterFolders(end+1) = folderPath;
         end
     end
 
