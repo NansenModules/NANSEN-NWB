@@ -59,6 +59,11 @@ classdef NWBConfiguratorApp < handle
         GENERIC_CONVERTER = "GenericNeurodataType"
         NO_MODULE_LABEL = "(none)"
         FIGURE_SIZE = [1180, 660]
+        CONTROL_HEIGHT = 22                 % Height of a MATLAB button or dropdown
+        LIST_COLUMN_WIDTHS = [150, 150, 240, 140, 150, 120] % Preferred widths of the list's columns
+        MIN_LIST_COLUMN_WIDTH = 70          % Below this a column is not narrowed further
+        LIST_SCROLLBAR_ALLOWANCE = 16       % Width kept free for the list's vertical scrollbar
+        UITABLE_ROW_NUMBER_WIDTH = 42       % Width of the row numbers a uitable shows
     end
 
     properties (SetAccess = private)
@@ -84,6 +89,7 @@ classdef NWBConfiguratorApp < handle
         VariableDropdown
         ListHost
         List
+        FittedColumnWidths (1,:) double = []  % Column widths last given to the list
         ConverterDropdown
         DescriptionLabel
         PythonLabel
@@ -552,7 +558,7 @@ classdef NWBConfiguratorApp < handle
             obj.Figure.CloseRequestFcn = @(~, ~) obj.onCloseRequested();
 
             root = uigridlayout(obj.Figure, [3, 2]);
-            root.RowHeight = {36, "1x", 44};
+            root.RowHeight = {obj.CONTROL_HEIGHT, "1x", 44};
             root.ColumnWidth = {"2x", 400};
             root.Padding = [16, 12, 16, 12];
             root.ColumnSpacing = 16;
@@ -588,7 +594,8 @@ classdef NWBConfiguratorApp < handle
             % A panel hosts the list because both entity-table backends
             % position their component in pixels inside the parent; in a
             % grid cell that only warns. The host resizes the HTML view.
-            obj.ListHost = uipanel(root, "BorderType", "none", "AutoResizeChildren", "off");
+            % Its border separates the list from the panel beside it.
+            obj.ListHost = uipanel(root, "BorderType", "line", "AutoResizeChildren", "off");
             obj.ListHost.Layout.Row = 2;
             obj.ListHost.Layout.Column = 1;
 
@@ -608,31 +615,60 @@ classdef NWBConfiguratorApp < handle
         function fitListToHost(obj)
             % The uitable backend is normalized and follows its parent;
             % the HTML view holds a pixel position and is resized here.
-            if isempty(obj.List) || obj.ListBackend ~= "html"
+            if isempty(obj.List)
                 return
             end
-            component = obj.List.getComponent();
             hostSize = obj.ListHost.InnerPosition(3:4);
-            component.Position = [1, 1, max(1, hostSize(1)), max(1, hostSize(2))];
+            if obj.ListBackend == "html"
+                component = obj.List.getComponent();
+                component.Position = [1, 1, max(1, hostSize(1)), max(1, hostSize(2))];
+            end
+            obj.fitColumnsToWidth(hostSize(1))
+        end
+
+        function fitColumnsToWidth(obj, availableWidth)
+            % Both backends give each column a fixed width in pixels, and
+            % macOS hides a scrollbar until the list is scrolled, so a list
+            % wider than its panel looks cut off. The columns share the
+            % width in proportion to their preferred widths, and the list
+            % scrolls sideways only once they reach their minimum.
+            usableWidth = availableWidth - obj.LIST_SCROLLBAR_ALLOWANCE;
+            if obj.ListBackend == "uitable"
+                usableWidth = usableWidth - obj.UITABLE_ROW_NUMBER_WIDTH;
+            end
+            widths = floor(obj.LIST_COLUMN_WIDTHS / sum(obj.LIST_COLUMN_WIDTHS) * usableWidth);
+            widths = max(widths, obj.MIN_LIST_COLUMN_WIDTH);
+
+            % Setting the widths redraws the list, so it is skipped when
+            % they have not changed.
+            if isequal(widths, obj.FittedColumnWidths)
+                return
+            end
+            obj.FittedColumnWidths = widths;
+            obj.List.setColumnWidths(num2cell(widths))
         end
 
         function specs = listColumnSpecs(obj)
             import entitytable.ColumnSpec
+            widths = obj.LIST_COLUMN_WIDTHS;
             specs = [ ...
-                ColumnSpec("Variable", DisplayName="Variable", Width=150), ...
-                ColumnSpec("NWBName", DisplayName="NWB name", IsEditable=true, Width=150), ...
+                ColumnSpec("Variable", DisplayName="Variable", Width=widths(1)), ...
+                ColumnSpec("NWBName", DisplayName="NWB name", IsEditable=true, Width=widths(2)), ...
                 ColumnSpec("Converter", DisplayName="Converter", IsEditable=true, ...
-                    Options=obj.converterLabels(), Width=240), ...
-                ColumnSpec("Produces", DisplayName="Produces", Width=140), ...
-                ColumnSpec("Placement", DisplayName="Placement", Width=150), ...
-                ColumnSpec("Status", DisplayName="Status", Width=120, ...
+                    Options=obj.converterLabels(), Width=widths(3)), ...
+                ColumnSpec("Produces", DisplayName="Produces", Width=widths(4)), ...
+                ColumnSpec("Placement", DisplayName="Placement", Width=widths(5)), ...
+                ColumnSpec("Status", DisplayName="Status", Width=widths(6), ...
                     UserData=struct("Renderer", "badge"))];
         end
 
         function createPanel(obj, root)
-            panel = uigridlayout(root, [14, 2]);
-            panel.Layout.Row = [1, 2];
-            panel.Layout.Column = 2;
+            % The border separates the panel from the list beside it.
+            container = uipanel(root, "BorderType", "line");
+            container.Layout.Row = [1, 2];
+            container.Layout.Column = 2;
+
+            panel = uigridlayout(container, [14, 2]);
             panel.ColumnWidth = {110, "1x"};
             panel.RowHeight = {28, 24, 48, 36, 24, 24, 24, 24, 24, 24, 24, 8, "1x", 0};
             panel.Padding = [12, 8, 12, 8];
