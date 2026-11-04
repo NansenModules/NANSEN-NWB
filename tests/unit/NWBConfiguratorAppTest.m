@@ -137,6 +137,22 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
             testCase.verifySubstring(state.Message, "No Python here")
         end
 
+        function opensAnItemNamingAnUnregisteredConverter(testCase, ListBackend)
+            % A configuration can name a custom converter whose folder
+            % this session has not registered.
+            item = speedItem();
+            item.ConverterName = "NotRegistered";
+            app = testCase.createApp(configurationWith(item), ListBackend);
+
+            state = app.panelState();
+            choices = app.converterChoices();
+
+            testCase.verifyEqual(app.listTable().Converter, "NotRegistered (not registered)")
+            testCase.verifyEqual(state.Status, "unknown converter")
+            testCase.verifyEqual(state.ConverterLabel, "NotRegistered (not registered)")
+            testCase.verifyEqual(choices(2).Name, "NotRegistered")
+        end
+
         function reportsAnAmbiguousItem(testCase, ListBackend)
             % pupil records only its class, which two converters accept.
             app = testCase.createApp(configurationWith(pupilItem()), ListBackend);

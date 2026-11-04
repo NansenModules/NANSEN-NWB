@@ -33,15 +33,15 @@ function value = iso8601ToDatetime(text)
         characters(end-5:end) = [];
     end
 
+    % Anything after the 19 characters of the date and time of day must be
+    % a decimal point followed by at least one digit of the seconds.
     inputFormat = "uuuu-MM-dd'T'HH:mm:ss";
-    fractionDigits = numel(characters) - 20;
-    if fractionDigits > 0
-        if characters(20) ~= '.'
+    if numel(characters) > 19
+        fractionDigits = numel(characters) - 20;
+        if characters(20) ~= '.' || fractionDigits < 1
             return
         end
         inputFormat = inputFormat + "." + repmat('S', 1, fractionDigits);
-    elseif fractionDigits < 0
-        return
     end
 
     try
