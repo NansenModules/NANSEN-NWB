@@ -362,6 +362,22 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
             testCase.verifyEqual([electrodes.name], ["e1", "e2"])
         end
 
+        function fillsPlaceholdersInAListOfPaths(testCase)
+            % jsondecode reads a JSON list of strings as a cell array.
+            item = dataItem("abf");
+            item.ConverterArgs = struct("InterfaceArgs", struct( ...
+                "file_paths", {{"${session.abf_path}"}}), ...
+                "Tags", ["cell ${session.cell_id}", "fixed"]);
+            session = sessionStub(Columns=struct( ...
+                "abf_path", '/data/170518_1a.ABF', "cell_id", '170518_1'));
+
+            config = buildFor(session, DataItems=item);
+
+            converterArgs = config.DataItems(1).ConverterArgs;
+            testCase.verifyEqual(converterArgs.InterfaceArgs.file_paths, {"/data/170518_1a.ABF"})
+            testCase.verifyEqual(converterArgs.Tags, ["cell 170518_1", "fixed"])
+        end
+
         function rejectsAPlaceholderTheSessionCannotFill(testCase)
         % An argument left empty would reach the file unnoticed, so a
         % missing session property stops the build.

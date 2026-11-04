@@ -84,8 +84,9 @@ classdef NWBSessionConfigBuilder
             %   "${session.<name>}" takes that property of the session
             %   object in its place, so a column of the session table
             %   becomes a per-session argument, such as the cell_id of an
-            %   intracellular electrode. Nested structs are resolved too;
-            %   a resolved value is always a string.
+            %   intracellular electrode. Nested structs, struct arrays,
+            %   cell arrays and string arrays are resolved too; a resolved
+            %   value is always a string.
             %
             %   Errors:
             %     nansen:nwb:missingSessionIdentifier - the session has no
@@ -346,9 +347,11 @@ classdef NWBSessionConfigBuilder
             %
             %   A text that holds such a placeholder comes back as a string
             %   with the session's property in its place; a struct, or each
-            %   element of a struct array, is resolved field by field.
-            %   Anything else is returned as it is, so numeric and cell
-            %   arguments keep their type.
+            %   element of a struct array, is resolved field by field, and
+            %   a cell or string array element by element, keeping its
+            %   type. jsondecode reads a JSON list of strings as a cell
+            %   array. Anything else, such as a number, is returned as it
+            %   is.
 
             import nansen.module.nwb.session.NWBSessionConfigBuilder
 
@@ -361,6 +364,16 @@ classdef NWBSessionConfigBuilder
                         value(elementIndex).(fieldName) = NWBSessionConfigBuilder ...
                             .resolveSessionPlaceholders(value(elementIndex).(fieldName), sessionObject);
                     end
+                end
+            elseif iscell(value)
+                for elementIndex = 1:numel(value)
+                    value{elementIndex} = NWBSessionConfigBuilder ...
+                        .resolveSessionPlaceholders(value{elementIndex}, sessionObject);
+                end
+            elseif isstring(value) && ~isscalar(value)
+                for elementIndex = 1:numel(value)
+                    value(elementIndex) = NWBSessionConfigBuilder ...
+                        .resolveSessionPlaceholders(value(elementIndex), sessionObject);
                 end
             elseif (ischar(value) || isstring(value)) && isscalar(string(value))
                 text = string(value);
