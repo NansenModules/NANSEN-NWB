@@ -164,6 +164,11 @@ function sessionStartTime = startTimeFromRecording(sessionObject, dataItems, pyt
 %   acquisition computer. That time is given timeZone, the zone the
 %   session's own date and time are read in, because the builder refuses
 %   a start time without one.
+%
+%   The interface runs in the Python the item's converter will use, its
+%   PythonExecutable converter argument, or pythonExecutable when the item
+%   names none. MATLAB keeps the first Python it loads for the session, so
+%   loading another one here would make the conversion itself fail.
 
     import nansen.module.nwb.session.NWBSessionConfigBuilder
 
@@ -191,11 +196,16 @@ function sessionStartTime = startTimeFromRecording(sessionObject, dataItems, pyt
             % without one there is nothing to ask.
             continue
         end
+        itemPythonExecutable = string(nansen.module.nwb.conversion.getConverterArg( ...
+            converterArgs, "PythonExecutable", ""));
+        if strlength(itemPythonExecutable) == 0
+            itemPythonExecutable = pythonExecutable;
+        end
         try
             sourceArg = nansen.module.nwb.neuroconv.resolveSourceArg(item, converterArgs);
             sessionStartTime = nansen.module.nwb.neuroconv.readSessionStartTime( ...
                 string(converterArgs.InterfaceClassName), sourceArg, ...
-                PythonExecutable=pythonExecutable);
+                PythonExecutable=itemPythonExecutable);
         catch cause
             warning("nansen:nwb:sessionStartTimeUnavailable", ...
                 "The recording of ''%s'' could not say when it started: %s", ...
