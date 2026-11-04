@@ -11,19 +11,27 @@ function sourceArg = resolveSourceArg(dataItem, converterArgs)
 %   both by setting SourceArg to the finished struct.
 %
 %   SourcePathMode must be one of:
-%       "file"         - (default) The data item's own path
-%       "path"         - Same as "file"
-%       "folder"       - A recorded folder path, or the path itself
-%       "parentFolder" - The folder containing the data item's path
-%       "fileList"     - Every recorded path, as a cell array
-%       "siblingFiles" - Every file beside the data item's path with the
-%                        same extension, sorted by name, as a cell array.
-%                        For formats that split one session across many
-%                        files, such as ABF.
+%       "file"              - (default) The data item's own path
+%       "path"              - Same as "file"
+%       "folder"            - A recorded folder path, or the path itself
+%       "parentFolder"      - The folder containing the data item's path
+%       "grandparentFolder" - The folder two levels above it, such as
+%                             the suite2p folder for a file in plane0
+%       "fileList"          - Every recorded path, as a cell array
+%       "siblingFiles"      - Every file beside the data item's path with
+%                             the same extension, sorted by name, as a
+%                             cell array. For formats that split one
+%                             session across many files, such as ABF.
+%
+%   Constructor arguments other than the path, such as the sampling
+%   frequency of a TIFF stack, go in converterArgs.InterfaceArgs, a struct
+%   whose fields are added to the result. converterArgs.RequiredInterfaceArgs
+%   names the ones an interface cannot run without.
 %
 %   Errors:
 %     nansen:nwb:missingConverterArg - neither SourceArg nor
-%                     SourceArgumentName is set.
+%                     SourceArgumentName is set, or an argument named in
+%                     RequiredInterfaceArgs is not in InterfaceArgs.
 %     nansen:nwb:missingSourcePath - the data item records no path.
 %     nansen:nwb:invalidConverterArg - SourceArg or SourcePathMode is not
 %                     a value this function accepts.
@@ -70,6 +78,19 @@ function sourceArg = resolveSourceArg(dataItem, converterArgs)
     else
         sourceArg.(sourceArgumentName) = sourcePaths(1);
     end
+
+    interfaceArgs = getConverterArg(converterArgs, "InterfaceArgs", struct());
+    requiredNames = string(getConverterArg(converterArgs, "RequiredInterfaceArgs", strings(1, 0)));
+    missingNames = requiredNames(~isfield(interfaceArgs, requiredNames));
+    if ~isempty(missingNames)
+        error("nansen:nwb:missingConverterArg", ...
+            ['''%s'' needs %s to create its NeuroConv interface. Set ', ...
+             'ConverterArgs.InterfaceArgs.%s on the data item.'], ...
+            dataItem.VariableName, strjoin(missingNames, " and "), missingNames(1))
+    end
+    for fieldName = string(fieldnames(interfaceArgs))'
+        sourceArg.(fieldName) = interfaceArgs.(fieldName);
+    end
 end
 
 function sourcePaths = resolveSourcePaths(dataItem, sourcePathMode)
@@ -92,6 +113,9 @@ function sourcePaths = resolveSourcePaths(dataItem, sourcePathMode)
         case "parentFolder"
             sourcePaths = string(fileparts(recordedPaths(1)));
 
+        case "grandparentFolder"
+            sourcePaths = string(fileparts(fileparts(recordedPaths(1))));
+
         case "fileList"
             sourcePaths = recordedPaths;
 
@@ -101,8 +125,8 @@ function sourcePaths = resolveSourcePaths(dataItem, sourcePathMode)
         otherwise
             error("nansen:nwb:invalidConverterArg", ...
                 ['''%s'' is not a supported SourcePathMode. Use one of: ', ...
-                 'file, path, folder, parentFolder, fileList, siblingFiles.'], ...
-                sourcePathMode)
+                 'file, path, folder, parentFolder, grandparentFolder, ', ...
+                 'fileList, siblingFiles.'], sourcePathMode)
     end
 end
 

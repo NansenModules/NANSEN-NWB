@@ -101,6 +101,74 @@ classdef neuroconvBridgeTest < matlab.unittest.TestCase
                 "nansen:nwb:missingConverterArg")
         end
 
+        function takesTheSuite2pFolderForAFileInAPlaneFolder(testCase)
+            % Suite2pSegmentationInterface takes the suite2p folder that
+            % holds the plane folders, and picks the first plane unless
+            % told otherwise.
+            registry = nansen.module.nwb.conversion.ConverterRegistry();
+            defaults = registry.get("NeuroConvSuite2pSegmentationInterface") ...
+                .DefaultConverterArgs;
+
+            sourceArg = resolveFor("/data/suite2p/plane0/F.npy", defaults);
+
+            testCase.verifyEqual(string(sourceArg.folder_path), "/data/suite2p")
+        end
+
+        function addsTheOtherConstructorArguments(testCase)
+            converterArgs = struct("SourceArgumentName", "file_paths", ...
+                "SourcePathMode", "fileList", ...
+                "InterfaceArgs", struct("sampling_frequency", 30.5));
+
+            sourceArg = resolveFor("/data/rec.tif", converterArgs);
+
+            testCase.verifyEqual(string(sourceArg.file_paths), "/data/rec.tif")
+            testCase.verifyEqual(sourceArg.sampling_frequency, 30.5)
+        end
+
+        function reportsAConstructorArgumentTheInterfaceNeeds(testCase)
+            % TiffImagingInterface cannot time the frames without a
+            % sampling frequency, which no file path supplies.
+            registry = nansen.module.nwb.conversion.ConverterRegistry();
+            defaults = registry.get("NeuroConvTiffImagingInterface").DefaultConverterArgs;
+
+            testCase.verifyError(@() resolveFor("/data/rec.tif", defaults), ...
+                "nansen:nwb:missingConverterArg")
+        end
+
+        function givesTheAbfInterfaceOnlyTheSessionsOwnFile(testCase)
+            % Sessions that share a folder must not take each other's
+            % recordings.
+            registry = nansen.module.nwb.conversion.ConverterRegistry();
+            defaults = registry.get("NeuroConvAbfInterface").DefaultConverterArgs;
+
+            sourceArg = resolveFor("/data/170518_1a.ABF", defaults);
+
+            testCase.verifyEqual(string(sourceArg.file_paths), "/data/170518_1a.ABF")
+        end
+
+        function rejectsAnUnknownIcephysExperimentType(testCase)
+            % NeuroConv's metadata schema does not check the value, so a
+            % typo would only fail deep inside the conversion.
+            filePath = fullfile(tempdir, "neuroconvBridgeTest_target.nwb");
+            writelines("not an NWB file", filePath)
+            testCase.addTeardown(@() delete(filePath))
+
+            sourceInfo = nansen.module.nwb.config.NWBDataItemConfig.emptySourceInfo();
+            sourceInfo.Path = "/data/170518_1a.ABF";
+            context = struct( ...
+                "DataItem", nansen.module.nwb.config.NWBDataItemConfig( ...
+                    VariableName="Vm", SourceInfo=sourceInfo), ...
+                "FilePath", filePath, ...
+                "Metadata", struct(), ...
+                "ConverterArgs", struct("InterfaceClassName", "AbfInterface", ...
+                    "SourceArgumentName", "file_paths", "SourcePathMode", "fileList", ...
+                    "IcephysExperimentType", "currentclamp"));
+
+            testCase.verifyError( ...
+                @() nansen.module.nwb.conversion.builtin.convertWithNeuroconv(context), ...
+                "nansen:nwb:invalidConverterArg")
+        end
+
         function reportsAnUnknownSourcePathMode(testCase)
             testCase.verifyError( ...
                 @() resolveFor("/data/rec.tif", ...

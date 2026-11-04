@@ -2,14 +2,13 @@ classdef getTypeMetadataStructTest < matlab.unittest.TestCase
 %getTypeMetadataStructTest - Tests for getTypeMetadataStruct
 %
 %   Tests nansen.module.nwb.internal.getTypeMetadataStruct, which builds
-%   the metadata template the configurator and createNewNWBInstance show
-%   for a neurodata type.
+%   the metadata template shown for a neurodata type.
 %
 %   The template must leave out the properties dataPropertyNames lists as
 %   carrying data: converters fill those from the session's data, so a
 %   template that offered them would ask for values nobody can enter.
-%   A property is looked up under the class that declares it, so the
-%   exclusions of a superclass apply to every type that extends it.
+%   A property is left out when the type or any class it extends lists
+%   it, whichever class declares it.
 %
 %   See also: nansen.module.nwb.internal.getTypeMetadataStruct,
 %   nansen.module.nwb.internal.dataPropertyNames
@@ -45,6 +44,24 @@ classdef getTypeMetadataStructTest < matlab.unittest.TestCase
 
             testCase.verifyFalse(any(isfield(template, ["rois", "data", "timestamps"])))
             testCase.verifyTrue(isfield(template, "data_unit"))
+        end
+
+        function leavesOutTheDataOfAnImage(testCase)
+            % matnwb declares data on hdmf_common.Data, which Image extends.
+            for typeName = ["types.core.GrayscaleImage", "types.core.RGBImage"]
+                template = templateFor(typeName);
+
+                testCase.verifyFalse(isfield(template, "data"), typeName)
+                testCase.verifyTrue(isfield(template, "description"), typeName)
+            end
+        end
+
+        function keepsTheDataOfTypesThatOnlyShareItsDeclaringClass(testCase)
+            % VectorData also extends hdmf_common.Data, and no class in its
+            % hierarchy lists data as carrying data.
+            template = templateFor("types.hdmf_common.VectorData");
+
+            testCase.verifyTrue(isfield(template, "data"))
         end
 
         function leavesOutTheOrderOfImagesInACollection(testCase)

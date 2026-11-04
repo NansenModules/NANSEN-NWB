@@ -28,7 +28,9 @@ classdef NWBSessionConfigBuilder
             %   configuration for converting sessionObject, with the
             %   file-level metadata filled in from the session and the
             %   source of each item in dataItems described from the
-            %   project's variable model.
+            %   project's variable model. A source field the variable
+            %   model leaves empty keeps the value the item was configured
+            %   with.
             %
             %   CONFIG = buildConfig(...,TimeZone=ZONE) also says which
             %   time zone the session's date and time are in. It defaults
@@ -82,8 +84,11 @@ classdef NWBSessionConfigBuilder
             %   "${session.<name>}" takes that property of the session
             %   object in its place, so a column of the session table
             %   becomes a per-session argument, such as the cell_id of an
-            %   intracellular electrode. Nested structs are resolved too;
-            %   a resolved value is always a string.
+            %   intracellular electrode. Nested structs, struct arrays,
+            %   cell arrays and string arrays are resolved too; a resolved
+            %   value is always a string. Placeholders in the default
+            %   arguments of the converter an item resolves to are filled
+            %   the same way, so a lab converter can declare one.
             %
             %   Errors:
             %     nansen:nwb:missingSessionIdentifier - the session has no
@@ -125,11 +130,11 @@ classdef NWBSessionConfigBuilder
 
             dataItems = nansen.module.nwb.config.NWBDataItemConfig.fromAny(dataItems);
             for i = 1:numel(dataItems)
-                dataItems(i).SourceInfo = ...
-                    NWBSessionConfigBuilder.sourceInfoForItem(sessionObject, dataItems(i));
+                dataItems(i).SourceInfo = mergeSourceInfo(dataItems(i).SourceInfo, ...
+                    NWBSessionConfigBuilder.sourceInfoForItem(sessionObject, dataItems(i)));
                 dataItems(i).ConverterArgs = ...
                     NWBSessionConfigBuilder.resolveSessionPlaceholders( ...
-                    dataItems(i).ConverterArgs, sessionObject);
+                    withPlaceholderDefaults(dataItems(i)), sessionObject);
             end
 
             subjectMetadata = NWBSessionConfigBuilder.subjectMetadata(sessionObject);
@@ -344,9 +349,11 @@ classdef NWBSessionConfigBuilder
             %
             %   A text that holds such a placeholder comes back as a string
             %   with the session's property in its place; a struct, or each
-            %   element of a struct array, is resolved field by field.
-            %   Anything else is returned as it is, so numeric and cell
-            %   arguments keep their type.
+            %   element of a struct array, is resolved field by field, and
+            %   a cell or string array element by element, keeping its
+            %   type. jsondecode reads a JSON list of strings as a cell
+            %   array. Anything else, such as a number, is returned as it
+            %   is.
 
             import nansen.module.nwb.session.NWBSessionConfigBuilder
 
@@ -359,6 +366,16 @@ classdef NWBSessionConfigBuilder
                         value(elementIndex).(fieldName) = NWBSessionConfigBuilder ...
                             .resolveSessionPlaceholders(value(elementIndex).(fieldName), sessionObject);
                     end
+                end
+            elseif iscell(value)
+                for elementIndex = 1:numel(value)
+                    value{elementIndex} = NWBSessionConfigBuilder ...
+                        .resolveSessionPlaceholders(value{elementIndex}, sessionObject);
+                end
+            elseif isstring(value) && ~isscalar(value)
+                for elementIndex = 1:numel(value)
+                    value(elementIndex) = NWBSessionConfigBuilder ...
+                        .resolveSessionPlaceholders(value(elementIndex), sessionObject);
                 end
             elseif (ischar(value) || isstring(value)) && isscalar(string(value))
                 text = string(value);
@@ -558,6 +575,26 @@ classdef NWBSessionConfigBuilder
     end
 end
 
+function sourceInfo = mergeSourceInfo(configuredInfo, sessionInfo)
+%mergeSourceInfo - The session's source evidence, with configured values filling gaps
+%
+%   The variable model knows the file a variable comes from in this
+%   session, so its values win. A file the model does not know about,
+%   such as one a hand-written configuration points at, keeps its
+%   configured path and format.
+
+    sourceInfo = sessionInfo;
+    for fieldName = string(fieldnames(sessionInfo))'
+        % Path holds one or more paths, so a field is blank when it holds
+        % no text at all.
+        sessionValue = string(sourceInfo.(fieldName));
+        isBlank = isempty(sessionValue) || all(strlength(sessionValue) == 0);
+        if isBlank && isfield(configuredInfo, fieldName)
+            sourceInfo.(fieldName) = configuredInfo.(fieldName);
+        end
+    end
+end
+
 function value = readField(S, fieldName)
 %readField - Read one struct field as text, or "" when it is absent
 
@@ -713,6 +750,51 @@ function sex = mapBiologicalSex(value)
         sex = value;
     else
         sex = "U";
+    end
+end
+
+function converterArgs = withPlaceholderDefaults(dataItem)
+%withPlaceholderDefaults - An item's arguments over defaults that hold placeholders
+%
+%   The runner lays an item's ConverterArgs over its converter's
+%   DefaultConverterArgs, after the session is gone. Defaults holding a
+%   session placeholder are therefore merged in here, by the runner's rule
+%   that an item's argument replaces the default of the same name, so the
+%   placeholders are resolved with the item's own. Other defaults are left
+%   to the runner.
+
+    converterArgs = dataItem.ConverterArgs;
+    try
+        descriptor = nansen.module.nwb.conversion.ConverterRegistry.instance() ...
+            .resolveForItem(dataItem);
+    catch
+        % An item no converter resolves is reported when it converts.
+        return
+    end
+
+    defaultArgs = descriptor.DefaultConverterArgs;
+    if ~holdsPlaceholder(defaultArgs)
+        return
+    end
+
+    itemArgs = converterArgs;
+    converterArgs = defaultArgs;
+    for fieldName = string(fieldnames(itemArgs))'
+        converterArgs.(fieldName) = itemArgs.(fieldName);
+    end
+end
+
+function tf = holdsPlaceholder(value)
+%holdsPlaceholder - Whether a value holds "${session.<name>}" anywhere
+
+    if isstruct(value)
+        tf = any(arrayfun(@(element) any(structfun(@holdsPlaceholder, element)), value));
+    elseif iscell(value)
+        tf = any(cellfun(@holdsPlaceholder, value));
+    elseif ischar(value) || isstring(value)
+        tf = any(contains(string(value), "${session."));
+    else
+        tf = false;
     end
 end
 

@@ -294,6 +294,19 @@ classdef NWBFileConverterTest < matlab.unittest.TestCase
             testCase.verifyTrue(nwbFile.acquisition.isKey("consumer"))
         end
 
+        function countsAConverterProducingAnyTypeAsItsTarget(testCase)
+            % A converter producing "*" builds the type its item names, so
+            % it satisfies a requirement for that type.
+            producer = dataItem("speed", "TestProducesAnyType");
+            producer.TargetNWBType = "TestMarker";
+            config = testCase.configurationWith([ ...
+                dataItem("consumer", "TestRequiresMarker"), producer]);
+
+            nwbFile = nwbRead(testCase.runConversion(config));
+
+            testCase.verifyTrue(nwbFile.acquisition.isKey("consumer"))
+        end
+
         function reportsARequirementNothingProduces(testCase)
             config = testCase.configurationWith( ...
                 dataItem("consumer", "TestRequiresMarker"));
@@ -379,6 +392,19 @@ classdef NWBFileConverterTest < matlab.unittest.TestCase
             nwbFile = nwbRead(testCase.OutputPath);
             testCase.verifyTrue(nwbFile.acquisition.isKey("speed"), ...
                 "The items that did convert should still be in the file.")
+        end
+
+        function skipsAnItemNoConverterResolvesWhenAskedToContinue(testCase)
+            config = testCase.configurationWith([ ...
+                dataItem("orphan", "NoSuchConverter"), ...
+                dataItem("speed", "TimetableTimeSeries")]);
+
+            testCase.verifyError( ...
+                @() testCase.runConversion(config, OnItemError="continue"), ...
+                "nansen:nwb:itemsFailed")
+
+            nwbFile = nwbRead(testCase.OutputPath);
+            testCase.verifyTrue(nwbFile.acquisition.isKey("speed"))
         end
     end
 
@@ -481,6 +507,12 @@ classdef NWBFileConverterTest < matlab.unittest.TestCase
                 Name="TestProducesMarker", ...
                 AcceptedClasses="*", ...
                 ProducesNWBType="TestMarker", ...
+                Function=@addTimeSeriesToAcquisition))
+
+            registry.add(NWBConverterDescriptor( ...
+                Name="TestProducesAnyType", ...
+                AcceptedClasses="*", ...
+                ProducesNWBType="*", ...
                 Function=@addTimeSeriesToAcquisition))
 
             registry.add(NWBConverterDescriptor( ...

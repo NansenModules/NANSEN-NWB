@@ -136,6 +136,29 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
             testCase.verifyEmpty(config.DataItems(1).SourceInfo.Path)
         end
 
+        function keepsAConfiguredSourceTheSessionDoesNotKnow(testCase)
+            % A hand-written configuration can point at a file the
+            % variable model has no entry for.
+            item = dataItem("rawMovie");
+            item.SourceInfo.Path = "/raw/rec.tif";
+            item.SourceInfo.Format = "tiff";
+
+            config = buildFor(sessionStub(FilePathFails=true), DataItems=item);
+
+            testCase.verifyEqual(config.DataItems(1).SourceInfo.Path, "/raw/rec.tif")
+            testCase.verifyEqual(config.DataItems(1).SourceInfo.Format, "tiff")
+        end
+
+        function prefersWhatTheSessionReportsOverTheConfiguredSource(testCase)
+            item = dataItem("roiSignals");
+            item.SourceInfo.Path = "/elsewhere/old.mat";
+
+            config = buildFor(sessionStub(), DataItems=item);
+
+            testCase.verifyEqual(config.DataItems(1).SourceInfo.Path, ...
+                "/data/session/roiSignals.mat")
+        end
+
         function doesNotLoadDataWhileBuildingAConfiguration(testCase)
             % A session's recordings are far larger than memory, so a
             % configurator that loaded them to pick a converter would be
@@ -337,6 +360,46 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
             testCase.verifySize(electrodes, [1, 2])
             testCase.verifyEqual([electrodes.cell], ["170518_1", "fixed"])
             testCase.verifyEqual([electrodes.name], ["e1", "e2"])
+        end
+
+        function fillsPlaceholdersInAListOfPaths(testCase)
+            % jsondecode reads a JSON list of strings as a cell array.
+            item = dataItem("abf");
+            item.ConverterArgs = struct("InterfaceArgs", struct( ...
+                "file_paths", {{"${session.abf_path}"}}), ...
+                "Tags", ["cell ${session.cell_id}", "fixed"]);
+            session = sessionStub(Columns=struct( ...
+                "abf_path", '/data/170518_1a.ABF', "cell_id", '170518_1'));
+
+            config = buildFor(session, DataItems=item);
+
+            converterArgs = config.DataItems(1).ConverterArgs;
+            testCase.verifyEqual(converterArgs.InterfaceArgs.file_paths, {"/data/170518_1a.ABF"})
+            testCase.verifyEqual(converterArgs.Tags, ["cell 170518_1", "fixed"])
+        end
+
+        function fillsPlaceholdersInTheConverterDefaults(testCase)
+            % A lab converter can declare a per-session default; the
+            % runner merges defaults after the session is gone.
+            import nansen.module.nwb.conversion.ConverterRegistry
+            ConverterRegistry.instance(Refresh=true);
+            testCase.addTeardown(@() ConverterRegistry.instance(Refresh=true));
+            ConverterRegistry.instance().add(nansen.module.nwb.conversion.NWBConverterDescriptor( ...
+                Name="SessionArgsConverter", AcceptedClasses="*", ...
+                ProducesNWBType="TimeSeries", Function=@(context) context.NwbFile, ...
+                DefaultConverterArgs=struct("ElectrodeMetadata", ...
+                    struct("cell_id", "${session.cell_id}"), "Gain", 1)));
+
+            item = dataItem("abf");
+            item.ConverterName = "SessionArgsConverter";
+            item.ConverterArgs = struct("Gain", 5);
+            session = sessionStub(Columns=struct("cell_id", '170518_1'));
+
+            config = buildFor(session, DataItems=item);
+
+            converterArgs = config.DataItems(1).ConverterArgs;
+            testCase.verifyEqual(converterArgs.ElectrodeMetadata.cell_id, "170518_1")
+            testCase.verifyEqual(converterArgs.Gain, 5)
         end
 
         function rejectsAPlaceholderTheSessionCannotFill(testCase)
