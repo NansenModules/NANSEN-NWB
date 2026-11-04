@@ -7,9 +7,11 @@ classdef builtinConverterTest < matlab.unittest.TestCase
 %   calling the converters directly means the tests cover the contract
 %   the converters are actually used under.
 %
-%   The ophys converters are covered by ConverterRegistry and runner
-%   tests rather than here, because they need ROI group and signal
-%   objects that only NANSEN produces.
+%   The ROI signal tests append to a file seeded with a plane
+%   segmentation built directly in matnwb. The ROI mask and image stack
+%   converters are covered by ConverterRegistry and runner tests rather
+%   than here, because they need ROI group and image stack objects that
+%   only NANSEN produces.
 %
 %   These tests need matnwb on the MATLAB path with generated core types.
 %   They are filtered when it is unavailable.
@@ -181,6 +183,37 @@ classdef builtinConverterTest < matlab.unittest.TestCase
         end
     end
 
+    methods (Test) % ROI signals
+
+        function convertsASamplesByRoisMatrixAtTheConfiguredRate(testCase)
+            % NANSEN saves RoiSignals_* variables as samples by ROIs.
+            numSamples = 50;
+            numRois = 3;
+
+            series = testCase.appendRoiSignals(rand(numSamples, numRois), ...
+                struct("SamplingRate", 30), numRois);
+
+            testCase.verifyEqual(series.starting_time_rate, 30)
+            testCase.verifyEqual(size(loadData(series)), [numRois, numSamples])
+        end
+
+        function convertsATimetableAtItsOwnRate(testCase)
+            numRois = 2;
+            data = timetable(rand(20, 1), rand(20, 1), SampleRate=10);
+
+            series = testCase.appendRoiSignals(data, struct(), numRois);
+
+            testCase.verifyEqual(series.starting_time_rate, 10)
+            testCase.verifyEqual(size(loadData(series)), [numRois, 20])
+        end
+
+        function rejectsAMatrixWithoutASamplingRate(testCase)
+            testCase.verifyError( ...
+                @() testCase.appendRoiSignals(rand(20, 2), struct(), 2), ...
+                "nansen:nwb:converterFailed")
+        end
+    end
+
     methods (Test) % The generic neurodata path
 
         function buildsTheNeurodataTypeNamedByTheDataItem(testCase)
@@ -244,7 +277,70 @@ classdef builtinConverterTest < matlab.unittest.TestCase
                 DataResolver=@(name) data);
             nwbFile = nwbRead(converter.convert());
         end
+
+        function series = appendRoiSignals(testCase, data, converterArgs, numRois)
+            % A RoiResponseSeries indexes the rows of a plane segmentation,
+            % which RoiSignals requires to be in the file already.
+            seedFileWithPlaneSegmentation(testCase.OutputPath, numRois)
+
+            item = nansen.module.nwb.config.NWBDataItemConfig( ...
+                VariableName="RoiSignals_MeanF", ConverterName="RoiSignals", ...
+                ConverterArgs=converterArgs);
+            config = nansen.module.nwb.config.NWBFileConfiguration( ...
+                OutputPath=testCase.OutputPath, WriteMode="append", ...
+                DataItems=item);
+
+            converter = nansen.module.nwb.conversion.NWBFileConverter(config, ...
+                DataResolver=@(name) data);
+            nwbFile = nwbRead(converter.convert());
+
+            series = nwbFile.processing.get("ophys").nwbdatainterface ...
+                .get("Fluorescence").roiresponseseries.get("RoiSignals_MeanF");
+        end
     end
+end
+
+function seedFileWithPlaneSegmentation(filePath, numRois)
+%seedFileWithPlaneSegmentation - Write a file holding only an ROI table
+%
+%   The names are the defaults convertRoiSignals looks the table up by.
+%   Argument names are char because matnwb constructors key constrained
+%   sets, such as the imaging plane's optical channels, by them in a
+%   containers.Map, which rejects string keys.
+
+    nwbFile = NwbFile( ...
+        'session_description', "builtin converter test", ...
+        'identifier', "builtin-test", ...
+        'session_start_time', datetime(2026, 5, 10, TimeZone="UTC"));
+
+    device = types.core.Device();
+    nwbFile.general_devices.set('Microscope', device);
+
+    imagingPlane = types.core.ImagingPlane( ...
+        'optical_channel', types.core.OpticalChannel( ...
+            'description', 'green', 'emission_lambda', 525), ...
+        'device', types.untyped.SoftLink(device), ...
+        'excitation_lambda', 920, ...
+        'indicator', 'GCaMP6s', ...
+        'location', 'V1');
+    nwbFile.general_optophysiology.set('ImagingPlane', imagingPlane);
+
+    planeSegmentation = types.core.PlaneSegmentation( ...
+        'colnames', {'image_mask'}, ...
+        'description', "test ROIs", ...
+        'imaging_plane', types.untyped.SoftLink(imagingPlane), ...
+        'image_mask', types.hdmf_common.VectorData( ...
+            'data', rand(8, 8, numRois) > 0.5, 'description', "ROI masks"), ...
+        'id', types.hdmf_common.ElementIdentifiers('data', int64(0:numRois-1)'));
+
+    imageSegmentation = types.core.ImageSegmentation();
+    imageSegmentation.planesegmentation.set('PlaneSegmentation', planeSegmentation);
+
+    ophysModule = types.core.ProcessingModule('description', "ophys");
+    ophysModule.nwbdatainterface.set('ImageSegmentation', imageSegmentation);
+    nwbFile.processing.set('ophys', ophysModule);
+
+    nwbExport(nwbFile, filePath);
 end
 
 function names = imageNames(nwbFile)
