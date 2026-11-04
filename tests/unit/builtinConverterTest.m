@@ -215,6 +215,67 @@ classdef builtinConverterTest < matlab.unittest.TestCase
             testCase.verifyEqual(series.data_conversion, 1e-12)
         end
 
+        function ignoresComputedFieldsInTheItemMetadata(testCase)
+            % The configurator's PatchClampSeries template holds
+            % data_conversion = 1 and an empty electrode.
+            metadata = struct("data_conversion", 1, "electrode", '', ...
+                "gain", [], "description", "steps");
+
+            nwbFile = testCase.verifyWarning( ...
+                @() testCase.convert(patchClampRecording("mV", 1), "PatchClampSweeps", ...
+                    NWBVariableName="Vm", Metadata=metadata), ...
+                "nansen:nwb:metadataIgnored");
+
+            series = nwbFile.acquisition.get("Vm_sweep001");
+            testCase.verifyEqual(series.data_conversion, 1e-3)
+            testCase.verifyEqual(string(series.description), "steps")
+            testCase.verifyClass(series.electrode, "types.untyped.SoftLink")
+        end
+
+        function storesTheInjectedCurrentAsTheStimulusInCurrentClamp(testCase)
+            % A current-clamp file also records the current monitor.
+            recording = patchClampRecording(["mV", "pA"], 1);
+
+            nwbFile = testCase.convert(recording, "PatchClampSweeps", NWBVariableName="cell");
+
+            testCase.verifyClass(nwbFile.acquisition.get("cell_ch1_sweep001"), ...
+                "types.core.CurrentClampSeries")
+            testCase.verifyFalse(nwbFile.acquisition.isKey("cell_ch2_sweep001"))
+            testCase.verifyClass(nwbFile.stimulus_presentation.get("cell_ch2_sweep001"), ...
+                "types.core.CurrentClampStimulusSeries")
+        end
+
+        function followsTheClampModeTheItemNames(testCase)
+            recording = patchClampRecording(["mV", "pA"], 1);
+
+            nwbFile = testCase.convert(recording, "PatchClampSweeps", NWBVariableName="cell", ...
+                ConverterArgs=struct("ClampMode", "voltage"));
+
+            testCase.verifyClass(nwbFile.acquisition.get("cell_ch2_sweep001"), ...
+                "types.core.VoltageClampSeries")
+            testCase.verifyClass(nwbFile.stimulus_presentation.get("cell_ch1_sweep001"), ...
+                "types.core.VoltageClampStimulusSeries")
+        end
+
+        function startsEachSweepAtItsRecordedTime(testCase)
+            % abfload gives the sweep starts in samples of one channel.
+            recording = patchClampRecording("mV", 3);
+            recording.Header = struct("sweepStartInPts", [0; 5000; 10000]);
+
+            nwbFile = testCase.convert(recording, "PatchClampSweeps", NWBVariableName="Vm");
+
+            startTimes = arrayfun(@(sweep) nwbFile.acquisition.get( ...
+                sprintf("Vm_sweep%03d", sweep)).starting_time, 1:3);
+            testCase.verifyEqual(startTimes, [0, 5, 10])
+        end
+
+        function rejectsAnUnknownClampMode(testCase)
+            testCase.verifyError( ...
+                @() testCase.convert(patchClampRecording("mV", 1), "PatchClampSweeps", ...
+                    ConverterArgs=struct("ClampMode", "whole-cell")), ...
+                "nansen:nwb:converterFailed")
+        end
+
         function rejectsAChannelInAUnitThatIsNeitherVoltageNorCurrent(testCase)
             testCase.verifyError( ...
                 @() testCase.convert(patchClampRecording("degC", 1), "PatchClampSweeps"), ...
@@ -364,14 +425,15 @@ classdef builtinConverterTest < matlab.unittest.TestCase
     end
 end
 
-function recording = patchClampRecording(unit, numSweeps)
+function recording = patchClampRecording(units, numSweeps)
 %patchClampRecording - The struct the ABF adapter returns, with made-up sweeps
 
+    units = string(units);
     recording = struct( ...
-        "Data", cumsum(ones(40, 1, numSweeps), 1), ...
+        "Data", cumsum(ones(40, numel(units), numSweeps), 1), ...
         "SamplingRate", 1000, ...
         "ChannelNames", "", ...
-        "ChannelUnits", string(unit), ...
+        "ChannelUnits", units, ...
         "Header", struct());
 end
 
