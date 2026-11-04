@@ -491,6 +491,10 @@ classdef NWBFileConverter < handle
                 dataItems, "UniformOutput", false);
             producedTypes = cellfun(@(d) d.ProducesNWBType, descriptors);
 
+            % A converter that produces "*" builds the type its item names.
+            producesAnyType = producedTypes == "*";
+            producedTypes(producesAnyType) = [dataItems(producesAnyType).TargetNWBType];
+
             % Appending to a file that already exists may satisfy a
             % requirement no item in this run produces.
             isAppending = obj.Config.WriteMode == "append";
