@@ -57,19 +57,22 @@ classdef ConverterRegistryTest < matlab.unittest.TestCase
             testCase.verifyTrue(any([descriptors.RequiresPython]))
         end
 
-        function offersBothAbfConvertersForAnAbfFile(testCase)
-            % Two converters read ABF: the built-in one, which stores each
-            % sweep the file adapter read, and NeuroConv's interface. Both
-            % match the format, the built-in one first since it needs no
-            % Python, and a data item has to name the one it wants.
+        function resolvesAnAbfFileToTheNeuroconvInterface(testCase)
+            % Two converters read ABF: NeuroConv's interface, matched by
+            % the format, and the built-in one, which stores each sweep the
+            % SHAREbrain file adapter read and is matched by the struct it
+            % returns. An item naming neither gets the interface.
             registry = nansen.module.nwb.conversion.ConverterRegistry();
             sourceInfo = nansen.module.nwb.config.NWBDataItemConfig.emptySourceInfo();
-            sourceInfo.Format = "abf";
+            sourceInfo.Format = "ABF";
+            sourceInfo.MatlabClass = "struct";
+            item = nansen.module.nwb.config.NWBDataItemConfig( ...
+                VariableName="Vm", SourceInfo=sourceInfo);
 
             [descriptors, ranks] = registry.findForSourceInfo(sourceInfo);
 
-            topNames = [descriptors(ranks == ranks(1)).Name];
-            testCase.verifyEqual(topNames, ["PatchClampSweeps", "NeuroConvAbfInterface"])
+            testCase.verifyEqual(registry.resolveForItem(item).Name, "NeuroConvAbfInterface")
+            testCase.verifyTrue(any([descriptors(ranks > 1).Name] == "PatchClampSweeps"))
 
             defaults = registry.get("NeuroConvAbfInterface").DefaultConverterArgs;
             testCase.verifyEqual(string(defaults.InterfaceClassName), "AbfInterface")
