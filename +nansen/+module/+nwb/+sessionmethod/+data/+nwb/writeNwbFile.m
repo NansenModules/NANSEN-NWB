@@ -16,6 +16,11 @@ function varargout = writeNwbFile(sessionObject, varargin)
 %   every conversion shares — institution, experimenter, keywords and the
 %   like. Values from the session win over the defaults.
 %
+%   By default a data item that fails to convert stops the export and
+%   leaves the previous file as it was. Set 'OnItemError' to "continue" to
+%   convert the other items, write the file without the failed ones, and
+%   raise nansen:nwb:itemsFailed at the end.
+%
 %   The method itself only assembles the configuration for this session and
 %   hands it to the conversion runner. Everything about how data becomes
 %   neurodata lives in the converters, and everything about how the file is
@@ -87,6 +92,7 @@ import nansen.session.SessionMethod
     converter = nansen.module.nwb.conversion.NWBFileConverter(config, ...
         DataResolver=@(variableName) sessionObject.loadData(char(variableName)), ...
         MetadataResolver=@nansen.module.nwb.internal.resolveMetadata, ...
+        OnItemError=params.OnItemError, ...
         Validate=params.Validate);
 
     nwbFilePath = converter.convert();
@@ -105,6 +111,7 @@ function params = getDefaultParameters()
     params.TimeZone = "local";
     params.WriteMode = 'Overwrite'; % 'Overwrite' | 'Append'
     params.Validate = true; % Check the written file against NWB Best Practices
+    params.OnItemError = "stop"; % "stop" | "continue": what a failing data item does
 end
 
 function subjectRecord = findSubjectRecord(currentProject, sessionObject)
