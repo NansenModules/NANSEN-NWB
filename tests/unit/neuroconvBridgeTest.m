@@ -101,6 +101,40 @@ classdef neuroconvBridgeTest < matlab.unittest.TestCase
                 "nansen:nwb:missingConverterArg")
         end
 
+        function takesTheSuite2pFolderForAFileInAPlaneFolder(testCase)
+            % Suite2pSegmentationInterface takes the suite2p folder that
+            % holds the plane folders, and picks the first plane unless
+            % told otherwise.
+            registry = nansen.module.nwb.conversion.ConverterRegistry();
+            defaults = registry.get("NeuroConvSuite2pSegmentationInterface") ...
+                .DefaultConverterArgs;
+
+            sourceArg = resolveFor("/data/suite2p/plane0/F.npy", defaults);
+
+            testCase.verifyEqual(string(sourceArg.folder_path), "/data/suite2p")
+        end
+
+        function addsTheOtherConstructorArguments(testCase)
+            converterArgs = struct("SourceArgumentName", "file_paths", ...
+                "SourcePathMode", "fileList", ...
+                "InterfaceArgs", struct("sampling_frequency", 30.5));
+
+            sourceArg = resolveFor("/data/rec.tif", converterArgs);
+
+            testCase.verifyEqual(string(sourceArg.file_paths), "/data/rec.tif")
+            testCase.verifyEqual(sourceArg.sampling_frequency, 30.5)
+        end
+
+        function reportsAConstructorArgumentTheInterfaceNeeds(testCase)
+            % TiffImagingInterface cannot time the frames without a
+            % sampling frequency, which no file path supplies.
+            registry = nansen.module.nwb.conversion.ConverterRegistry();
+            defaults = registry.get("NeuroConvTiffImagingInterface").DefaultConverterArgs;
+
+            testCase.verifyError(@() resolveFor("/data/rec.tif", defaults), ...
+                "nansen:nwb:missingConverterArg")
+        end
+
         function reportsAnUnknownSourcePathMode(testCase)
             testCase.verifyError( ...
                 @() resolveFor("/data/rec.tif", ...

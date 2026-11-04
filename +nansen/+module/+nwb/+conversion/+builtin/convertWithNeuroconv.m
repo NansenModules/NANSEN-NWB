@@ -17,6 +17,8 @@ function result = convertWithNeuroconv(context)
 %                            "ScanImageImagingInterface"
 %       SourceArgumentName - Constructor argument the path is passed as
 %       SourcePathMode     - How to derive that path from the data item
+%       InterfaceArgs      - Other constructor arguments, as a struct
+%       RequiredInterfaceArgs - Names in InterfaceArgs the interface needs
 %       PythonExecutable   - Python interpreter to use, when not the default
 %       RunConversionArgs  - Extra arguments forwarded to run_conversion
 %       UseInterfaceMetadata - Whether to start from the metadata the
