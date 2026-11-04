@@ -26,9 +26,18 @@ function result = convertWithNeuroconv(context)
 %                            the item's metadata laid over it. Needed by
 %                            interfaces that derive electrodes or tables
 %                            from file headers, such as AbfInterface
+%       IcephysExperimentType - For AbfInterface: "current_clamp",
+%                            "voltage_clamp" or "izero", the clamp mode
+%                            of every file's recording session. NeuroConv
+%                            needs it for ABF 2 files with a protocol and
+%                            cannot read it from the file. Only one
+%                            AbfInterface can write into an NWB file, so
+%                            a session's ABF files go in one data item
 %
 %   Errors:
 %     nansen:nwb:missingConverterArg - InterfaceClassName is not set.
+%     nansen:nwb:invalidConverterArg - IcephysExperimentType is not one
+%                     of the values above.
 %     nansen:nwb:missingOutputFile - the NWB file to append to is absent.
 %
 %   See also nansen.module.nwb.neuroconv.runConversion,
@@ -77,10 +86,45 @@ function result = convertWithNeuroconv(context)
     useInterfaceMetadata = getConverterArg(args, "UseInterfaceMetadata", false);
     runArguments = [runArguments, {"UseInterfaceMetadata", logical(useInterfaceMetadata)}];
 
+    metadata = itemMetadata(context);
+    experimentType = string(getConverterArg(args, "IcephysExperimentType", ""));
+    if strlength(experimentType) > 0
+        sourceArgumentName = string(getConverterArg(args, "SourceArgumentName", ""));
+        metadata = addIcephysExperimentType(metadata, ...
+            string(sourceArg.(sourceArgumentName)), experimentType);
+    end
+
     nansen.module.nwb.neuroconv.runConversion(interfaceClassName, sourceArg, ...
-        context.FilePath, itemMetadata(context), runArguments{:});
+        context.FilePath, metadata, runArguments{:});
 
     result = struct("DidWriteFile", true);
+end
+
+function metadata = addIcephysExperimentType(metadata, filePaths, experimentType)
+%addIcephysExperimentType - Set the clamp mode of every ABF file's session
+%
+%   AbfInterface keeps one Icephys session per file, named by the file's
+%   name, and NeuroConv merges caller metadata into it by that name. A
+%   cell array keeps the sessions a list when there is only one file.
+
+    validTypes = ["current_clamp", "voltage_clamp", "izero"];
+    if ~any(experimentType == validTypes)
+        error("nansen:nwb:invalidConverterArg", ...
+            ['IcephysExperimentType must be "current_clamp", ', ...
+             '"voltage_clamp" or "izero", but was "%s".'], experimentType)
+    end
+
+    sessions = cell(1, numel(filePaths));
+    for i = 1:numel(filePaths)
+        [~, name, extension] = fileparts(filePaths(i));
+        sessions{i} = struct("name", name + extension, ...
+            "icephys_experiment_type", experimentType);
+    end
+
+    if ~isfield(metadata, "Icephys")
+        metadata.Icephys = struct();
+    end
+    metadata.Icephys.Sessions = sessions;
 end
 
 function metadata = itemMetadata(context)
