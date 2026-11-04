@@ -12,6 +12,10 @@ function result = convertWithNeuroconv(context)
 %   metadata section, which is what makes that split work; the section
 %   itself is still required, so it is sent empty.
 %
+%   An interface times its data from the start of its own recording. The
+%   data are shifted so that they count from the session_start_time of the
+%   file being appended to.
+%
 %   Converter arguments:
 %       InterfaceClassName - NeuroConv interface to run, for example
 %                            "ScanImageImagingInterface"
@@ -86,6 +90,11 @@ function result = convertWithNeuroconv(context)
     useInterfaceMetadata = getConverterArg(args, "UseInterfaceMetadata", false);
     runArguments = [runArguments, {"UseInterfaceMetadata", logical(useInterfaceMetadata)}];
 
+    fileStartTime = fileSessionStartTime(context.FilePath);
+    if ~isempty(fileStartTime)
+        runArguments = [runArguments, {"AlignToStartTime", fileStartTime}];
+    end
+
     metadata = itemMetadata(context);
     experimentType = string(getConverterArg(args, "IcephysExperimentType", ""));
     if strlength(experimentType) > 0
@@ -98,6 +107,23 @@ function result = convertWithNeuroconv(context)
         context.FilePath, metadata, runArguments{:});
 
     result = struct("DidWriteFile", true);
+end
+
+function startTime = fileSessionStartTime(filePath)
+%fileSessionStartTime - The session_start_time of an NWB file on disk
+%
+%   Empty when the file holds no start time this function can read, in
+%   which case the interface's data are left as NeuroConv times them.
+
+    startTime = datetime.empty;
+    try
+        text = string(h5read(filePath, "/session_start_time"));
+    catch
+        % A file without the dataset is not an NWB file the runner wrote;
+        % NeuroConv reports what is wrong with it when it appends.
+        return
+    end
+    startTime = nansen.module.nwb.internal.iso8601ToDatetime(text(1));
 end
 
 function metadata = addIcephysExperimentType(metadata, filePaths, experimentType)
