@@ -14,6 +14,11 @@ function nwbFilePath = runAbfConversionExample(abfFilePath, options)
 %   runAbfConversionExample(...,OutputFolder=FOLDER) writes the file to
 %   FOLDER instead of a temporary folder.
 %
+%   runAbfConversionExample(...,SessionStartTime=T) sets the file's
+%   session_start_time to the zoned datetime T. The sweeps are aligned to
+%   it, so it must not be later than the first recording. The default,
+%   2000-01-01 UTC, is earlier than any ABF recording.
+%
 %   The example is the check that the NeuroConv path works end to end for
 %   an intracellular format: the runner creates the file with session and
 %   subject metadata, the interface appends its electrodes, recordings and
@@ -33,6 +38,7 @@ function nwbFilePath = runAbfConversionExample(abfFilePath, options)
         abfFilePath (1,1) string {mustBeFile}
         options.PythonExecutable (1,1) string = ""
         options.OutputFolder (1,1) string = string(tempname())
+        options.SessionStartTime (1,1) datetime = datetime(2000, 1, 1, TimeZone="UTC")
     end
 
     import nansen.module.nwb.config.NWBFileConfiguration
@@ -48,7 +54,9 @@ function nwbFilePath = runAbfConversionExample(abfFilePath, options)
     sourceInfo = NWBDataItemConfig.emptySourceInfo();
     sourceInfo.Path = abfFilePath;
 
-    converterArgs = struct();
+    % Every ABF file beside the recorded one goes into the file, rather
+    % than only the recorded one, the converter's default.
+    converterArgs = struct("SourcePathMode", "siblingFiles");
     if strlength(options.PythonExecutable) > 0
         converterArgs.PythonExecutable = options.PythonExecutable;
     end
@@ -64,7 +72,7 @@ function nwbFilePath = runAbfConversionExample(abfFilePath, options)
         SessionMetadata=struct( ...
             "session_description", "ABF conversion example", ...
             "identifier", "abf-example-001", ...
-            "session_start_time", datetime("now", TimeZone="local")), ...
+            "session_start_time", options.SessionStartTime), ...
         SubjectMetadata=struct( ...
             "subject_id", "demo", ...
             "species", "Mus musculus", ...
