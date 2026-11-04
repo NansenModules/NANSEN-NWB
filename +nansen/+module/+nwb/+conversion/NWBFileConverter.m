@@ -27,7 +27,8 @@ classdef NWBFileConverter < handle
 %   OBJ = NWBFileConverter(...,OnItemError=MODE) also says what to do
 %   when one item fails. MODE must be:
 %       "stop"     - (default) Raise, leaving the file as it was
-%       "continue" - Warn, convert the rest, and report at the end
+%       "continue" - Warn, convert the rest, write the file without
+%                    the failed items, and raise at the end
 %
 %   OBJ = NWBFileConverter(...,Validate=true) also checks the finished
 %   file against NWB Best Practices and warns about what it finds. This
@@ -123,8 +124,11 @@ classdef NWBFileConverter < handle
             %   general metadata, so every converter has a file to add to
             %   and only one of them writes the file-level metadata. When
             %   overwriting, it is built under a work name and moved over
-            %   the previous file only once every item is in it, so an
-            %   error leaves the previous file as it was.
+            %   the previous file only after the last item, so an error
+            %   leaves the previous file as it was. With
+            %   OnItemError "continue" a failed item is not an error until
+            %   the end: the file without it replaces the previous file,
+            %   and then nansen:nwb:itemsFailed is raised.
             %
             %   Items are ordered so that converters producing a type run
             %   before converters requiring it, whatever order the
