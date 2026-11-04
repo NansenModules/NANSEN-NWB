@@ -378,6 +378,30 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
             testCase.verifyEqual(converterArgs.Tags, ["cell 170518_1", "fixed"])
         end
 
+        function fillsPlaceholdersInTheConverterDefaults(testCase)
+            % A lab converter can declare a per-session default; the
+            % runner merges defaults after the session is gone.
+            import nansen.module.nwb.conversion.ConverterRegistry
+            ConverterRegistry.instance(Refresh=true);
+            testCase.addTeardown(@() ConverterRegistry.instance(Refresh=true));
+            ConverterRegistry.instance().add(nansen.module.nwb.conversion.NWBConverterDescriptor( ...
+                Name="SessionArgsConverter", AcceptedClasses="*", ...
+                ProducesNWBType="TimeSeries", Function=@(context) context.NwbFile, ...
+                DefaultConverterArgs=struct("ElectrodeMetadata", ...
+                    struct("cell_id", "${session.cell_id}"), "Gain", 1)));
+
+            item = dataItem("abf");
+            item.ConverterName = "SessionArgsConverter";
+            item.ConverterArgs = struct("Gain", 5);
+            session = sessionStub(Columns=struct("cell_id", '170518_1'));
+
+            config = buildFor(session, DataItems=item);
+
+            converterArgs = config.DataItems(1).ConverterArgs;
+            testCase.verifyEqual(converterArgs.ElectrodeMetadata.cell_id, "170518_1")
+            testCase.verifyEqual(converterArgs.Gain, 5)
+        end
+
         function rejectsAPlaceholderTheSessionCannotFill(testCase)
         % An argument left empty would reach the file unnoticed, so a
         % missing session property stops the build.

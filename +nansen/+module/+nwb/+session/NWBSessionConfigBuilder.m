@@ -86,7 +86,9 @@ classdef NWBSessionConfigBuilder
             %   becomes a per-session argument, such as the cell_id of an
             %   intracellular electrode. Nested structs, struct arrays,
             %   cell arrays and string arrays are resolved too; a resolved
-            %   value is always a string.
+            %   value is always a string. Placeholders in the default
+            %   arguments of the converter an item resolves to are filled
+            %   the same way, so a lab converter can declare one.
             %
             %   Errors:
             %     nansen:nwb:missingSessionIdentifier - the session has no
@@ -132,7 +134,7 @@ classdef NWBSessionConfigBuilder
                     NWBSessionConfigBuilder.sourceInfoForItem(sessionObject, dataItems(i)));
                 dataItems(i).ConverterArgs = ...
                     NWBSessionConfigBuilder.resolveSessionPlaceholders( ...
-                    dataItems(i).ConverterArgs, sessionObject);
+                    withPlaceholderDefaults(dataItems(i)), sessionObject);
             end
 
             subjectMetadata = NWBSessionConfigBuilder.subjectMetadata(sessionObject);
@@ -748,6 +750,51 @@ function sex = mapBiologicalSex(value)
         sex = value;
     else
         sex = "U";
+    end
+end
+
+function converterArgs = withPlaceholderDefaults(dataItem)
+%withPlaceholderDefaults - An item's arguments over defaults that hold placeholders
+%
+%   The runner lays an item's ConverterArgs over its converter's
+%   DefaultConverterArgs, after the session is gone. Defaults holding a
+%   session placeholder are therefore merged in here, by the runner's rule
+%   that an item's argument replaces the default of the same name, so the
+%   placeholders are resolved with the item's own. Other defaults are left
+%   to the runner.
+
+    converterArgs = dataItem.ConverterArgs;
+    try
+        descriptor = nansen.module.nwb.conversion.ConverterRegistry.instance() ...
+            .resolveForItem(dataItem);
+    catch
+        % An item no converter resolves is reported when it converts.
+        return
+    end
+
+    defaultArgs = descriptor.DefaultConverterArgs;
+    if ~holdsPlaceholder(defaultArgs)
+        return
+    end
+
+    itemArgs = converterArgs;
+    converterArgs = defaultArgs;
+    for fieldName = string(fieldnames(itemArgs))'
+        converterArgs.(fieldName) = itemArgs.(fieldName);
+    end
+end
+
+function tf = holdsPlaceholder(value)
+%holdsPlaceholder - Whether a value holds "${session.<name>}" anywhere
+
+    if isstruct(value)
+        tf = any(arrayfun(@(element) any(structfun(@holdsPlaceholder, element)), value));
+    elseif iscell(value)
+        tf = any(cellfun(@holdsPlaceholder, value));
+    elseif ischar(value) || isstring(value)
+        tf = any(contains(string(value), "${session."));
+    else
+        tf = false;
     end
 end
 
