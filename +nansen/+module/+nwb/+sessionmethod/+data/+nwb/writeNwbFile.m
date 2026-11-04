@@ -78,7 +78,11 @@ import nansen.session.SessionMethod
 
     % We build the filename using BIDS/DandiArchive convention.
     % Todo: Add custom postfix via configuration
-    nwbFilename = sprintf('sub-%s_ses-%s.nwb', sessionObject.subjectID, sessionObject.sessionID);
+    % The IDs are converted to text first because NANSEN does not type
+    % them: sprintf would write a numeric ID as the character with that
+    % code rather than as digits.
+    nwbFilename = sprintf('sub-%s_ses-%s.nwb', ...
+        string(sessionObject.subjectID), string(sessionObject.sessionID));
     targetFilePath = fullfile(saveFolder, nwbFilename);
 
     % When overwriting, the new file is built under a work name and moved
