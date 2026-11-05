@@ -186,6 +186,23 @@ classdef ConverterRegistryTest < matlab.unittest.TestCase
             testCase.verifyEqual(descriptor.Name, "IntervalConverter")
         end
 
+        function reportsATieAtTheBestRankAsAmbiguous(testCase)
+            % The configurator tells an ambiguous item from one nothing
+            % matches by this identifier.
+            import nansen.module.nwb.conversion.NWBConverterDescriptor
+            registry = testCase.registryWithRankingConverters();
+            registry.add(NWBConverterDescriptor( ...
+                Name="SecondClassConverter", ...
+                AcceptedClasses="timetable", ...
+                ProducesNWBType="TimeSeries", ...
+                Function=@(context) context.NwbFile))
+            item = nansen.module.nwb.config.NWBDataItemConfig( ...
+                VariableName="speed", SourceInfo=sourceEvidence(MatlabClass="timetable"));
+
+            testCase.verifyError(@() registry.resolveForItem(item), ...
+                "nansen:nwb:ambiguousConverter")
+        end
+
         function passesOverAMatchThatProducesAnotherType(testCase)
             % RoiSignals is the only converter for the class, but it does
             % not build the type the item asks for.

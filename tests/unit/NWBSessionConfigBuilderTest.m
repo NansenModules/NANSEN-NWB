@@ -21,7 +21,19 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
             'weeks', struct('Text', "12 weeks", 'Expected', "P12W"), ...
             'years', struct('Text', "2 years", 'Expected', "P2Y"), ...
             'isoAlready', struct('Text', "P90D", 'Expected', "P90D"), ...
-            'range', struct('Text', "6-8 weeks", 'Expected', "P6W/P8W"))
+            'isoCombined', struct('Text', "P1Y6M", 'Expected', "P1Y6M"), ...
+            'isoRange', struct('Text', "P6W/P8W", 'Expected', "P6W/P8W"), ...
+            'range', struct('Text', "6-8 weeks", 'Expected', "P6W/P8W"), ...
+            'rangeWithSpaces', struct('Text', "6 - 8 weeks", 'Expected', "P6W/P8W"))
+
+        % Text that is not an age, keyed by what is wrong with it.
+        unreadableAge = struct( ...
+            'word', "adult", ...
+            'unknownUnit', "6 fortnights", ...
+            'wordStartingWithP', "Paris", ...
+            'designatorOnly', "P", ...
+            'unknownDesignator', "P6X", ...
+            'threePartRange', "P1D/P2D/P3D")
     end
 
     methods (TestClassSetup)
@@ -134,6 +146,37 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
             config = buildFor(session, DataItems=dataItem("notRecordedYet"));
 
             testCase.verifyEmpty(config.DataItems(1).SourceInfo.Path)
+        end
+
+        function describesAVariableFromAGivenVariableModel(testCase)
+            % The configurator suggests converters before any session is
+            % chosen, from the project's variable model alone.
+            model = variableModelStub(struct( ...
+                "DataType", "RoiSignalArray", "FileAdapter", "RoiSignalArray"));
+
+            sourceInfo = describeVariable("RoiSignals_MeanF", model);
+
+            testCase.verifyEqual(sourceInfo.MatlabClass, "RoiSignalArray")
+            testCase.verifyEqual(sourceInfo.Format, "RoiSignalArray")
+            testCase.verifyEmpty(sourceInfo.Path)
+        end
+
+        function leavesTheFormatEmptyForTheDefaultAdapterInAModel(testCase)
+            model = variableModelStub(struct("DataType", "struct", "FileAdapter", "Default"));
+
+            sourceInfo = describeVariable("trials", model);
+
+            testCase.verifyEqual(sourceInfo.MatlabClass, "struct")
+            testCase.verifyEqual(sourceInfo.Format, "")
+        end
+
+        function describesNothingForAVariableTheModelLacks(testCase)
+            model = variableModelStub(struct("DataType", "struct"), IsExistingEntry=false);
+
+            sourceInfo = describeVariable("notInTheModel", model);
+
+            testCase.verifyEqual(sourceInfo, ...
+                nansen.module.nwb.config.NWBDataItemConfig.emptySourceInfo())
         end
 
         function keepsAConfiguredSourceTheSessionDoesNotKnow(testCase)
@@ -410,9 +453,24 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
             testCase.verifyEqual(string(config.SubjectMetadata.age), "P6M")
         end
 
-        function rejectsAnAgeItCannotRead(testCase)
-            testCase.verifyError(@() buildFor(sessionStub(), SubjectAge="adult"), ...
+        function rejectsAnAgeItCannotRead(testCase, unreadableAge)
+            % Text starting with P is not taken as a duration unchecked,
+            % or it would fail only in NWB Inspector.
+            testCase.verifyError(@() buildFor(sessionStub(), SubjectAge=unreadableAge), ...
                 "nansen:nwb:invalidSubjectAge")
+        end
+
+        function rejectsASessionStartTimeThatIsNaT(testCase)
+            testCase.verifyError( ...
+                @() buildFor(sessionStub(), SessionStartTime=NaT(TimeZone="UTC")), ...
+                "nansen:nwb:invalidSessionStartTime")
+        end
+
+        function rejectsMoreThanOneSessionStartTime(testCase)
+            startTimes = datetime(2026, 5, 10, 9, 0, 0, TimeZone="UTC") + hours(0:1);
+
+            testCase.verifyError(@() buildFor(sessionStub(), SessionStartTime=startTimes), ...
+                "nansen:nwb:invalidSessionStartTime")
         end
 
         function rejectsAMissingSubjectIdentifier(testCase)
@@ -464,6 +522,25 @@ function record = subjectRecordStub()
     record.BiologicalSex = 'male';
     record.DateOfBirth = datetime(2026, 2, 9);
     record.Genotype = 'Scn1a+/-';
+end
+
+function sourceInfo = describeVariable(variableName, variableModel)
+%describeVariable - Shorthand for sourceInfoForVariable
+
+    sourceInfo = nansen.module.nwb.session.NWBSessionConfigBuilder ...
+        .sourceInfoForVariable(variableName, variableModel);
+end
+
+function model = variableModelStub(variableInfo, options)
+%variableModelStub - Stand-in for a NANSEN variable model holding one entry
+
+    arguments
+        variableInfo (1,1) struct
+        options.IsExistingEntry (1,1) logical = true
+    end
+
+    model = struct();
+    model.getVariableStructure = @(~) deal(variableInfo, options.IsExistingEntry);
 end
 
 function item = dataItem(variableName)

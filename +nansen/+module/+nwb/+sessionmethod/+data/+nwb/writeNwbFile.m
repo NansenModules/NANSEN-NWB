@@ -142,9 +142,21 @@ end
 
 function tf = hasTimeOfDay(sessionObject)
 %hasTimeOfDay - Whether the session records a usable time of day
+%
+%   NaT, blank text and a missing string all mean the folder recorded no
+%   time, so the recording is asked instead.
 
     value = sessionObject.Time;
-    tf = ~isempty(value) && ~(isdatetime(value) && all(isnat(value)));
+    if isempty(value)
+        tf = false;
+    elseif isdatetime(value)
+        tf = ~all(isnat(value));
+    elseif isstring(value) || ischar(value)
+        text = string(value);
+        tf = ~all(ismissing(text)) && any(strlength(strtrim(text(~ismissing(text)))) > 0);
+    else
+        tf = true;
+    end
 end
 
 function ageText = sessionSubjectAge(sessionObject)
@@ -196,7 +208,9 @@ function sessionStartTime = startTimeFromRecording(sessionObject, dataItems, pyt
             continue
         end
 
-        converterArgs = nansen.module.nwb.internal.deepMerge( ...
+        % The arguments the conversion itself will pass, by the runner's
+        % rule.
+        converterArgs = nansen.module.nwb.internal.mergeConverterArgs( ...
             descriptor.DefaultConverterArgs, item.ConverterArgs);
         if ~isfield(converterArgs, "InterfaceClassName")
             % The raw NeuroConv entry takes its interface from the item;
@@ -214,8 +228,13 @@ function sessionStartTime = startTimeFromRecording(sessionObject, dataItems, pyt
                 string(converterArgs.InterfaceClassName), sourceArg, ...
                 PythonExecutable=itemPythonExecutable);
         catch cause
+            % MATLAB keeps one Python for the session, so the conversion
+            % would fail the same way; that is reported as it is.
+            if cause.identifier == "nansen:nwb:pythonAlreadyLoaded"
+                rethrow(cause)
+            end
             warning("nansen:nwb:sessionStartTimeUnavailable", ...
-                "The recording of ''%s'' could not say when it started: %s", ...
+                "The recording of '%s' could not say when it started: %s", ...
                 item.VariableName, cause.message)
             continue
         end
