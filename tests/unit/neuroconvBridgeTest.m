@@ -169,6 +169,31 @@ classdef neuroconvBridgeTest < matlab.unittest.TestCase
                 "nansen:nwb:invalidConverterArg")
         end
 
+        function readsTheStartTimeOfAnNwbFile(testCase)
+            testCase.assumeNotEmpty(which("NwbFile"), "matnwb is not on the MATLAB path.")
+            filePath = string(fullfile(testCase.temporaryFolder(), "start.nwb"));
+            startTime = datetime(2017, 5, 18, 9, 0, 0, TimeZone="Europe/Oslo");
+            nwbExport(NwbFile('identifier', 'x', 'session_description', 'x', ...
+                'session_start_time', startTime), char(filePath));
+
+            readTime = nansen.module.nwb.neuroconv.internal.readFileSessionStartTime(filePath);
+
+            testCase.verifyEqual(readTime, startTime)
+        end
+
+        function warnsWhenAFileHasNoStartTime(testCase)
+            % Data appended to such a file keep their interface's times,
+            % which can be wrong, so this is not silent.
+            filePath = string(fullfile(testCase.temporaryFolder(), "notNwb.nwb"));
+            writelines("not an NWB file", filePath)
+
+            readTime = testCase.verifyWarning( ...
+                @() nansen.module.nwb.neuroconv.internal.readFileSessionStartTime(filePath), ...
+                "nansen:nwb:unalignedRecording");
+
+            testCase.verifyEmpty(readTime)
+        end
+
         function reportsAnUnknownSourcePathMode(testCase)
             testCase.verifyError( ...
                 @() resolveFor("/data/rec.tif", ...
@@ -246,6 +271,74 @@ classdef neuroconvBridgeTest < matlab.unittest.TestCase
         end
     end
 
+    methods (Test, TestTags = {'RequiresPython'}) % Aligning appended data
+
+        function shiftsDataThatStartedAfterTheFile(testCase)
+            % The ABF start has no offset, so it is wall-clock time in the
+            % file's zone.
+            interface = testCase.stubInterface("2017-05-18T10:42:07");
+
+            offset = align(interface, datetime(2017, 5, 18, 9, 0, 0, TimeZone="Europe/Oslo"));
+
+            testCase.verifyEqual(offset, 6127)
+            testCase.verifyEqual(alignedOffsets(interface), 6127)
+        end
+
+        function convertsAZonedStartToTheFileZone(testCase)
+            interface = testCase.stubInterface("2017-05-18T08:42:07+00:00");
+
+            offset = align(interface, datetime(2017, 5, 18, 9, 0, 0, TimeZone="Europe/Oslo"));
+
+            testCase.verifyEqual(offset, 6127)
+        end
+
+        function comparesWallClockTimesWhenTheFileHasNoZone(testCase)
+            interface = testCase.stubInterface("2017-05-18T10:42:07+00:00");
+
+            offset = align(interface, datetime(2017, 5, 18, 9, 0, 0));
+
+            testCase.verifyEqual(offset, 6127)
+        end
+
+        function takesAnUndatedStartOnTheFileDate(testCase)
+            % An ABF 1 header has a time of day but no date, which
+            % NeuroConv reports on 1900-01-01.
+            interface = testCase.stubInterface("1900-01-01T11:38:54");
+
+            offset = align(interface, datetime(2017, 5, 18, 9, 0, 0, TimeZone="Europe/Oslo"));
+
+            testCase.verifyEqual(offset, 9534)
+        end
+
+        function rejectsARecordingThatStartedBeforeTheFile(testCase)
+            interface = testCase.stubInterface("2017-05-18T08:00:00");
+
+            testCase.verifyError( ...
+                @() align(interface, datetime(2017, 5, 18, 9, 0, 0, TimeZone="Europe/Oslo")), ...
+                "nansen:nwb:recordingBeforeSessionStart")
+            testCase.verifyEmpty(alignedOffsets(interface))
+        end
+
+        function warnsWhenTheStartCannotBeRead(testCase)
+            interface = testCase.stubInterface("the morning of the 18th");
+
+            testCase.verifyWarning( ...
+                @() align(interface, datetime(2017, 5, 18, 9, 0, 0, TimeZone="UTC")), ...
+                "nansen:nwb:unalignedRecording")
+            testCase.verifyEmpty(alignedOffsets(interface))
+        end
+
+        function warnsWhenTheInterfaceCannotShift(testCase)
+            interface = testCase.stubInterface("2017-05-18T10:42:07", CanAlign=false);
+
+            offset = testCase.verifyWarning( ...
+                @() align(interface, datetime(2017, 5, 18, 9, 0, 0, TimeZone="Europe/Oslo")), ...
+                "nansen:nwb:unalignedRecording");
+
+            testCase.verifyEqual(offset, 0)
+        end
+    end
+
     methods (Test, TestTags = {'RequiresPython'}) % Reaching NeuroConv itself
 
         function reportsWhetherNeuroconvCanBeRun(testCase)
@@ -316,6 +409,58 @@ classdef neuroconvBridgeTest < matlab.unittest.TestCase
 
     methods (Access = private)
 
+        function interface = stubInterface(testCase, startText, options)
+            %stubInterface - A Python object answering what alignToStartTime asks
+            %
+            %   Its get_metadata reports startText as the recording's start,
+            %   and set_aligned_starting_time records the offsets it is given.
+
+            arguments
+                testCase
+                startText (1,1) string
+                options.CanAlign (1,1) logical = true
+            end
+
+            testCase.assumePythonIsAvailable()
+
+            folder = testCase.temporaryFolder();
+            writelines([ ...
+                "class StubInterface:"
+                "    def __init__(self, start):"
+                "        self.start = start"
+                "        self.aligned = []"
+                "    def get_metadata(self):"
+                "        return {'NWBFile': {'session_start_time': self.start}}"
+                "    def set_aligned_starting_time(self, offset):"
+                "        self.aligned.append(offset)"
+                ""
+                "class StubInterfaceWithoutAlignment:"
+                "    def __init__(self, start):"
+                "        self.start = start"
+                "        self.aligned = []"
+                "    def get_metadata(self):"
+                "        return {'NWBFile': {'session_start_time': self.start}}"], ...
+                fullfile(folder, "nansen_nwb_stub_interface.py"))
+
+            pythonPath = py.sys.path;
+            pythonPath.insert(int32(0), folder);
+            testCase.addTeardown(@() pythonPath.remove(folder))
+            stubModule = py.importlib.import_module("nansen_nwb_stub_interface");
+            stubModule = py.importlib.reload(stubModule);
+
+            if options.CanAlign
+                interface = stubModule.StubInterface(char(startText));
+            else
+                interface = stubModule.StubInterfaceWithoutAlignment(char(startText));
+            end
+        end
+
+        function folder = temporaryFolder(testCase)
+            fixture = testCase.applyFixture( ...
+                matlab.unittest.fixtures.TemporaryFolderFixture);
+            folder = string(fixture.Folder);
+        end
+
         function assumePythonIsAvailable(testCase)
             %assumePythonIsAvailable - Skip when MATLAB has no Python
 
@@ -371,6 +516,18 @@ classdef neuroconvBridgeTest < matlab.unittest.TestCase
             filePath = converter.convert();
         end
     end
+end
+
+function offset = align(interface, fileStartTime)
+%align - Shorthand for alignToStartTime
+
+    offset = nansen.module.nwb.neuroconv.internal.alignToStartTime(interface, fileStartTime);
+end
+
+function offsets = alignedOffsets(interface)
+%alignedOffsets - The offsets a stub interface was asked to shift by
+
+    offsets = cellfun(@double, cell(interface.aligned));
 end
 
 function sourceArg = resolveFor(paths, converterArgs)
