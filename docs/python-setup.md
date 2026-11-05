@@ -4,12 +4,10 @@ Converters backed by [NeuroConv](https://neuroconv.readthedocs.io/) data interfa
 
 1. Install a Python version that both NeuroConv and your MATLAB release support. NeuroConv 0.10.2 needs Python 3.10 or later, and MathWorks lists the versions each release supports in [Versions of Python Compatible with MATLAB Products by Release](https://www.mathworks.com/support/requirements/python-compatibility.html). R2024b, for example, supports 3.10, 3.11 and 3.12.
 
-2. Create a virtual environment and install the packages listed in `python/requirements.txt` of the cloned NANSEN-NWB repository.
+> [!IMPORTANT]
+> Did you verify that your Python version is compatible with your MATLAB release? `venv` creates the environment with whichever Python you invoke, compatible or not, so check the [compatibility table](https://www.mathworks.com/support/requirements/python-compatibility.html) from step 1 first. The commands in step 2 use `python3.12` as an example — replace it with the version you verified.
 
-   > [!IMPORTANT]
-   > Did you verify that your Python version is compatible with your MATLAB release? `venv` creates the environment with whichever Python you invoke, compatible or not, so check the [compatibility table](https://www.mathworks.com/support/requirements/python-compatibility.html) from step 1 first. The commands below use `python3.12` as an example — replace it with the version you verified.
-
-   On macOS or Linux:
+2. Create a virtual environment and install the packages listed in `python/requirements.txt` of the cloned NANSEN-NWB repository. On macOS or Linux:
 
    ```bash
    cd path/to/NANSEN-NWB
