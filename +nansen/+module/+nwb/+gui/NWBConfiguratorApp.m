@@ -934,6 +934,10 @@ classdef NWBConfiguratorApp < handle
                 defaults = resolution.Descriptor.DefaultConverterArgs;
             end
             converterArgs = nansen.module.nwb.internal.deepMerge(defaults, item.ConverterArgs);
+            % The editor renders char fields and skips string-valued ones
+            % with a warning, while a converter's default arguments are
+            % authored as strings.
+            converterArgs = convertContainedStringsToChars(converterArgs);
             if isempty(fieldnames(converterArgs))
                 uialert(obj.Figure, ...
                     "This converter takes no arguments.", "Converter arguments", "Icon", "info")
