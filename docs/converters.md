@@ -98,7 +98,7 @@ The constructor validates the descriptor, so an inconsistent one fails where it 
 
 Most converters that read a file take a path, so a converter declaring "I accept a file path" would match every file-backed variable in the session. That is exactly where the configurator most needs to discriminate.
 
-The registry ranks matches instead: a converter naming the variable's **format** beats one accepting its **class**, which beats one matching only the **file extension**, which beats one accepting **anything**. When a data item names no converter, the runner takes the single converter at the best rank and reports a tie as ambiguous; a wildcard match never decides. A data item that sets `TargetNWBType` is matched only against converters that produce that type, so the target type can settle a tie, and a match that produces another type is passed over for the generic converter. Declare a format when your converter reads a particular kind of file, and a class when it takes a MATLAB object.
+The registry ranks matches instead: a converter naming the variable's **format** beats one accepting its **class**, which beats one matching only the **file extension**, which beats one accepting **anything**. When a data item names no converter, the runner takes the single converter at the best rank and reports a tie as ambiguous, with `nansen:nwb:ambiguousConverter`; a wildcard match never decides. A data item that sets `TargetNWBType` is matched only against converters that produce that type, so the target type can settle a tie, and a match that produces another type is passed over for the generic converter. Declare a format when your converter reads a particular kind of file, and a class when it takes a MATLAB object.
 
 ## Registering a lab's converters
 

@@ -24,7 +24,12 @@ function nwbFile = convertPatchClampSweeps(context)
 %   abfload reads from the file's synch array. A file without one, such
 %   as an ABF 1 file recorded in a fixed-length mode, records no start
 %   time per sweep: every sweep then starts at 0 and the comment of each
-%   series says so.
+%   series says so. A file whose start times do not match its sweeps is
+%   warned about and handled the same way.
+%
+%   A series is named after the item, the channel when the recording has
+%   several, and the sweep number. A channel without a name, or with a
+%   name another channel shares, is named "ch<N>".
 %
 %   Converter arguments:
 %       DeviceMetadata      - name, description and manufacturer of the
@@ -83,7 +88,8 @@ function nwbFile = convertPatchClampSweeps(context)
             'ClampMode must be "current" or "voltage", but was "%s".', clampMode)
     end
 
-    sweepStartTimes = sweepStartTimesOf(recording, numSweeps);
+    [sweepStartTimes, startTimeNote] = sweepStartTimesOf(recording, numSweeps, ...
+        context.DataItem.VariableName);
 
     nwbFile = context.NwbFile;
     device = getOrCreateDevice(nwbFile, getConverterArg(args, "DeviceMetadata", struct()));
@@ -91,11 +97,7 @@ function nwbFile = convertPatchClampSweeps(context)
         getConverterArg(args, "ElectrodeMetadata", struct()), device);
 
     seriesMetadata = itemMetadata(context.Metadata);
-    comments = "";
-    if isempty(sweepStartTimes)
-        comments = "Sweep start times are not recorded in the file; every sweep starts at 0.";
-        sweepStartTimes = zeros(1, numSweeps);
-    end
+    comments = startTimeNote;
     if isfield(seriesMetadata, "comments")
         comments = strtrim(string(seriesMetadata.comments) + " " + comments);
         seriesMetadata = rmfield(seriesMetadata, "comments");
@@ -106,7 +108,7 @@ function nwbFile = convertPatchClampSweeps(context)
     end
 
     baseName = string(context.Placement.Name);
-    channelNames = string(recording.ChannelNames);
+    labels = channelLabels(string(recording.ChannelNames), numChannels);
 
     for channel = channelIndex
         [seriesConstructor, storedUnit, conversion, isStimulus] = seriesForUnit( ...
@@ -129,7 +131,7 @@ function nwbFile = convertPatchClampSweeps(context)
                 'stimulus_description', char(stimulusDescription), ...
                 metadataNvPairs{:});
 
-            targetGroup.set(char(seriesName(baseName, channelNames, channel, ...
+            targetGroup.set(char(seriesName(baseName, labels(channel), ...
                 numChannels, sweep)), series);
         end
     end
@@ -171,21 +173,33 @@ function clampMode = defaultClampMode(unit, variableName)
     end
 end
 
-function startTimes = sweepStartTimesOf(recording, numSweeps)
-%sweepStartTimesOf - Sweep start times in seconds, or empty when not recorded
+function [startTimes, note] = sweepStartTimesOf(recording, numSweeps, variableName)
+%sweepStartTimesOf - Sweep start times in seconds, and a note when they are not known
 %
 %   abfload gives sweepStartInPts in samples of one channel from the
-%   start of the recording, read from the file's synch array.
+%   start of the recording, read from the file's synch array. Without
+%   usable start times every sweep starts at 0, and the note, written
+%   into each series' comments, says why.
 
-    startTimes = [];
+    startTimes = zeros(1, numSweeps);
+    note = "Sweep start times are not recorded in the file; every sweep starts at 0.";
     if ~isfield(recording, "Header") || ~isstruct(recording.Header) ...
             || ~isfield(recording.Header, "sweepStartInPts")
         return
     end
+
     startInSamples = double(recording.Header.sweepStartInPts(:))';
-    if numel(startInSamples) == numSweeps
-        startTimes = startInSamples / recording.SamplingRate;
+    if numel(startInSamples) ~= numSweeps
+        warning("nansen:nwb:sweepStartTimesMismatch", ...
+            ['''%s'' records %d sweep start times for %d sweeps, so they ', ...
+             'cannot be matched to the sweeps; every sweep starts at 0.'], ...
+            variableName, numel(startInSamples), numSweeps)
+        note = "The file's sweep start times do not match its sweeps; every sweep starts at 0.";
+        return
     end
+
+    startTimes = startInSamples / recording.SamplingRate;
+    note = "";
 end
 
 function assertRecording(recording, variableName)
@@ -250,19 +264,32 @@ function [constructor, storedUnit, conversion, isStimulus] = seriesForUnit(unit,
     end
 end
 
-function name = seriesName(baseName, channelNames, channel, numChannels, sweep)
+function labels = channelLabels(channelNames, numChannels)
+%channelLabels - The label each channel's series names carry
+%
+%   A channel's own name, or "ch<N>" when the name is blank or another
+%   channel has it too: two series with one name would leave only the
+%   second in the file.
+
+    names = strings(1, numChannels);
+    numNamed = min(numel(channelNames), numChannels);
+    names(1:numNamed) = strtrim(channelNames(1:numNamed));
+
+    [~, ~, groupIndex] = unique(names);
+    counts = accumarray(groupIndex(:), 1);
+    isShared = reshape(counts(groupIndex) > 1, 1, []);
+
+    labels = "ch" + (1:numChannels);
+    isUsable = strlength(names) > 0 & ~isShared;
+    labels(isUsable) = names(isUsable);
+end
+
+function name = seriesName(baseName, channelLabel, numChannels, sweep)
 %seriesName - <item>[_<channel>]_sweep<nnn>
 
     name = baseName;
     if numChannels > 1
-        channelName = "";
-        if numel(channelNames) >= channel
-            channelName = strtrim(channelNames(channel));
-        end
-        if strlength(channelName) == 0
-            channelName = "ch" + channel;
-        end
-        name = name + "_" + channelName;
+        name = name + "_" + channelLabel;
     end
     name = name + sprintf("_sweep%03d", sweep);
 end

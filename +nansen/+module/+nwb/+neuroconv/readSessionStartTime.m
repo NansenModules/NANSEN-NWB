@@ -51,41 +51,13 @@ function sessionStartTime = readSessionStartTime(interfaceClassName, sourceArg, 
         if isequal(fileMetadata.get("session_start_time"), py.None)
             return
         end
-        sessionStartTime = startTimeFromPython(fileMetadata{"session_start_time"});
+        sessionStartTime = nansen.module.nwb.neuroconv.internal.startTimeFromPython( ...
+            fileMetadata{"session_start_time"});
     catch cause
         exception = MException("nansen:nwb:neuroconvFailed", ...
             ['The NeuroConv interface ''%s'' could not report when its ', ...
              'recording started. The Python error is attached below.'], ...
             interfaceClassName);
         throw(addCause(exception, cause))
-    end
-end
-
-function value = startTimeFromPython(pythonValue)
-%startTimeFromPython - Read the start time whether it is a datetime or text
-%
-%   NeuroConv's metadata dictionaries hold a datetime object or its ISO
-%   8601 text, depending on the interface and on whether the value has
-%   been through its JSON schema.
-
-    if isa(pythonValue, "py.datetime.datetime")
-        value = nansen.module.nwb.neuroconv.fromPythonDatetime(pythonValue);
-        return
-    end
-
-    text = string(char(pythonValue));
-    value = nansen.module.nwb.internal.iso8601ToDatetime(text);
-    if isempty(value)
-        value = datetime(text);
-    end
-
-    % An ABF 1 header holds the time of day but no date, and NeuroConv
-    % then reports the time on 1900-01-01. That is not when the recording
-    % started, so it is not returned as if it were.
-    if ~isempty(value) && year(value) < 1970
-        warning("nansen:nwb:undatedSessionStartTime", ...
-            ['The recording''s header gives a time of day, %s, but no date. ', ...
-             'Supply the session start time another way.'], string(value, "HH:mm:ss"))
-        value = datetime.empty;
     end
 end
