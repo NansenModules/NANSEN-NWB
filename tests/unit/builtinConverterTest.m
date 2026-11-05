@@ -299,6 +299,39 @@ classdef builtinConverterTest < matlab.unittest.TestCase
             testCase.verifySubstring(string(series.comments), "do not match")
         end
 
+        function storesASingleSweepGivenAsAMatrix(testCase)
+            recording = patchClampRecording("mV", 1);
+            recording.Data = (1:40)';
+
+            nwbFile = testCase.convert(recording, "PatchClampSweeps", NWBVariableName="Vm");
+
+            testCase.verifyEqual(string(nwbFile.acquisition.keys()), "Vm_sweep001")
+        end
+
+        function storesOnlyTheChannelsTheItemSelects(testCase)
+            recording = patchClampRecording(["mV", "pA"], 1);
+
+            nwbFile = testCase.convert(recording, "PatchClampSweeps", NWBVariableName="cell", ...
+                ConverterArgs=struct("ChannelIndex", 2));
+
+            % The first channel stored is a current, so this is voltage clamp.
+            testCase.verifyEqual(string(nwbFile.acquisition.keys()), "cell_ch2_sweep001")
+            testCase.verifyClass(nwbFile.acquisition.get("cell_ch2_sweep001"), ...
+                "types.core.VoltageClampSeries")
+            testCase.verifyEqual(nwbFile.stimulus_presentation.Count, uint64(0))
+        end
+
+        function takesVoltageClampWhenTheFirstChannelIsACurrent(testCase)
+            recording = patchClampRecording(["pA", "mV"], 1);
+
+            nwbFile = testCase.convert(recording, "PatchClampSweeps", NWBVariableName="cell");
+
+            testCase.verifyClass(nwbFile.acquisition.get("cell_ch1_sweep001"), ...
+                "types.core.VoltageClampSeries")
+            testCase.verifyClass(nwbFile.stimulus_presentation.get("cell_ch2_sweep001"), ...
+                "types.core.VoltageClampStimulusSeries")
+        end
+
         function namesChannelsThatShareANameByNumber(testCase)
             % Two series with one name would leave only the second.
             recording = patchClampRecording(["mV", "mV"], 1);
@@ -318,6 +351,49 @@ classdef builtinConverterTest < matlab.unittest.TestCase
 
             testCase.verifyTrue(nwbFile.acquisition.isKey("cell_Vm_sweep001"))
             testCase.verifyTrue(nwbFile.stimulus_presentation.isKey("cell_Im_sweep001"))
+        end
+
+        function writesTheStimulusDescriptionAndTheItemsComments(testCase)
+            nwbFile = testCase.convert(patchClampRecording("mV", 1), "PatchClampSweeps", ...
+                NWBVariableName="Vm", Metadata=struct("comments", "cell 1"), ...
+                ConverterArgs=struct("StimulusDescription", "current steps"));
+
+            series = nwbFile.acquisition.get("Vm_sweep001");
+            testCase.verifyEqual(string(series.stimulus_description), "current steps")
+            testCase.verifySubstring(string(series.comments), "cell 1")
+            testCase.verifySubstring(string(series.comments), "not recorded")
+        end
+
+        function reusesTheDeviceAndElectrodeAcrossItems(testCase)
+            converterArgs = struct("DeviceMetadata", struct("name", "EPC8"), ...
+                "ElectrodeMetadata", struct("name", "pipette"));
+            items = [ ...
+                nansen.module.nwb.config.NWBDataItemConfig(VariableName="Vm", ...
+                    NWBVariableName="Vm", ConverterName="PatchClampSweeps", ...
+                    ConverterArgs=converterArgs), ...
+                nansen.module.nwb.config.NWBDataItemConfig(VariableName="Vm2", ...
+                    NWBVariableName="Vm2", ConverterName="PatchClampSweeps", ...
+                    ConverterArgs=converterArgs)];
+            config = nansen.module.nwb.config.NWBFileConfiguration( ...
+                OutputPath=testCase.OutputPath, ...
+                SessionMetadata=struct("session_description", "builtin converter test", ...
+                    "identifier", "builtin-test", ...
+                    "session_start_time", datetime(2026, 5, 10, TimeZone="UTC")), ...
+                DataItems=items);
+            converter = nansen.module.nwb.conversion.NWBFileConverter(config, ...
+                DataResolver=@(name) patchClampRecording("mV", 1));
+
+            nwbFile = nwbRead(converter.convert());
+
+            testCase.verifyEqual(nwbFile.general_devices.Count, uint64(1))
+            testCase.verifyEqual(nwbFile.general_intracellular_ephys.Count, uint64(1))
+            testCase.verifyEqual(nwbFile.acquisition.Count, uint64(2))
+        end
+
+        function rejectsDataThatIsNotARecording(testCase)
+            testCase.verifyError( ...
+                @() testCase.convert(struct("Data", []), "PatchClampSweeps"), ...
+                "nansen:nwb:converterFailed")
         end
 
         function rejectsAChannelInAUnitThatIsNeitherVoltageNorCurrent(testCase)
