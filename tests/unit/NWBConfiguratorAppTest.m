@@ -137,6 +137,50 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
             testCase.verifySubstring(state.Message, "No Python here")
         end
 
+        function reportsAConverterWhosePackagesAreMissing(testCase, ListBackend)
+            item = speedItem();
+            item.ConverterName = "PackagedOne";
+            app = testCase.createApp(configurationWith(item), ListBackend, ...
+                PythonCheckFcn=@pythonIsAvailable, ...
+                PackageCheckFcn=@(names) names(names == "tifffile"));
+
+            state = app.panelState();
+
+            testCase.verifyEqual(state.Status, "needs packages")
+            testCase.verifyTrue(state.NeedsPython)
+            testCase.verifySubstring(state.Message, "tifffile")
+            testCase.verifySubstring(state.Message, "python/requirements.txt")
+            testCase.verifyFalse(contains(state.Message, "roiextractors"), ...
+                "Only the missing package should be named.")
+            testCase.verifyEqual(app.listTable().Status, "needs packages")
+        end
+
+        function acceptsAConverterWhosePackagesAreInstalled(testCase, ListBackend)
+            item = speedItem();
+            item.ConverterName = "PackagedOne";
+            app = testCase.createApp(configurationWith(item), ListBackend, ...
+                PythonCheckFcn=@pythonIsAvailable, ...
+                PackageCheckFcn=@(names) strings(1, 0));
+
+            state = app.panelState();
+
+            testCase.verifyEqual(state.Status, "ok")
+            testCase.verifyFalse(state.NeedsPython)
+        end
+
+        function reportsMissingPythonBeforeMissingPackages(testCase, ListBackend)
+            % Without Python there is nothing to ask about packages.
+            item = speedItem();
+            item.ConverterName = "PackagedOne";
+            app = testCase.createApp(configurationWith(item), ListBackend, ...
+                PackageCheckFcn=@(names) error("test:unexpectedCall", ...
+                    "Packages were checked without Python."));
+
+            state = app.panelState();
+
+            testCase.verifyEqual(state.Status, "needs Python")
+        end
+
         function opensAnItemNamingAnUnregisteredConverter(testCase, ListBackend)
             % A configuration can name a custom converter whose folder
             % this session has not registered.
@@ -320,6 +364,8 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
                 config
                 listBackend
                 options.FilePath (1,1) string = ""
+                options.PythonCheckFcn = @() deal(false, struct("Message", "No Python here."))
+                options.PackageCheckFcn = @(names) strings(1, 0)
             end
 
             app = nansen.module.nwb.gui.NWBConfiguratorApp(config, ...
@@ -328,7 +374,8 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
                 VariableNames=["speed", "pupil", "frames"], ...
                 ListBackend=listBackend, ...
                 Visible="off", ...
-                PythonCheckFcn=@() deal(false, struct("Message", "No Python here.")));
+                PythonCheckFcn=options.PythonCheckFcn, ...
+                PackageCheckFcn=options.PackageCheckFcn);
             testCase.addTeardown(@() delete(app))
         end
 
@@ -400,6 +447,18 @@ function registry = testRegistry()
         Source="neuroconv", AcceptedFormats="pyfmt", ProducesNWBType="TimeSeries", ...
         ExecutionMode="external", PlacementPolicy="converter", RequiresPython=true, ...
         NeedsData=false, Function=@(context) struct("DidWriteFile", true)))
+    registry.add(NWBConverterDescriptor(Name="PackagedOne", DisplayName="Packaged converter", ...
+        Source="neuroconv", AcceptedFormats="pkgfmt", ProducesNWBType="TimeSeries", ...
+        ExecutionMode="external", PlacementPolicy="converter", RequiresPython=true, ...
+        RequiredPythonPackages=["roiextractors", "tifffile"], ...
+        NeedsData=false, Function=@(context) struct("DidWriteFile", true)))
+end
+
+function [isAvailable, report] = pythonIsAvailable()
+%pythonIsAvailable - A Python check that finds NeuroConv
+
+    isAvailable = true;
+    report = struct("Message", "NeuroConv is available.");
 end
 
 function folderPath = repositoryRoot()
