@@ -4,7 +4,7 @@ classdef PrimaryGroupName < handle
 %   variable can be written into. The configuration table offers these
 %   as the choices in its primary group column.
 %
-%   See also NeuroDataType, ProcessingModule
+%   See also ProcessingModule, nansen.module.nwb.lookup.listNeurodataTypes
 
     enumeration
         Acquisition

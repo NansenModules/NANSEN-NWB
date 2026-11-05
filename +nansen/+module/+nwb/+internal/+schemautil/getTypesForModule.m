@@ -55,16 +55,16 @@ function [neuroDataTypes, descriptions] = getTypesForModule(moduleName)
         'NANSEN_NWB:Internal:InvalidModuleName', ...
         'Internal error: "%s" is not a known NWB module. Please report.', moduleName)
 
-    groups = D{moduleName}{"groups"};
+    % A module defines types under both keys. The image module, for one,
+    % defines ImageSeries as a group and GrayscaleImage as a dataset, and
+    % reading only the groups would leave every dataset type out of the
+    % listing without saying so.
+    moduleSchema = D{moduleName};
+    [groupTypes, groupDescriptions] = readDefinedTypes(moduleSchema, "groups");
+    [datasetTypes, datasetDescriptions] = readDefinedTypes(moduleSchema, "datasets");
 
-    numNeuroDataTypes = numel(groups);
-    neuroDataTypes = repmat("", 1, numNeuroDataTypes);
-    descriptions = repmat("", 1, numNeuroDataTypes);
-
-    for i = 1:numNeuroDataTypes
-        neuroDataTypes(i) = groups{i}{"neurodata_type_def"};
-        descriptions(i) = groups{i}{"doc"};
-    end
+    neuroDataTypes = [groupTypes, datasetTypes];
+    descriptions = [groupDescriptions, datasetDescriptions];
 
     % Filter out deprecated fields. Todo: Make option to allow deprecated?
     isDeprecated = startsWith(descriptions, 'DEPRECATED');
@@ -76,5 +76,35 @@ function [neuroDataTypes, descriptions] = getTypesForModule(moduleName)
 
     if nargout == 1
         clear descriptions
+    end
+end
+
+function [typeNames, descriptions] = readDefinedTypes(moduleSchema, schemaKey)
+%readDefinedTypes - Read the types one schema key defines
+%
+%   An entry without a neurodata_type_def extends or includes another
+%   type rather than defining one, so it names no type to list.
+
+    typeNames = strings(1, 0);
+    descriptions = strings(1, 0);
+
+    if ~isKey(moduleSchema, schemaKey)
+        return
+    end
+
+    definitions = moduleSchema{schemaKey};
+    for i = 1:numel(definitions)
+        definition = definitions{i};
+        if ~isKey(definition, "neurodata_type_def")
+            continue
+        end
+
+        typeNames(end+1) = definition{"neurodata_type_def"}; %#ok<AGROW>
+
+        if isKey(definition, "doc")
+            descriptions(end+1) = definition{"doc"}; %#ok<AGROW>
+        else
+            descriptions(end+1) = ""; %#ok<AGROW>
+        end
     end
 end

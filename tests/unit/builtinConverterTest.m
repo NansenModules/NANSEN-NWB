@@ -1,0 +1,442 @@
+classdef builtinConverterTest < matlab.unittest.TestCase
+%builtinConverterTest - Tests for the converters that ship with the module
+%
+%   Tests the converters under nansen.module.nwb.conversion.builtin by
+%   running each through the conversion runner and reading the result
+%   back from the written file. Going through the runner rather than
+%   calling the converters directly means the tests cover the contract
+%   the converters are actually used under.
+%
+%   The ROI signal tests append to a file seeded with a plane
+%   segmentation built directly in matnwb. The ROI mask test passes a
+%   struct with the two properties of a NANSEN ROI group the converter
+%   reads. TwoPhotonImageStack is not covered: it writes through NANSEN's
+%   NWBExporter, which builds matnwb.types.core objects, a namespace the
+%   matnwb 2.11 core does not define.
+%
+%   These tests need matnwb on the MATLAB path with generated core types.
+%   They are filtered when it is unavailable.
+%
+%   See also: nansen.module.nwb.conversion.builtin.convertTimetableToTimeSeries
+
+    properties (Access = private)
+        OutputPath (1,1) string
+    end
+
+    methods (TestClassSetup)
+
+        function addModuleToPath(testCase)
+            testCase.applyFixture( ...
+                matlab.unittest.fixtures.PathFixture(repositoryRoot()))
+        end
+
+        function assumeMatnwbIsAvailable(testCase)
+            testCase.assumeNotEmpty(which("NwbFile"), ...
+                "matnwb is not on the MATLAB path.")
+            testCase.assumeNotEmpty(which("types.core.TimeSeries"), ...
+                "matnwb core types have not been generated.")
+        end
+    end
+
+    methods (TestMethodSetup)
+
+        function useTemporaryOutputFile(testCase)
+            fixture = testCase.applyFixture( ...
+                matlab.unittest.fixtures.TemporaryFolderFixture);
+            testCase.OutputPath = fullfile(fixture.Folder, "test.nwb");
+        end
+    end
+
+    methods (Test) % Timetable to TimeSeries
+
+        function convertsEachTimetableVariableToItsOwnSeries(testCase)
+            data = timetable(seconds((0:4)'), (1:5)', (6:10)', ...
+                VariableNames=["speed", "pupil"]);
+
+            nwbFile = testCase.convert(data, "TimetableTimeSeries");
+
+            testCase.verifyEqual(sort(string(nwbFile.acquisition.keys())), ...
+                ["pupil", "speed"])
+        end
+
+        function namesASingleSeriesAfterTheConfiguredName(testCase)
+            data = timetable(seconds((0:4)'), (1:5)', VariableNames="speed");
+
+            nwbFile = testCase.convert(data, "TimetableTimeSeries", ...
+                NWBVariableName="RunningSpeed");
+
+            testCase.verifyTrue(nwbFile.acquisition.isKey("RunningSpeed"))
+        end
+
+        function rejectsDataThatIsNotATimetable(testCase)
+            testCase.verifyError( ...
+                @() testCase.convert(magic(4), "TimetableTimeSeries"), ...
+                "nansen:nwb:converterFailed")
+        end
+    end
+
+    methods (Test) % Timetable to TimeIntervals
+
+        function convertsATimetableToIntervalsWithAStopTimeVariable(testCase)
+            data = timetable(seconds([0; 10; 20]), seconds([5; 15; 25]), ...
+                VariableNames="stopTime");
+
+            nwbFile = testCase.convert(data, "TimetableTimeIntervals", ...
+                NWBVariableName="epochs", PrimaryGroup="Intervals", ...
+                ConverterArgs=struct("StopTimeVariable", "stopTime"));
+
+            intervals = intervalsNamed(nwbFile, "epochs");
+            testCase.verifyEqual(loadData(intervals.start_time)', [0 10 20])
+            testCase.verifyEqual(loadData(intervals.stop_time)', [5 15 25])
+        end
+
+        function derivesStopTimesFromDurations(testCase)
+            data = timetable(seconds([0; 10]), seconds([4; 6]), ...
+                VariableNames="trialDuration");
+
+            nwbFile = testCase.convert(data, "TimetableTimeIntervals", ...
+                NWBVariableName="epochs", PrimaryGroup="Intervals", ...
+                ConverterArgs=struct("DurationVariable", "trialDuration"));
+
+            intervals = intervalsNamed(nwbFile, "epochs");
+            testCase.verifyEqual(loadData(intervals.stop_time)', [4 16])
+        end
+
+        function runsEachIntervalToTheNextWhenNothingElseBoundsIt(testCase)
+            % The last row has no successor, so nothing says when it ends
+            % and it is dropped rather than given an invented stop time.
+            data = timetable(seconds([0; 10; 20]), (1:3)', VariableNames="value");
+
+            nwbFile = testCase.convert(data, "TimetableTimeIntervals", ...
+                NWBVariableName="epochs", PrimaryGroup="Intervals");
+
+            intervals = intervalsNamed(nwbFile, "epochs");
+            testCase.verifyEqual(loadData(intervals.start_time)', [0 10])
+            testCase.verifyEqual(loadData(intervals.stop_time)', [10 20])
+        end
+
+        function carriesTheOtherVariablesIntoColumns(testCase)
+            data = timetable(seconds([0; 10]), seconds([5; 15]), ...
+                ["go"; "nogo"], [1; 0], ...
+                VariableNames=["stopTime", "trialType", "correct"]);
+
+            nwbFile = testCase.convert(data, "TimetableTimeIntervals", ...
+                NWBVariableName="epochs", PrimaryGroup="Intervals", ...
+                ConverterArgs=struct("StopTimeVariable", "stopTime"));
+
+            intervals = intervalsNamed(nwbFile, "epochs");
+            testCase.verifyEqual(string(loadData(intervals.vectordata.get("trialType")))', ...
+                ["go", "nogo"])
+            testCase.verifyEqual(loadData(intervals.vectordata.get("correct"))', [1 0])
+        end
+
+        function measuresDatetimesFromTheSessionStart(testCase)
+            % NWB measures every time from session_start_time, and the
+            % starts and stops of one table must share that origin.
+            sessionStart = datetime(2026, 5, 10, TimeZone="UTC");
+            data = timetable(sessionStart + seconds([10; 20]), ...
+                sessionStart + seconds([15; 25]), VariableNames="stopTime");
+
+            nwbFile = testCase.convert(data, "TimetableTimeIntervals", ...
+                NWBVariableName="epochs", PrimaryGroup="Intervals", ...
+                ConverterArgs=struct("StopTimeVariable", "stopTime"));
+
+            intervals = intervalsNamed(nwbFile, "epochs");
+            testCase.verifyEqual(loadData(intervals.start_time)', [10 20])
+            testCase.verifyEqual(loadData(intervals.stop_time)', [15 25])
+        end
+
+        function rejectsAStopTimeVariableThatIsNotThere(testCase)
+            data = timetable(seconds([0; 10]), (1:2)', VariableNames="value");
+
+            testCase.verifyError( ...
+                @() testCase.convert(data, "TimetableTimeIntervals", ...
+                    PrimaryGroup="Intervals", ...
+                    ConverterArgs=struct("StopTimeVariable", "noSuchVariable")), ...
+                "nansen:nwb:converterFailed")
+        end
+    end
+
+    methods (Test) % Projection images
+
+        function storesEachProjectionUnderItsOwnName(testCase)
+            data = struct("average", magic(8), "maximum", magic(8) * 2);
+
+            nwbFile = testCase.convert(data, "ProjectionImages", ...
+                PrimaryGroup="Processing", NWBModule="ophys");
+
+            testCase.verifyEqual(sort(imageNames(nwbFile)), ["average", "maximum"])
+        end
+
+        function storesASingleImageUnderTheConfiguredName(testCase)
+            nwbFile = testCase.convert(magic(8), "ProjectionImages", ...
+                NWBVariableName="AverageProjection", ...
+                PrimaryGroup="Processing", NWBModule="ophys");
+
+            testCase.verifyEqual(imageNames(nwbFile), "AverageProjection")
+        end
+
+        function rejectsDataThatIsNotAnImage(testCase)
+            testCase.verifyError( ...
+                @() testCase.convert("not an image", "ProjectionImages", ...
+                    PrimaryGroup="Processing", NWBModule="ophys"), ...
+                "nansen:nwb:converterFailed")
+        end
+    end
+
+    methods (Test) % ROI masks
+
+        function convertsRoiMasksIntoAPlaneSegmentation(testCase)
+            % The imaging plane and optical channel the converter creates
+            % need NWB's required fields.
+            nwbFile = testCase.convert(roiGroupStandIn(), "RoiGroupPlaneSegmentation", ...
+                ConverterArgs=struct( ...
+                    "ImagingPlaneMetadata", struct("excitation_lambda", 920, ...
+                        "indicator", "GCaMP6s", "location", "V1"), ...
+                    "OpticalChannelMetadata", struct("description", "green", ...
+                        "emission_lambda", 525)));
+
+            planeSegmentation = nwbFile.processing.get("ophys").nwbdatainterface ...
+                .get("ImageSegmentation").planesegmentation.get("PlaneSegmentation");
+            testCase.verifyNumElements(loadData(planeSegmentation.id), 2)
+            testCase.verifyTrue(nwbFile.general_optophysiology.Count > 0, ...
+                "The imaging plane the segmentation links to should be in the file.")
+        end
+
+        function namesTheImagingPlanePropertiesNwbRequires(testCase)
+            % matnwb checks them only at export, after every item ran, and
+            % its error names neither the item nor the argument to set.
+            converterArgs = struct("ImagingPlaneMetadata", struct("location", "V1"), ...
+                "OpticalChannelMetadata", struct("description", "green", ...
+                    "emission_lambda", 525));
+
+            try
+                testCase.convert(roiGroupStandIn(), "RoiGroupPlaneSegmentation", ...
+                    ConverterArgs=converterArgs);
+                testCase.verifyFail("A plane without an indicator should be rejected.")
+            catch exception
+                testCase.verifyEqual(string(exception.identifier), "nansen:nwb:converterFailed")
+                cause = exception.cause{1};
+                testCase.verifyEqual(string(cause.identifier), "nansen:nwb:missingRequiredMetadata")
+                testCase.verifySubstring(cause.message, "excitation_lambda, indicator")
+            end
+            testCase.verifyFalse(isfile(testCase.OutputPath), ...
+                "Nothing should have been written.")
+        end
+    end
+
+    methods (Test) % ROI signals
+
+        function convertsASamplesByRoisMatrixAtTheConfiguredRate(testCase)
+            % NANSEN saves RoiSignals_* variables as samples by ROIs.
+            numSamples = 50;
+            numRois = 3;
+
+            series = testCase.appendRoiSignals(rand(numSamples, numRois), ...
+                struct("SamplingRate", 30), numRois);
+
+            testCase.verifyEqual(series.starting_time_rate, 30)
+            testCase.verifyEqual(size(loadData(series)), [numRois, numSamples])
+        end
+
+        function convertsATimetableAtItsOwnRate(testCase)
+            numRois = 2;
+            data = timetable(rand(20, 1), rand(20, 1), SampleRate=10);
+
+            series = testCase.appendRoiSignals(data, struct(), numRois);
+
+            testCase.verifyEqual(series.starting_time_rate, 10)
+            testCase.verifyEqual(size(loadData(series)), [numRois, 20])
+        end
+
+        function rejectsAMatrixWithoutASamplingRate(testCase)
+            testCase.verifyError( ...
+                @() testCase.appendRoiSignals(rand(20, 2), struct(), 2), ...
+                "nansen:nwb:converterFailed")
+        end
+    end
+
+    methods (Test) % The generic neurodata path
+
+        function buildsTheNeurodataTypeNamedByTheDataItem(testCase)
+            nwbFile = testCase.convert((1:10)', "GenericNeurodataType", ...
+                NWBVariableName="Signal", ...
+                TargetNWBType="TimeSeries", ...
+                Metadata=struct("data_unit", "volts", ...
+                    "starting_time", 0, "starting_time_rate", 30));
+
+            testCase.verifyTrue(nwbFile.acquisition.isKey("Signal"))
+            testCase.verifyEqual(string(nwbFile.acquisition.get("Signal").data_unit), ...
+                "volts")
+        end
+
+        function storesEachVariableOfATimetableUnderItsOwnName(testCase)
+            % The generic path returns one object per timetable variable;
+            % each must keep its own name rather than the item's.
+            data = timetable(seconds((0:4)'), (1:5)', (6:10)', ...
+                VariableNames=["speed", "pupil"]);
+
+            nwbFile = testCase.convert(data, "GenericNeurodataType", ...
+                NWBVariableName="Signals", TargetNWBType="TimeSeries", ...
+                Metadata=struct("data_unit", "n/a"));
+
+            testCase.verifyEqual(sort(string(nwbFile.acquisition.keys())), ...
+                ["pupil", "speed"])
+        end
+
+        function rejectsAnItemThatNamesNoTargetType(testCase)
+            testCase.verifyError( ...
+                @() testCase.convert((1:10)', "GenericNeurodataType"), ...
+                "nansen:nwb:converterFailed")
+        end
+    end
+
+    methods (Access = private)
+
+        function nwbFile = convert(testCase, data, converterName, itemOptions)
+            arguments
+                testCase
+                data
+                converterName (1,1) string
+                itemOptions.?nansen.module.nwb.config.NWBDataItemConfig
+            end
+
+            % Every argument goes through one cell array: MATLAB does not
+            % accept a cell expansion after name=value arguments.
+            itemArguments = [{"VariableName", "testVariable", ...
+                "ConverterName", converterName}, namedargs2cell(itemOptions)];
+            item = nansen.module.nwb.config.NWBDataItemConfig(itemArguments{:});
+
+            config = nansen.module.nwb.config.NWBFileConfiguration( ...
+                OutputPath=testCase.OutputPath, ...
+                SessionMetadata=struct( ...
+                    "session_description", "builtin converter test", ...
+                    "identifier", "builtin-test", ...
+                    "session_start_time", datetime(2026, 5, 10, TimeZone="UTC")), ...
+                DataItems=item);
+
+            converter = nansen.module.nwb.conversion.NWBFileConverter(config, ...
+                DataResolver=@(name) data);
+            nwbFile = nwbRead(converter.convert());
+        end
+
+        function series = appendRoiSignals(testCase, data, converterArgs, numRois)
+            % A RoiResponseSeries indexes the rows of a plane segmentation,
+            % which RoiSignals requires to be in the file already.
+            seedFileWithPlaneSegmentation(testCase.OutputPath, numRois)
+
+            item = nansen.module.nwb.config.NWBDataItemConfig( ...
+                VariableName="RoiSignals_MeanF", ConverterName="RoiSignals", ...
+                ConverterArgs=converterArgs);
+            config = nansen.module.nwb.config.NWBFileConfiguration( ...
+                OutputPath=testCase.OutputPath, WriteMode="append", ...
+                DataItems=item);
+
+            converter = nansen.module.nwb.conversion.NWBFileConverter(config, ...
+                DataResolver=@(name) data);
+            nwbFile = nwbRead(converter.convert());
+
+            series = nwbFile.processing.get("ophys").nwbdatainterface ...
+                .get("Fluorescence").roiresponseseries.get("RoiSignals_MeanF");
+        end
+    end
+end
+
+function roiGroup = roiGroupStandIn()
+%roiGroupStandIn - A struct with the two ROI group properties convertRoiGroup reads
+
+    roiGroup = struct("FovImageSize", [16, 16], ...
+        "roiArray", struct( ...
+            "coordinates", {[1, 1; 2, 2], [5, 5; 5, 6; 6, 6]}, ...
+            "pixelweights", {[1; 1], [0.5; 1; 0.5]}));
+end
+
+function seedFileWithPlaneSegmentation(filePath, numRois)
+%seedFileWithPlaneSegmentation - Write a file holding only an ROI table
+%
+%   The names are the defaults convertRoiSignals looks the table up by.
+%   Argument names are char because matnwb constructors key constrained
+%   sets, such as the imaging plane's optical channels, by them in a
+%   containers.Map, which rejects string keys.
+
+    nwbFile = NwbFile( ...
+        'session_description', "builtin converter test", ...
+        'identifier', "builtin-test", ...
+        'session_start_time', datetime(2026, 5, 10, TimeZone="UTC"));
+
+    device = types.core.Device();
+    nwbFile.general_devices.set('Microscope', device);
+
+    imagingPlane = types.core.ImagingPlane( ...
+        'optical_channel', types.core.OpticalChannel( ...
+            'description', 'green', 'emission_lambda', 525), ...
+        'device', types.untyped.SoftLink(device), ...
+        'excitation_lambda', 920, ...
+        'indicator', 'GCaMP6s', ...
+        'location', 'V1');
+    nwbFile.general_optophysiology.set('ImagingPlane', imagingPlane);
+
+    planeSegmentation = types.core.PlaneSegmentation( ...
+        'colnames', {'image_mask'}, ...
+        'description', "test ROIs", ...
+        'imaging_plane', types.untyped.SoftLink(imagingPlane), ...
+        'image_mask', types.hdmf_common.VectorData( ...
+            'data', rand(8, 8, numRois) > 0.5, 'description', "ROI masks"), ...
+        'id', types.hdmf_common.ElementIdentifiers('data', int64(0:numRois-1)'));
+
+    imageSegmentation = types.core.ImageSegmentation();
+    imageSegmentation.planesegmentation.set('PlaneSegmentation', planeSegmentation);
+
+    ophysModule = types.core.ProcessingModule('description', "ophys");
+    ophysModule.nwbdatainterface.set('ImageSegmentation', imageSegmentation);
+    nwbFile.processing.set('ophys', ophysModule);
+
+    nwbExport(nwbFile, filePath);
+end
+
+function names = imageNames(nwbFile)
+%imageNames - Names in the projection image collection
+%
+%   NWB 2.9 renamed the Images collection's member property from image to
+%   baseimage, and the module does not pin a matnwb version.
+
+    collection = nwbFile.processing.get("ophys") ...
+        .nwbdatainterface.get("FovProjectionImages");
+
+    if isprop(collection, 'baseimage')
+        names = sort(string(collection.baseimage.keys()));
+    else
+        names = sort(string(collection.image.keys()));
+    end
+end
+
+function intervals = intervalsNamed(nwbFile, name)
+%intervalsNamed - Read an interval table back, wherever NWB put it
+%
+%   NWB gives trials, epochs and invalid_times their own properties on
+%   the file rather than keeping them in the general intervals set, and
+%   matnwb routes a table with one of those names accordingly on export.
+
+    canonicalProperty = "intervals_" + name;
+    if isprop(nwbFile, canonicalProperty) && ~isempty(nwbFile.(canonicalProperty))
+        intervals = nwbFile.(canonicalProperty);
+        return
+    end
+
+    intervals = nwbFile.intervals.get(name);
+end
+
+function values = loadData(vectorData)
+%loadData - Read a column's data whether or not it is a stub
+
+    values = vectorData.data;
+    if isa(values, "types.untyped.DataStub")
+        values = values.load();
+    end
+end
+
+function folderPath = repositoryRoot()
+%repositoryRoot - Path of the repository holding this test
+
+    folderPath = fileparts(fileparts(fileparts(mfilename("fullpath"))));
+end

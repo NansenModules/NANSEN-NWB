@@ -260,7 +260,18 @@ classdef DataVariableConfigTable < handle & applify.mixin.HasUserData
                 obj.UITable.ColumnFormat = {'char', 'char', 'popup', 'popup', 'popup', 'popup', 'char'};
 
                 nwbModules = obj.NWB_MODULES;
-                [~, neuroDataTypes] = enumeration( 'nansen.module.nwb.enum.NeuroDataType' );
+
+                % The types come from the schema matnwb loaded, so a type
+                % added upstream appears without this module being edited.
+                % Metadata and abstract types are not neurodata a variable
+                % converts to, so they are left out as the per-module
+                % refresh leaves them out.
+                neuroDataTypes = nansen.module.nwb.lookup.listNeurodataTypes();
+                neuroDataTypes = setdiff(neuroDataTypes, ...
+                    nansen.module.nwb.internal.lookup.getMetadataClassNames());
+                neuroDataTypes = setdiff(neuroDataTypes, ...
+                    nansen.module.nwb.internal.lookup.getAbstractClassNames());
+                neuroDataTypes = cellstr(neuroDataTypes);
                 [~, groupNames] = enumeration( 'nansen.module.nwb.enum.PrimaryGroupName' );
 
                 placeholders = nansen.module.nwb.internal.getUnsetPlaceholders();

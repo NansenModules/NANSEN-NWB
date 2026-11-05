@@ -3,7 +3,8 @@ function metadataNameValuePairs = loadMetadata(nwbType, options)
 %   metadataNameValuePairs = loadMetadata(nwbType) returns the metadata
 %   recorded for the given neurodata type in the current project, as a
 %   cell array ready to expand into a constructor call. It returns an
-%   empty cell array when the project has no metadata file.
+%   empty cell array when the project has no metadata file, and when no
+%   NANSEN project is open, as in a conversion run without NANSEN.
 %
 %   metadataNameValuePairs = loadMetadata(...,Name=VALUE) selects one
 %   named instance, for a type that has more than one.
@@ -17,8 +18,13 @@ function metadataNameValuePairs = loadMetadata(nwbType, options)
         options.Name % If there are many instances for one type...
     end
     metadataNameValuePairs = {};
-    
-    project = nansen.getCurrentProject();
+
+    % Without a current project there is no stored metadata to read, which
+    % is the standalone case rather than an error.
+    project = currentProjectIfAny();
+    if isempty(project)
+        return
+    end
     metadataFolder = project.getMetadataFolder('nwb');
     
     L = dir(fullfile(metadataFolder, '*.json'));
@@ -44,6 +50,26 @@ function metadataNameValuePairs = loadMetadata(nwbType, options)
             metadataNameValuePairs = namedargs2cell(typeMetadata);
         else
             return
+        end
+    end
+end
+
+function project = currentProjectIfAny()
+%currentProjectIfAny - The current NANSEN project, or [] when there is none
+%
+%   nansen.getCurrentProject raises NANSEN:NoActiveUserSession when NANSEN
+%   has not been started, and is not on the path without NANSEN.
+
+    project = [];
+    if isempty(which("nansen.getCurrentProject"))
+        return
+    end
+
+    try
+        project = nansen.getCurrentProject();
+    catch exception
+        if exception.identifier ~= "NANSEN:NoActiveUserSession"
+            rethrow(exception)
         end
     end
 end
