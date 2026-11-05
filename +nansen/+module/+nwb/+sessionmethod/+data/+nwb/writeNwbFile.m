@@ -135,9 +135,21 @@ end
 
 function tf = hasTimeOfDay(sessionObject)
 %hasTimeOfDay - Whether the session records a usable time of day
+%
+%   NaT, blank text and a missing string all mean the folder recorded no
+%   time, so the recording is asked instead.
 
     value = sessionObject.Time;
-    tf = ~isempty(value) && ~(isdatetime(value) && all(isnat(value)));
+    if isempty(value)
+        tf = false;
+    elseif isdatetime(value)
+        tf = ~all(isnat(value));
+    elseif isstring(value) || ischar(value)
+        text = string(value);
+        tf = ~all(ismissing(text)) && any(strlength(strtrim(text(~ismissing(text)))) > 0);
+    else
+        tf = true;
+    end
 end
 
 function ageText = sessionSubjectAge(sessionObject)
