@@ -34,8 +34,14 @@ A [NANSEN](https://github.com/VervaekeLab/NANSEN) module for converting the sess
 ## Getting started
 
 1. **Define data variables.** The configurator lists the project's data variables, so the project needs at least one (**Nansen ▸ Configure ▸ Variables...**).
-2. **Configure the conversion.** Open **Tools ▸ Nwb ▸ Configure Nwb File**. For each data variable, pick a converter, where its output goes in the NWB file, and the metadata the converter takes. The configuration is saved as `nwb_conversion_configuration.json` in the project's `nwb` configuration folder.
-3. **Add project-wide metadata (optional).** Put a `nwb_metadata_defaults.json` in the same folder to fill fields that no session carries:
+2. **Configure the conversion.** Open **Tools ▸ Nwb ▸ Configure Nwb File**. For each data variable, pick a converter, where its output goes in the NWB file, and the metadata the converter takes. The configuration is saved as `nwb_conversion_configuration.json` in `<project folder>/configurations/nwb`. To get that path in MATLAB:
+
+   ```matlab
+   project = nansen.getCurrentProject();
+   project.getConfigurationFolder(Subfolder="nwb")
+   ```
+
+3. **Add project-wide metadata (optional).** Create `nwb_metadata_defaults.json` in `<project folder>/configurations/nwb`, next to the conversion configuration, to fill fields that no session carries:
 
    ```json
    {
