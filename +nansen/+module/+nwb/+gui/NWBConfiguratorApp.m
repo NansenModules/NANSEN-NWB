@@ -436,7 +436,8 @@ classdef NWBConfiguratorApp < handle
             resolution = obj.describeResolution(item);
 
             state.Variable = item.VariableName;
-            state.ConverterName = item.ConverterName;
+            converterName = obj.namedConverter(item);
+            state.ConverterName = converterName;
             state.NWBModule = item.NWBModule;
             state.TargetNWBType = item.TargetNWBType;
             [state.PrimaryGroup, state.NWBModule] = ...
@@ -448,12 +449,12 @@ classdef NWBConfiguratorApp < handle
             state.Message = resolution.Message;
             state.NeedsPython = resolution.Status == "needs Python";
 
-            if strlength(item.ConverterName) > 0
-                state.ConverterLabel = obj.labelForName(item.ConverterName);
+            if strlength(converterName) > 0
+                state.ConverterLabel = obj.labelForName(converterName);
                 % An unregistered converter leaves the description empty;
                 % the status says the converter is unknown.
-                if obj.isRegistered(item.ConverterName)
-                    descriptor = obj.Registry.get(item.ConverterName);
+                if obj.isRegistered(converterName)
+                    descriptor = obj.Registry.get(converterName);
                     state.Description = descriptor.Description;
                     state.IsGeneric = descriptor.Name == obj.GENERIC_CONVERTER;
                     state.PlacementOwnedByConverter = ownsPlacement(descriptor);
@@ -485,9 +486,10 @@ classdef NWBConfiguratorApp < handle
                 [matches, ranks] = obj.Registry.findForSourceInfo(item.SourceInfo);
                 suggested = matches(ranks > 1);
 
-                if strlength(item.ConverterName) > 0 && ~obj.isRegistered(item.ConverterName)
-                    choices(end+1) = struct("Label", obj.labelForName(item.ConverterName), ...
-                        "Name", item.ConverterName, "IsSuggested", false);
+                converterName = obj.namedConverter(item);
+                if strlength(converterName) > 0 && ~obj.isRegistered(converterName)
+                    choices(end+1) = struct("Label", obj.labelForName(converterName), ...
+                        "Name", converterName, "IsSuggested", false);
                 end
             end
 
@@ -525,8 +527,9 @@ classdef NWBConfiguratorApp < handle
 
                 Variable(i) = item.VariableName;
                 NWBName(i) = item.NWBVariableName;
-                if strlength(item.ConverterName) > 0
-                    Converter(i) = obj.labelForName(item.ConverterName);
+                converterName = obj.namedConverter(item);
+                if strlength(converterName) > 0
+                    Converter(i) = obj.labelForName(converterName);
                 else
                     Converter(i) = obj.AUTO_LABEL;
                 end
@@ -1177,6 +1180,18 @@ classdef NWBConfiguratorApp < handle
                 label = obj.labelFor(obj.Registry.get(converterName));
             else
                 label = converterName + obj.UNREGISTERED_SUFFIX;
+            end
+        end
+
+        function converterName = namedConverter(~, item)
+            %namedConverter - The converter an item names, or "" for none
+            %   The pilot configurator wrote "Default" for an item that
+            %   names no converter, and ConverterRegistry.resolveForItem
+            %   reads it so; the app shows it as the runner's choice too.
+
+            converterName = item.ConverterName;
+            if converterName == "Default"
+                converterName = "";
             end
         end
 

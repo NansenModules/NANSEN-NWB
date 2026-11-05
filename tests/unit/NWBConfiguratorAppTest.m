@@ -153,6 +153,20 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
             testCase.verifyEqual(choices(2).Name, "NotRegistered")
         end
 
+        function showsADefaultConverterAsTheRunnersChoice(testCase, ListBackend)
+            % The pilot configurator wrote "Default" for no converter, and
+            % the registry resolves such an item from its source.
+            item = speedItem();
+            item.ConverterName = "Default";
+            app = testCase.createApp(configurationWith(item), ListBackend);
+
+            state = app.panelState();
+
+            testCase.verifyEqual(app.listTable().Converter, "Auto (let the runner decide)")
+            testCase.verifyEqual(state.ConverterName, "")
+            testCase.verifyEqual(state.Status, "ok")
+        end
+
         function opensAnItemWhoseGroupIsNotAnNwbGroup(testCase, ListBackend)
             % A pilot configuration can hold a lower-case group name.
             item = speedItem();
