@@ -23,6 +23,10 @@ function varargout = writeNwbFile(sessionObject, varargin)
 %   UTC offset is taken to be in the 'TimeZone' parameter's zone, the zone
 %   the session's own date and time are read in. Set 'PythonExecutable'
 %   to the Python that has NeuroConv when MATLAB is not configured for it.
+%   A project that knows better, because its files hold the start time
+%   in a form NeuroConv does not read, sets 'SessionStartTimeFcn' to a
+%   function of the session object returning a zoned datetime; it is
+%   asked first.
 %
 %   By default a data item that fails to convert stops the export and
 %   leaves the previous file as it was. Set 'OnItemError' to "continue" to
@@ -86,7 +90,9 @@ import nansen.session.SessionMethod
     % A session folder names a date but often no time; the recording's
     % header does, and a NeuroConv interface reads it.
     sessionStartTime = datetime.empty;
-    if ~hasTimeOfDay(sessionObject)
+    if ~isempty(params.SessionStartTimeFcn)
+        sessionStartTime = params.SessionStartTimeFcn(sessionObject);
+    elseif ~hasTimeOfDay(sessionObject)
         sessionStartTime = startTimeFromRecording(sessionObject, dataItems, ...
             params.PythonExecutable, params.TimeZone);
     end
@@ -130,6 +136,7 @@ function params = getDefaultParameters()
     params.WriteMode = 'Overwrite'; % 'Overwrite' | 'Append'
     params.Validate = true; % Check the written file against NWB Best Practices
     params.PythonExecutable = ""; % Python with NeuroConv, when MATLAB is not configured for it
+    params.SessionStartTimeFcn = []; % Function of the session returning a zoned start time
     params.OnItemError = "stop"; % "stop" | "continue": what a failing data item does
 end
 

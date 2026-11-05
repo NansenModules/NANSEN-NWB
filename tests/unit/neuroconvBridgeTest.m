@@ -365,6 +365,50 @@ classdef neuroconvBridgeTest < matlab.unittest.TestCase
                 "nansen:nwb:pythonAlreadyLoaded")
         end
 
+        function readsAStartTimeGivenAsIsoText(testCase)
+            testCase.assumePythonIsAvailable()
+
+            value = nansen.module.nwb.neuroconv.internal.startTimeFromPython( ...
+                py.str("2017-05-18T10:42:07+02:00"));
+
+            testCase.verifyEqual(string(value.TimeZone), "+02:00")
+            testCase.verifyEqual(value, datetime(2017, 5, 18, 8, 42, 7, TimeZone="UTC"))
+        end
+
+        function readsAStartTimeInAnotherTextFormat(testCase)
+            testCase.assumePythonIsAvailable()
+
+            value = nansen.module.nwb.neuroconv.internal.startTimeFromPython( ...
+                py.str("18-May-2017 10:42:07"));
+
+            testCase.verifyEqual(value, datetime(2017, 5, 18, 10, 42, 7))
+        end
+
+        function refusesAnUndatedStartTimeGivenAsText(testCase)
+            % NeuroConv reports an ABF 1 start, which has no date, on
+            % 1900-01-01.
+            testCase.assumePythonIsAvailable()
+
+            value = testCase.verifyWarning( ...
+                @() nansen.module.nwb.neuroconv.internal.startTimeFromPython( ...
+                    py.str("1900-01-01T11:38:54")), ...
+                "nansen:nwb:undatedSessionStartTime");
+
+            testCase.verifyEmpty(value)
+        end
+
+        function refusesAnUndatedStartTimeGivenAsADatetime(testCase)
+            testCase.assumePythonIsAvailable()
+            pythonValue = py.datetime.datetime(int32(1900), int32(1), int32(1), ...
+                int32(11), int32(38), int32(54));
+
+            value = testCase.verifyWarning( ...
+                @() nansen.module.nwb.neuroconv.internal.startTimeFromPython(pythonValue), ...
+                "nansen:nwb:undatedSessionStartTime");
+
+            testCase.verifyEmpty(value)
+        end
+
         function readsANaivePythonDatetimeWithoutAZone(testCase)
             testCase.assumePythonIsAvailable()
 

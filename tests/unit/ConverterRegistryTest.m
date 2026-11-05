@@ -57,19 +57,24 @@ classdef ConverterRegistryTest < matlab.unittest.TestCase
             testCase.verifyTrue(any([descriptors.RequiresPython]))
         end
 
-        function offersTheAbfConverterFirstForAnAbfFile(testCase)
-            % The interface reads its electrodes and recording tables from
-            % the file headers, and is given only the session's own file,
-            % so sessions sharing a folder keep their recordings apart.
-            % The descriptor's defaults are what make that work without
-            % per-item configuration.
+        function resolvesAnAbfFileToTheNeuroconvInterface(testCase)
+            % Two converters read ABF: NeuroConv's interface, matched by
+            % the format, and the built-in one, which stores each sweep the
+            % SHAREbrain file adapter read and is matched by the struct it
+            % returns. An item naming neither gets the interface.
             registry = nansen.module.nwb.conversion.ConverterRegistry();
-            sourceInfo = sourceEvidence(Path="/data/sub-01/2026_09_08_0001.abf");
+            sourceInfo = nansen.module.nwb.config.NWBDataItemConfig.emptySourceInfo();
+            sourceInfo.Format = "ABF";
+            sourceInfo.MatlabClass = "struct";
+            item = nansen.module.nwb.config.NWBDataItemConfig( ...
+                VariableName="Vm", SourceInfo=sourceInfo);
 
-            descriptors = registry.findForSourceInfo(sourceInfo);
+            [descriptors, ranks] = registry.findForSourceInfo(sourceInfo);
 
-            testCase.verifyEqual(descriptors(1).Name, "NeuroConvAbfInterface")
-            defaults = descriptors(1).DefaultConverterArgs;
+            testCase.verifyEqual(registry.resolveForItem(item).Name, "NeuroConvAbfInterface")
+            testCase.verifyTrue(any([descriptors(ranks > 1).Name] == "PatchClampSweeps"))
+
+            defaults = registry.get("NeuroConvAbfInterface").DefaultConverterArgs;
             testCase.verifyEqual(string(defaults.InterfaceClassName), "AbfInterface")
             testCase.verifyEqual(string(defaults.SourcePathMode), "fileList")
             testCase.verifyTrue(defaults.UseInterfaceMetadata)
