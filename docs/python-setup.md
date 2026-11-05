@@ -23,7 +23,10 @@ Converters backed by [NeuroConv](https://neuroconv.readthedocs.io/) data interfa
    pyenv(Version="~/.venvs/nansen-nwb/bin/python", ExecutionMode="OutOfProcess")
    ```
 
-   MATLAB saves this setting, so later sessions use the same Python. Once a session has loaded Python, `pyenv` cannot switch to another: restart MATLAB, or, when Python runs out of process, call `terminate(pyenv)` first.
+   MATLAB saves this setting, so later sessions use the same Python.
+
+> [!WARNING]
+> Once a session has loaded Python, `pyenv` cannot switch to another: restart MATLAB, or, when Python runs out of process, call `terminate(pyenv)` first.
 
 4. Check that MATLAB can run NeuroConv:
 
