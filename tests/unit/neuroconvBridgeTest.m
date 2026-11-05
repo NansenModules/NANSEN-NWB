@@ -300,6 +300,83 @@ classdef neuroconvBridgeTest < matlab.unittest.TestCase
                 "nansen:nwb:missingTimeZone")
         end
 
+        function readsAnAwarePythonDatetimeWithItsOffset(testCase)
+            % A recording's header gives the start time with the offset
+            % the software wrote; the wall-clock time and the offset both
+            % have to survive the trip into MATLAB.
+            testCase.assumePythonIsAvailable()
+
+            zone = py.datetime.timezone(py.datetime.timedelta(pyargs("hours", int32(2))));
+            pythonValue = py.datetime.datetime(int32(2017), int32(5), int32(18), ...
+                int32(10), int32(42), int32(7), int32(250000), pyargs("tzinfo", zone));
+
+            value = nansen.module.nwb.neuroconv.fromPythonDatetime(pythonValue);
+
+            testCase.verifyEqual(string(value.TimeZone), "+02:00")
+            testCase.verifyEqual([value.Hour, value.Minute], [10, 42])
+            testCase.verifyEqual(value.Second, 7.25, AbsTol=1e-9)
+            testCase.verifyEqual(value, datetime(2017, 5, 18, 8, 42, 7.25, TimeZone="UTC"))
+        end
+
+        function readsAZeroOffsetAsUtc(testCase)
+            testCase.assumePythonIsAvailable()
+
+            zone = py.datetime.timezone(py.datetime.timedelta(int32(0)));
+            pythonValue = py.datetime.datetime(int32(2017), int32(5), int32(18), ...
+                int32(10), int32(42), int32(7), pyargs("tzinfo", zone));
+
+            value = nansen.module.nwb.neuroconv.fromPythonDatetime(pythonValue);
+
+            testCase.verifyEqual(string(value.TimeZone), "UTC")
+        end
+
+        function readsANegativeOffset(testCase)
+            testCase.assumePythonIsAvailable()
+
+            zone = py.datetime.timezone(py.datetime.timedelta(pyargs("hours", int32(-5), ...
+                "minutes", int32(-30))));
+            pythonValue = py.datetime.datetime(int32(2017), int32(5), int32(18), ...
+                int32(10), int32(42), int32(7), pyargs("tzinfo", zone));
+
+            value = nansen.module.nwb.neuroconv.fromPythonDatetime(pythonValue);
+
+            testCase.verifyEqual(string(value.TimeZone), "-05:30")
+            testCase.verifyEqual(value, datetime(2017, 5, 18, 16, 12, 7, TimeZone="UTC"))
+        end
+
+        function leavesPythonAloneWhenNoExecutableIsNamed(testCase)
+            environmentBefore = pyenv();
+
+            nansen.module.nwb.neuroconv.internal.configurePython("", "OutOfProcess")
+
+            testCase.verifyEqual(string(pyenv().Executable), string(environmentBefore.Executable))
+        end
+
+        function refusesASecondPythonInOneSession(testCase)
+            % MATLAB keeps the Python it loaded first, so a different one
+            % cannot be honoured without a restart.
+            environment = pyenv();
+            testCase.assumeEqual(string(environment.Status), "Loaded", ...
+                "Python is not loaded in this MATLAB session.")
+
+            testCase.verifyError( ...
+                @() nansen.module.nwb.neuroconv.internal.configurePython( ...
+                    "/no/such/python", "OutOfProcess"), ...
+                "nansen:nwb:pythonAlreadyLoaded")
+        end
+
+        function readsANaivePythonDatetimeWithoutAZone(testCase)
+            testCase.assumePythonIsAvailable()
+
+            pythonValue = py.datetime.datetime(int32(2017), int32(5), int32(18), ...
+                int32(10), int32(42), int32(7));
+
+            value = nansen.module.nwb.neuroconv.fromPythonDatetime(pythonValue);
+
+            testCase.verifyEqual(string(value.TimeZone), "")
+            testCase.verifyEqual(value, datetime(2017, 5, 18, 10, 42, 7))
+        end
+
         function convertsALogicalToAPythonBool(testCase)
             testCase.assumePythonIsAvailable()
 

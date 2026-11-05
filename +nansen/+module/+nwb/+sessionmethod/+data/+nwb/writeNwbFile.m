@@ -11,10 +11,18 @@ function varargout = writeNwbFile(sessionObject, varargin)
 %
 %   Metadata is pulled from wherever the project holds it: the session
 %   supplies the identifier and start time, the Subject metatable (when
-%   the project keeps one) supplies age, sex and genotype, and a
+%   the project keeps one) supplies age, sex and genotype, a SubjectAge
+%   column on the session table supplies the age at that session, and a
 %   nwb_metadata_defaults.json next to the configuration supplies what
 %   every conversion shares — institution, experimenter, keywords and the
 %   like. Values from the session win over the defaults.
+%
+%   A session whose folder records no time of day gets its start time
+%   from the first data item a NeuroConv interface converts, since such
+%   an interface reads the recording's header. A header time without a
+%   UTC offset is taken to be in the 'TimeZone' parameter's zone, the zone
+%   the session's own date and time are read in. Set 'PythonExecutable'
+%   to the Python that has NeuroConv when MATLAB is not configured for it.
 %
 %   By default a data item that fails to convert stops the export and
 %   leaves the previous file as it was. Set 'OnItemError' to "continue" to
@@ -75,12 +83,22 @@ import nansen.session.SessionMethod
     % rates the file critically incomplete.
     subjectRecord = findSubjectRecord(currentProject, sessionObject);
 
+    % A session folder names a date but often no time; the recording's
+    % header does, and a NeuroConv interface reads it.
+    sessionStartTime = datetime.empty;
+    if ~hasTimeOfDay(sessionObject)
+        sessionStartTime = startTimeFromRecording(sessionObject, dataItems, ...
+            params.PythonExecutable, params.TimeZone);
+    end
+
     config = nansen.module.nwb.session.NWBSessionConfigBuilder.buildConfig( ...
         sessionObject, dataItems, ...
         TimeZone=params.TimeZone, ...
         WriteMode=lower(string(params.WriteMode)), ...
         ProjectName=string(currentProject.Name), ...
         SubjectRecord=subjectRecord, ...
+        SubjectAge=sessionSubjectAge(sessionObject), ...
+        SessionStartTime=sessionStartTime, ...
         MetadataDefaults=findMetadataDefaults(configurationFolderPath));
 
     % Checking the file is worth the Python round trip here: a session
@@ -111,7 +129,116 @@ function params = getDefaultParameters()
     params.TimeZone = "local";
     params.WriteMode = 'Overwrite'; % 'Overwrite' | 'Append'
     params.Validate = true; % Check the written file against NWB Best Practices
+    params.PythonExecutable = ""; % Python with NeuroConv, when MATLAB is not configured for it
     params.OnItemError = "stop"; % "stop" | "continue": what a failing data item does
+end
+
+function tf = hasTimeOfDay(sessionObject)
+%hasTimeOfDay - Whether the session records a usable time of day
+%
+%   NaT, blank text and a missing string all mean the folder recorded no
+%   time, so the recording is asked instead.
+
+    value = sessionObject.Time;
+    if isempty(value)
+        tf = false;
+    elseif isdatetime(value)
+        tf = ~all(isnat(value));
+    elseif isstring(value) || ischar(value)
+        text = string(value);
+        tf = ~all(ismissing(text)) && any(strlength(strtrim(text(~ismissing(text)))) > 0);
+    else
+        tf = true;
+    end
+end
+
+function ageText = sessionSubjectAge(sessionObject)
+%sessionSubjectAge - The subject's age at this session, if the table has it
+%
+%   A session class that carries the subject's state, such as the
+%   SHAREbrain session with its SubjectAge column, records the age at the
+%   time of the session as text.
+
+    ageText = "";
+    if isprop(sessionObject, 'SubjectAge') && ~isempty(sessionObject.SubjectAge)
+        ageText = string(sessionObject.SubjectAge);
+    end
+end
+
+function sessionStartTime = startTimeFromRecording(sessionObject, dataItems, pythonExecutable, timeZone)
+%startTimeFromRecording - Ask the first NeuroConv item's interface when it started
+%
+%   Returns an empty datetime when no item is converted by a NeuroConv
+%   interface or none reports a start time; the builder then reports the
+%   missing time with what to configure.
+%
+%   A header that wrote no UTC offset records the wall-clock time of the
+%   acquisition computer. That time is given timeZone, the zone the
+%   session's own date and time are read in, because the builder refuses
+%   a start time without one.
+%
+%   The interface runs in the Python the item's converter will use, its
+%   PythonExecutable converter argument, or pythonExecutable when the item
+%   names none. MATLAB keeps the first Python it loads for the session, so
+%   loading another one here would make the conversion itself fail.
+
+    import nansen.module.nwb.session.NWBSessionConfigBuilder
+
+    sessionStartTime = datetime.empty;
+    registry = nansen.module.nwb.conversion.ConverterRegistry.instance();
+
+    for i = 1:numel(dataItems)
+        item = dataItems(i);
+        item.SourceInfo = NWBSessionConfigBuilder.sourceInfoForItem(sessionObject, item);
+
+        try
+            descriptor = registry.resolveForItem(item);
+        catch
+            % An item no converter resolves is reported when it converts.
+            continue
+        end
+        if descriptor.Source ~= "neuroconv"
+            continue
+        end
+
+        % The arguments the conversion itself will pass, by the runner's
+        % rule.
+        converterArgs = nansen.module.nwb.internal.mergeConverterArgs( ...
+            descriptor.DefaultConverterArgs, item.ConverterArgs);
+        if ~isfield(converterArgs, "InterfaceClassName")
+            % The raw NeuroConv entry takes its interface from the item;
+            % without one there is nothing to ask.
+            continue
+        end
+        itemPythonExecutable = string(nansen.module.nwb.conversion.getConverterArg( ...
+            converterArgs, "PythonExecutable", ""));
+        if strlength(itemPythonExecutable) == 0
+            itemPythonExecutable = pythonExecutable;
+        end
+        try
+            sourceArg = nansen.module.nwb.neuroconv.resolveSourceArg(item, converterArgs);
+            sessionStartTime = nansen.module.nwb.neuroconv.readSessionStartTime( ...
+                string(converterArgs.InterfaceClassName), sourceArg, ...
+                PythonExecutable=itemPythonExecutable);
+        catch cause
+            % MATLAB keeps one Python for the session, so the conversion
+            % would fail the same way; that is reported as it is.
+            if cause.identifier == "nansen:nwb:pythonAlreadyLoaded"
+                rethrow(cause)
+            end
+            warning("nansen:nwb:sessionStartTimeUnavailable", ...
+                "The recording of '%s' could not say when it started: %s", ...
+                item.VariableName, cause.message)
+            continue
+        end
+
+        if ~isempty(sessionStartTime)
+            if sessionStartTime.TimeZone == ""
+                sessionStartTime.TimeZone = timeZone;
+            end
+            return
+        end
+    end
 end
 
 function subjectRecord = findSubjectRecord(currentProject, sessionObject)

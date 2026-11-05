@@ -2,7 +2,18 @@
 Development of NWB integration into Nansen (NWB hackaton participation project)
 
 ## Requirements and Installation
-NANSEN-NWB requires **MATLAB R2022b** or later.
+NANSEN-NWB requires **MATLAB R2022b** or later, [matnwb](https://github.com/NeurodataWithoutBorders/matnwb) and [NANSEN](https://github.com/VervaekeLab/NANSEN).
+
+### Python
+
+Converters backed by [NeuroConv](https://neuroconv.readthedocs.io/) data interfaces, and the NWB Inspector check that `writeNwbFile` runs on each written file, call Python through MATLAB's `py.*` interface. Everything else works without Python. Install the packages in `python/requirements.txt`, at the versions listed there, into the Python MATLAB is configured for, or into a virtual environment that you point MATLAB at:
+
+```matlab
+pyenv(Version="~/.venvs/nansen-nwb/bin/python", ExecutionMode="OutOfProcess")
+[isAvailable, report] = nansen.module.nwb.neuroconv.hasNeuroconv()
+```
+
+`report.Message` says what is missing when `isAvailable` is false.
 
 ## Project Description
 
