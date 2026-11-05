@@ -81,6 +81,16 @@ classdef NWBSessionConfigBuilder
             %   "P90D", a value and unit such as "6 month" or "90 days",
             %   or a range such as "6-8 weeks".
             %
+            %   A converter argument whose value is, or contains, the text
+            %   "${session.<name>}" takes that property of the session
+            %   object in its place, so a column of the session table
+            %   becomes a per-session argument, such as the cell_id of an
+            %   intracellular electrode. Nested structs, struct arrays,
+            %   cell arrays and string arrays are resolved too; a resolved
+            %   value is always a string. Placeholders in the default
+            %   arguments of the converter an item resolves to are filled
+            %   the same way, so a lab converter can declare one.
+            %
             %   Errors:
             %     nansen:nwb:missingSessionIdentifier - the session has no
             %                     subject or session ID.
@@ -90,6 +100,13 @@ classdef NWBSessionConfigBuilder
             %                     zone.
             %     nansen:nwb:invalidSubjectAge - SubjectAge is not a
             %                     duration this function can read.
+            %     nansen:nwb:unknownSessionPlaceholder - a converter
+            %                     argument names a session property that
+            %                     does not exist or has no value.
+            %     nansen:nwb:invalidSessionPlaceholder - a converter
+            %                     argument names a session property that
+            %                     holds more than one value, such as a
+            %                     vector or a cell array.
 
             arguments
                 sessionObject (1,1)
@@ -120,6 +137,9 @@ classdef NWBSessionConfigBuilder
             for i = 1:numel(dataItems)
                 dataItems(i).SourceInfo = mergeSourceInfo(dataItems(i).SourceInfo, ...
                     NWBSessionConfigBuilder.sourceInfoForItem(sessionObject, dataItems(i)));
+                dataItems(i).ConverterArgs = ...
+                    NWBSessionConfigBuilder.resolveSessionPlaceholders( ...
+                    withPlaceholderDefaults(dataItems(i)), sessionObject);
             end
 
             subjectMetadata = NWBSessionConfigBuilder.subjectMetadata(sessionObject);
@@ -328,6 +348,47 @@ classdef NWBSessionConfigBuilder
     end
 
     methods (Static, Access = private)
+
+        function value = resolveSessionPlaceholders(value, sessionObject)
+            %resolveSessionPlaceholders - Fill "${session.<name>}" from the session
+            %
+            %   A text that holds such a placeholder comes back as a string
+            %   with the session's property in its place; a struct, or each
+            %   element of a struct array, is resolved field by field, and
+            %   a cell or string array element by element, keeping its
+            %   type. jsondecode reads a JSON list of strings as a cell
+            %   array. Anything else, such as a number, is returned as it
+            %   is.
+
+            import nansen.module.nwb.session.NWBSessionConfigBuilder
+
+            if isstruct(value)
+                % A struct array, such as a JSON list of objects, is
+                % resolved one element at a time: value.(name) on the
+                % whole array is a comma-separated list, not one value.
+                for elementIndex = 1:numel(value)
+                    for fieldName = string(fieldnames(value))'
+                        value(elementIndex).(fieldName) = NWBSessionConfigBuilder ...
+                            .resolveSessionPlaceholders(value(elementIndex).(fieldName), sessionObject);
+                    end
+                end
+            elseif iscell(value)
+                for elementIndex = 1:numel(value)
+                    value{elementIndex} = NWBSessionConfigBuilder ...
+                        .resolveSessionPlaceholders(value{elementIndex}, sessionObject);
+                end
+            elseif isstring(value) && ~isscalar(value)
+                for elementIndex = 1:numel(value)
+                    value(elementIndex) = NWBSessionConfigBuilder ...
+                        .resolveSessionPlaceholders(value(elementIndex), sessionObject);
+                end
+            elseif (ischar(value) || isstring(value)) && isscalar(string(value))
+                text = string(value);
+                if contains(text, "${session.")
+                    value = substituteSessionPlaceholders(text, sessionObject);
+                end
+            end
+        end
 
         function outputPath = resolveOutputPath(sessionObject, options)
             %resolveOutputPath - Decide where this session's file is written
@@ -706,5 +767,110 @@ function sex = mapBiologicalSex(value)
         sex = value;
     else
         sex = "U";
+    end
+end
+
+function converterArgs = withPlaceholderDefaults(dataItem)
+%withPlaceholderDefaults - An item's arguments over defaults that hold placeholders
+%
+%   The runner lays an item's ConverterArgs over its converter's
+%   DefaultConverterArgs, after the session is gone. Defaults holding a
+%   session placeholder are therefore merged in here, by the runner's rule
+%   that an item's argument replaces the default of the same name, so the
+%   placeholders are resolved with the item's own. Other defaults are left
+%   to the runner.
+
+    converterArgs = dataItem.ConverterArgs;
+    try
+        descriptor = nansen.module.nwb.conversion.ConverterRegistry.instance() ...
+            .resolveForItem(dataItem);
+    catch cause
+        % An item no converter resolves is reported when it converts.
+        % Anything else is a fault that would leave placeholders unfilled.
+        if ~ismember(string(cause.identifier), ["nansen:nwb:unknownConverter", ...
+                "nansen:nwb:unresolvedConverter", "nansen:nwb:ambiguousConverter"])
+            rethrow(cause)
+        end
+        return
+    end
+
+    defaultArgs = descriptor.DefaultConverterArgs;
+    if ~holdsPlaceholder(defaultArgs)
+        return
+    end
+
+    converterArgs = nansen.module.nwb.internal.mergeConverterArgs(defaultArgs, converterArgs);
+end
+
+function tf = holdsPlaceholder(value)
+%holdsPlaceholder - Whether a value holds "${session.<name>}" anywhere
+
+    if isstruct(value)
+        tf = any(arrayfun(@(element) any(structfun(@holdsPlaceholder, element)), value));
+    elseif iscell(value)
+        tf = any(cellfun(@holdsPlaceholder, value));
+    elseif ischar(value) || isstring(value)
+        tf = any(contains(string(value), "${session."));
+    else
+        tf = false;
+    end
+end
+
+function text = substituteSessionPlaceholders(text, sessionObject)
+%substituteSessionPlaceholders - Replace every "${session.<name>}" in a text
+
+    placeholders = regexp(text, '\$\{session\.(?<name>\w+)\}', 'names');
+
+    for k = 1:numel(placeholders)
+        name = placeholders(k).name;
+        text = replace(text, "${session." + name + "}", ...
+            sessionPropertyText(sessionObject, name));
+    end
+end
+
+function text = sessionPropertyText(sessionObject, name)
+%sessionPropertyText - A session property as one text, or an error
+%
+%   The session is a NANSEN session object, whose table columns are
+%   properties, or a struct standing in for one. A property that is
+%   missing or empty is an error rather than empty text: an argument
+%   silently left blank would reach the file unnoticed. A property that
+%   holds more than one value has no single text to put in its place.
+
+    if isstruct(sessionObject)
+        hasProperty = isfield(sessionObject, name);
+    else
+        hasProperty = isprop(sessionObject, name);
+    end
+    if ~hasProperty
+        error("nansen:nwb:unknownSessionPlaceholder", ...
+            ['The converter argument placeholder "${session.%s}" cannot be ', ...
+             'filled: session ''%s'' has no property %s. Add the column to ', ...
+             'the session table or remove the placeholder.'], ...
+            name, string(sessionObject.sessionID), name)
+    end
+
+    value = sessionObject.(name);
+    isSingleValue = (ischar(value) && isrow(value)) || (isscalar(value) && ...
+        (isstring(value) || isnumeric(value) || islogical(value) ...
+        || isdatetime(value) || iscategorical(value)));
+    if ~isempty(value) && ~isSingleValue
+        error("nansen:nwb:invalidSessionPlaceholder", ...
+            ['The converter argument placeholder "${session.%s}" cannot be ', ...
+             'filled: the property %s of session ''%s'' is a %s of size %s, ', ...
+             'not one text or number.'], ...
+            name, name, string(sessionObject.sessionID), class(value), mat2str(size(value)))
+    end
+
+    text = string.empty;
+    if ~isempty(value)
+        text = string(value);
+    end
+    if isempty(text) || ismissing(text) || strlength(text) == 0
+        error("nansen:nwb:unknownSessionPlaceholder", ...
+            ['The converter argument placeholder "${session.%s}" cannot be ', ...
+             'filled: session ''%s'' has no value for %s. Fill in the column ', ...
+             'for this session or remove the placeholder.'], ...
+            name, string(sessionObject.sessionID), name)
     end
 end
