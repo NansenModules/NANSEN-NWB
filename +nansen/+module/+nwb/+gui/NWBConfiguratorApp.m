@@ -934,6 +934,10 @@ classdef NWBConfiguratorApp < handle
                 defaults = resolution.Descriptor.DefaultConverterArgs;
             end
             converterArgs = nansen.module.nwb.internal.deepMerge(defaults, item.ConverterArgs);
+            % An argument with a companion choice field is shown as a
+            % dropdown, which the dialog only renders for an
+            % Alternatives/Selection struct.
+            converterArgs = nansen.module.nwb.internal.expandArgChoices(converterArgs);
             if isempty(fieldnames(converterArgs))
                 uialert(obj.Figure, ...
                     "This converter takes no arguments.", "Converter arguments", "Icon", "info")
@@ -945,6 +949,7 @@ classdef NWBConfiguratorApp < handle
             if wasAborted
                 return
             end
+            edited = nansen.module.nwb.internal.collapseArgChoices(edited);
             obj.setConverterArgs(utility.struct.removeConfigFields(edited))
         end
 

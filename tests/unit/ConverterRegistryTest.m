@@ -79,8 +79,11 @@ classdef ConverterRegistryTest < matlab.unittest.TestCase
             testCase.verifyEqual(string(defaults.SourcePathMode), "fileList")
             testCase.verifyTrue(defaults.UseInterfaceMetadata)
             % Seeded blank so the configurator's argument editor, which
-            % only edits fields already present, offers the clamp mode.
+            % only edits fields already present, offers the clamp mode;
+            % the companion field supplies its dropdown choices.
             testCase.verifyEqual(string(defaults.IcephysExperimentType), "")
+            testCase.verifyEqual(defaults.IcephysExperimentType_, ...
+                {'current_clamp', 'voltage_clamp', 'izero'})
         end
 
         function hintsTheAbfClampModeArgument(testCase)
