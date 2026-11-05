@@ -1,6 +1,6 @@
 # NeuroConv converters
 
-The configurator offers [NeuroConv](https://neuroconv.readthedocs.io/) data interfaces as converters. They run in the Python environment that the [Python section of the README](../README.md#python) sets up.
+The configurator offers [NeuroConv](https://neuroconv.readthedocs.io/) data interfaces as converters. They run in the Python environment that [python-setup.md](python-setup.md) sets up.
 
 With the versions in `python/requirements.txt`, the NeuroConv converters behave as follows:
 

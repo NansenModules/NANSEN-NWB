@@ -1,6 +1,6 @@
 # Python packages for the NeuroConv-backed converters and the NWB Inspector
-# check that writeNwbFile runs on each written file. The "Python" section of
-# README.md says how to install them and point MATLAB at them.
+# check that writeNwbFile runs on each written file. docs/python-setup.md
+# says how to install them and point MATLAB at them.
 #
 # The neuroconv extras add the packages each NeuroConv converter in the
 # registry needs: abf, tiff, scanimage, suite2p, image and deeplabcut.
