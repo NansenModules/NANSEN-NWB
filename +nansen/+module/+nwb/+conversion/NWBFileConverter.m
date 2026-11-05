@@ -312,7 +312,7 @@ classdef NWBFileConverter < handle
             catch cause
                 if obj.OnItemError == "continue"
                     warning("nansen:nwb:converterFailed", ...
-                        "Skipping ''%s'': %s", dataItem.VariableName, cause.message)
+                        "Skipping '%s': %s", dataItem.VariableName, cause.message)
                     obj.FailedItems(end+1) = dataItem.VariableName;
                     return
                 end
@@ -454,7 +454,7 @@ classdef NWBFileConverter < handle
             summary = compose("  [%s] %s: %s", findings.Importance, ...
                 findings.Check, findings.Message);
             warning("nansen:nwb:bestPracticeFindings", ...
-                "NWB Inspector reported %d issue(s) with ''%s'':\n%s", ...
+                "NWB Inspector reported %d issue(s) with '%s':\n%s", ...
                 height(findings), obj.Config.OutputPath, strjoin(summary, newline))
         end
 
@@ -549,7 +549,7 @@ classdef NWBFileConverter < handle
                         rethrow(cause)
                     end
                     warning("nansen:nwb:converterFailed", ...
-                        "Skipping ''%s'': %s", dataItems(i).VariableName, cause.message)
+                        "Skipping '%s': %s", dataItems(i).VariableName, cause.message)
                     obj.FailedItems(end+1) = dataItems(i).VariableName;
                     isResolved(i) = false;
                 end
