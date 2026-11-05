@@ -57,6 +57,24 @@ classdef ConverterRegistryTest < matlab.unittest.TestCase
             testCase.verifyTrue(any([descriptors.RequiresPython]))
         end
 
+        function namesThePackagesEachNeuroconvConverterImports(testCase)
+            % The configurator reports a converter whose packages are
+            % missing, so every format-specific NeuroConv converter has to
+            % name them. The raw interface runs whatever it is told to.
+            registry = nansen.module.nwb.conversion.ConverterRegistry();
+            descriptors = registry.list();
+            neuroconvDescriptors = descriptors([descriptors.Source] == "neuroconv" ...
+                & [descriptors.Name] ~= "NeuroConvDataInterface");
+
+            for i = 1:numel(neuroconvDescriptors)
+                testCase.verifyNotEmpty(neuroconvDescriptors(i).RequiredPythonPackages, ...
+                    neuroconvDescriptors(i).Name + " names no Python packages.")
+            end
+            testCase.verifyEqual( ...
+                registry.get("NeuroConvTiffImagingInterface").RequiredPythonPackages, ...
+                ["roiextractors", "tifffile"])
+        end
+
         function resolvesAnAbfFileToTheNeuroconvInterface(testCase)
             % Two converters read ABF: NeuroConv's interface, matched by
             % the format, and the built-in one, which stores each sweep the

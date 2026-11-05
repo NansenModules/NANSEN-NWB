@@ -243,6 +243,18 @@ classdef neuroconvBridgeTest < matlab.unittest.TestCase
 
     methods (Test, TestTags = {'RequiresPython'}) % Crossing into Python
 
+        function findsOnlyThePackagesThatAreNotInstalled(testCase)
+            testCase.assumePythonIsAvailable()
+            metadata = py.importlib.import_module("importlib.metadata");
+            installedName = string(py.next(py.iter(metadata.distributions())).name);
+            absentName = "nansen-nwb-no-such-package";
+
+            missingNames = nansen.module.nwb.neuroconv.findMissingPackages( ...
+                [installedName, absentName], "Refresh");
+
+            testCase.verifyEqual(missingNames, absentName)
+        end
+
         function convertsANestedStructToADict(testCase)
             testCase.assumePythonIsAvailable()
 

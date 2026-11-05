@@ -21,6 +21,10 @@ classdef NWBConfiguratorApp < handle
 %       PythonCheckFcn - Function with the outputs of hasNeuroconv, called
 %                        once when a NeuroConv converter is first shown.
 %                        hasNeuroconv by default.
+%       PackageCheckFcn - Function taking package names and returning
+%                        the missing ones, called for a converter that
+%                        names RequiredPythonPackages once Python is
+%                        available. findMissingPackages by default.
 %
 %   The converters come from the registry, so a converter a lab registers
 %   with registerConverterFolder appears without the app being changed.
@@ -82,6 +86,7 @@ classdef NWBConfiguratorApp < handle
         ListBackend (1,1) string = "html"
         PythonCheckFcn
         PythonReport = []                   % Result of PythonCheckFcn once asked
+        PackageCheckFcn
         SavedState (1,1) string = ""        % Config as JSON when last saved
         LabelToName dictionary = dictionary(string.empty, string.empty)
 
@@ -120,12 +125,14 @@ classdef NWBConfiguratorApp < handle
                     {mustBeMember(options.ListBackend, ["html", "uitable"])} = "html"
                 options.Visible (1,1) matlab.lang.OnOffSwitchState = "on"
                 options.PythonCheckFcn = @() nansen.module.nwb.neuroconv.hasNeuroconv()
+                options.PackageCheckFcn = @nansen.module.nwb.neuroconv.findMissingPackages
             end
 
             obj.Config = nansen.module.nwb.config.NWBFileConfiguration.fromAny(config);
             obj.FilePath = options.FilePath;
             obj.ListBackend = options.ListBackend;
             obj.PythonCheckFcn = options.PythonCheckFcn;
+            obj.PackageCheckFcn = options.PackageCheckFcn;
 
             if isempty(options.Registry)
                 obj.Registry = nansen.module.nwb.conversion.ConverterRegistry.instance();
@@ -459,7 +466,7 @@ classdef NWBConfiguratorApp < handle
             state.HasConverterArgs = ~isempty(fieldnames(item.ConverterArgs));
             state.Status = resolution.Status;
             state.Message = resolution.Message;
-            state.NeedsPython = resolution.Status == "needs Python";
+            state.NeedsPython = any(resolution.Status == ["needs Python", "needs packages"]);
 
             if strlength(converterName) > 0
                 state.ConverterLabel = obj.labelForName(converterName);
@@ -1132,6 +1139,17 @@ classdef NWBConfiguratorApp < handle
                 resolution.Status = "needs Python";
                 resolution.Message = obj.PythonReport.Message;
                 return
+            end
+
+            if ~isempty(descriptor.RequiredPythonPackages)
+                missingNames = string(obj.PackageCheckFcn(descriptor.RequiredPythonPackages));
+                if ~isempty(missingNames)
+                    resolution.Status = "needs packages";
+                    resolution.Message = descriptor.DisplayName + " needs the Python " ...
+                        + "packages " + strjoin(missingNames, ", ") + ", which are not " ...
+                        + "installed. Install the packages in python/requirements.txt.";
+                    return
+                end
             end
 
             placementText = primaryGroup;

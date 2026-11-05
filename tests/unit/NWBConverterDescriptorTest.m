@@ -120,6 +120,19 @@ classdef NWBConverterDescriptorTest < matlab.unittest.TestCase
                 "nansen:nwb:invalidConverterDescriptor")
         end
 
+        function rejectsRequiredPythonPackagesWithoutPython(testCase)
+            testCase.verifyError( ...
+                @() validDescriptor(RequiredPythonPackages="roiextractors"), ...
+                "nansen:nwb:invalidConverterDescriptor")
+        end
+
+        function rejectsABlankRequiredPythonPackage(testCase)
+            testCase.verifyError( ...
+                @() validDescriptor(RequiresPython=true, ...
+                    RequiredPythonPackages=["roiextractors", ""]), ...
+                "nansen:nwb:invalidConverterDescriptor")
+        end
+
         function acceptsAWellFormedNeuroconvConverter(testCase)
             descriptor = neuroconvDescriptor();
 
@@ -140,6 +153,16 @@ classdef NWBConverterDescriptorTest < matlab.unittest.TestCase
             testCase.verifyEqual(restored.Name, original.Name)
             testCase.verifyEqual(restored.NWBModuleTags, original.NWBModuleTags)
             testCase.verifyEqual(restored.RequiresNWBTypes, original.RequiresNWBTypes)
+        end
+
+        function keepsRequiredPythonPackagesThroughAStruct(testCase)
+            original = validDescriptor(RequiresPython=true, ...
+                RequiredPythonPackages=["roiextractors", "tifffile"]);
+
+            restored = nansen.module.nwb.conversion.NWBConverterDescriptor...
+                .fromAny(original.toStruct());
+
+            testCase.verifyEqual(restored.RequiredPythonPackages, ["roiextractors", "tifffile"])
         end
 
         function rejectsSomethingThatIsNotADescriptor(testCase)
@@ -163,6 +186,8 @@ function descriptor = validDescriptor(options)
         options.NWBModuleTags (1,:) string = strings(1, 0)
         options.RequiresNWBTypes (1,:) string = strings(1, 0)
         options.MetadataSchema = struct()
+        options.RequiresPython (1,1) logical = false
+        options.RequiredPythonPackages (1,:) string = strings(1, 0)
         options.Function (1,1) function_handle = @(context) context
     end
 
@@ -177,6 +202,8 @@ function descriptor = validDescriptor(options)
         ExecutionMode=options.ExecutionMode, ...
         PlacementPolicy=options.PlacementPolicy, ...
         MetadataSchema=options.MetadataSchema, ...
+        RequiresPython=options.RequiresPython, ...
+        RequiredPythonPackages=options.RequiredPythonPackages, ...
         Function=options.Function);
 end
 
