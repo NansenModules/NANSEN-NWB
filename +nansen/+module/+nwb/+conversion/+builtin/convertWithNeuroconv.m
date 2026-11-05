@@ -45,7 +45,9 @@ function result = convertWithNeuroconv(context)
 %                            a session's ABF files go in one data item
 %
 %   Errors:
-%     nansen:nwb:missingConverterArg - InterfaceClassName is not set.
+%     nansen:nwb:missingConverterArg - InterfaceClassName is not set, or
+%                     NeuroConv reported a session without a clamp mode
+%                     and IcephysExperimentType is not set.
 %     nansen:nwb:invalidConverterArg - IcephysExperimentType is not one
 %                     of the values above, or the interface's arguments
 %                     have no file_paths.
@@ -109,8 +111,27 @@ function result = convertWithNeuroconv(context)
             metadata, sourceArg, experimentType);
     end
 
-    nansen.module.nwb.neuroconv.runConversion(interfaceClassName, sourceArg, ...
-        context.FilePath, metadata, runArguments{:});
+    try
+        nansen.module.nwb.neuroconv.runConversion(interfaceClassName, sourceArg, ...
+            context.FilePath, metadata, runArguments{:});
+    catch exception
+        % NeuroConv reports a missing clamp mode only after the conversion
+        % has started, as a bare AssertionError that does not name the
+        % argument supplying it. That argument is set here, so this is
+        % where the error can point to it.
+        if strlength(experimentType) == 0 && ...
+                nansen.module.nwb.neuroconv.internal.isMissingClampModeError(exception)
+            hint = MException("nansen:nwb:missingConverterArg", ...
+                ['NeuroConv needs the clamp mode of the ABF files in ''%s'' ', ...
+                 'and cannot read it from them. Set ', ...
+                 'ConverterArgs.IcephysExperimentType on this data item to ', ...
+                 '"current_clamp", "voltage_clamp" or "izero", the mode the ', ...
+                 'session was recorded in. The NeuroConv error is attached below.'], ...
+                context.DataItem.VariableName);
+            throw(addCause(hint, exception))
+        end
+        rethrow(exception)
+    end
 
     result = struct("DidWriteFile", true);
 end

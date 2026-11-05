@@ -186,6 +186,34 @@ classdef neuroconvBridgeTest < matlab.unittest.TestCase
                 "nansen:nwb:invalidConverterArg")
         end
 
+        function detectsTheClampModeAssertionInTheMessage(testCase)
+            exception = MException("Python:AssertionError", ...
+                "Python Error: AssertionError: 'icephys_experiment_type' should be " + ...
+                "'voltage_clamp', 'current_clamp' or 'izero', but received value None");
+
+            testCase.verifyTrue(isMissingClampMode(exception))
+        end
+
+        function detectsTheClampModeAssertionInANestedCause(testCase)
+            % runConversion wraps the Python error, so the assertion sits
+            % one cause below the error a converter catches.
+            pythonError = MException("Python:AssertionError", ...
+                "Python Error: AssertionError: 'icephys_experiment_type' should be " + ...
+                "'voltage_clamp', 'current_clamp' or 'izero', but received value None");
+            wrapped = addCause(MException("nansen:nwb:neuroconvFailed", ...
+                "The NeuroConv interface failed."), pythonError);
+
+            testCase.verifyTrue(isMissingClampMode(wrapped))
+        end
+
+        function ignoresAnUnrelatedConversionError(testCase)
+            unrelated = addCause(MException("nansen:nwb:neuroconvFailed", ...
+                "The NeuroConv interface failed."), ...
+                MException("Python:ValueError", "Python Error: ValueError: bad file"));
+
+            testCase.verifyFalse(isMissingClampMode(unrelated))
+        end
+
         function rejectsSiblingFilesForAPathWithoutExtension(testCase)
             testCase.verifyError( ...
                 @() resolveFor("/data/recording", ...
@@ -694,6 +722,12 @@ function metadata = addExperimentType(metadata, sourceArg, experimentType)
 
     metadata = nansen.module.nwb.neuroconv.internal.addIcephysExperimentType( ...
         metadata, sourceArg, experimentType);
+end
+
+function tf = isMissingClampMode(exception)
+%isMissingClampMode - Shorthand for isMissingClampModeError
+
+    tf = nansen.module.nwb.neuroconv.internal.isMissingClampModeError(exception);
 end
 
 function sourceArg = resolveFor(paths, converterArgs)

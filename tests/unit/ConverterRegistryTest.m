@@ -78,6 +78,24 @@ classdef ConverterRegistryTest < matlab.unittest.TestCase
             testCase.verifyEqual(string(defaults.InterfaceClassName), "AbfInterface")
             testCase.verifyEqual(string(defaults.SourcePathMode), "fileList")
             testCase.verifyTrue(defaults.UseInterfaceMetadata)
+            % Seeded blank so the configurator's argument editor, which
+            % only edits fields already present, offers the clamp mode;
+            % the companion field supplies its dropdown choices.
+            testCase.verifyEqual(string(defaults.IcephysExperimentType), "")
+            testCase.verifyEqual(defaults.IcephysExperimentType_, ...
+                {'current_clamp', 'voltage_clamp', 'izero'})
+        end
+
+        function hintsTheAbfClampModeArgument(testCase)
+            % NeuroConv cannot read the clamp mode from an ABF 2 file with
+            % a protocol, so the configurator guides the user to set it
+            % before the conversion runs.
+            registry = nansen.module.nwb.conversion.ConverterRegistry();
+
+            hints = registry.get("NeuroConvAbfInterface").ConverterArgHints;
+
+            testCase.verifySubstring(hints.IcephysExperimentType, "IcephysExperimentType")
+            testCase.verifySubstring(hints.IcephysExperimentType, "current_clamp")
         end
     end
 
