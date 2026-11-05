@@ -167,6 +167,20 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
             testCase.verifyEqual(state.Status, "ok")
         end
 
+        function editsThePlacementMetadataAndArgumentsOfTheItem(testCase, ListBackend)
+            app = testCase.createApp(configurationWith(speedItem()), ListBackend);
+
+            app.setPlacement("Processing", "behavior")
+            app.setMetadata(struct("description", "running speed"))
+            app.setConverterArgs(struct("Gain", 2))
+
+            item = app.Config.DataItems(1);
+            testCase.verifyEqual([item.PrimaryGroup, item.NWBModule], ["Processing", "behavior"])
+            testCase.verifyEqual(item.Metadata, struct("description", "running speed"))
+            testCase.verifyEqual(item.ConverterArgs, struct("Gain", 2))
+            testCase.verifyEqual(app.listTable().Placement, "Processing/behavior")
+        end
+
         function opensAnItemWhoseGroupIsNotAnNwbGroup(testCase, ListBackend)
             % A pilot configuration can hold a lower-case group name.
             item = speedItem();

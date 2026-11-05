@@ -148,6 +148,37 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
             testCase.verifyEmpty(config.DataItems(1).SourceInfo.Path)
         end
 
+        function describesAVariableFromAGivenVariableModel(testCase)
+            % The configurator suggests converters before any session is
+            % chosen, from the project's variable model alone.
+            model = variableModelStub(struct( ...
+                "DataType", "RoiSignalArray", "FileAdapter", "RoiSignalArray"));
+
+            sourceInfo = describeVariable("RoiSignals_MeanF", model);
+
+            testCase.verifyEqual(sourceInfo.MatlabClass, "RoiSignalArray")
+            testCase.verifyEqual(sourceInfo.Format, "RoiSignalArray")
+            testCase.verifyEmpty(sourceInfo.Path)
+        end
+
+        function leavesTheFormatEmptyForTheDefaultAdapterInAModel(testCase)
+            model = variableModelStub(struct("DataType", "struct", "FileAdapter", "Default"));
+
+            sourceInfo = describeVariable("trials", model);
+
+            testCase.verifyEqual(sourceInfo.MatlabClass, "struct")
+            testCase.verifyEqual(sourceInfo.Format, "")
+        end
+
+        function describesNothingForAVariableTheModelLacks(testCase)
+            model = variableModelStub(struct("DataType", "struct"), IsExistingEntry=false);
+
+            sourceInfo = describeVariable("notInTheModel", model);
+
+            testCase.verifyEqual(sourceInfo, ...
+                nansen.module.nwb.config.NWBDataItemConfig.emptySourceInfo())
+        end
+
         function keepsAConfiguredSourceTheSessionDoesNotKnow(testCase)
             % A hand-written configuration can point at a file the
             % variable model has no entry for.
@@ -491,6 +522,25 @@ function record = subjectRecordStub()
     record.BiologicalSex = 'male';
     record.DateOfBirth = datetime(2026, 2, 9);
     record.Genotype = 'Scn1a+/-';
+end
+
+function sourceInfo = describeVariable(variableName, variableModel)
+%describeVariable - Shorthand for sourceInfoForVariable
+
+    sourceInfo = nansen.module.nwb.session.NWBSessionConfigBuilder ...
+        .sourceInfoForVariable(variableName, variableModel);
+end
+
+function model = variableModelStub(variableInfo, options)
+%variableModelStub - Stand-in for a NANSEN variable model holding one entry
+
+    arguments
+        variableInfo (1,1) struct
+        options.IsExistingEntry (1,1) logical = true
+    end
+
+    model = struct();
+    model.getVariableStructure = @(~) deal(variableInfo, options.IsExistingEntry);
 end
 
 function item = dataItem(variableName)
