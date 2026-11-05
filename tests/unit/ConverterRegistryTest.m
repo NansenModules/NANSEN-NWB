@@ -78,6 +78,9 @@ classdef ConverterRegistryTest < matlab.unittest.TestCase
             testCase.verifyEqual(string(defaults.InterfaceClassName), "AbfInterface")
             testCase.verifyEqual(string(defaults.SourcePathMode), "fileList")
             testCase.verifyTrue(defaults.UseInterfaceMetadata)
+            % Seeded blank so the configurator's argument editor, which
+            % only edits fields already present, offers the clamp mode.
+            testCase.verifyEqual(string(defaults.IcephysExperimentType), "")
         end
 
         function hintsTheAbfClampModeArgument(testCase)

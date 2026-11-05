@@ -219,8 +219,8 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
         end
 
         function guidesTowardAHintedArgumentLeftUnset(testCase, ListBackend)
-            % HintedOne hints its ClampMode argument, which neither the
-            % item nor the converter's defaults set.
+            % HintedOne hints its ClampMode argument, which its defaults
+            % seed blank and the item does not set.
             item = speedItem();
             item.ConverterName = "HintedOne";
             app = testCase.createApp(configurationWith(item), ListBackend);
@@ -423,6 +423,7 @@ function registry = testRegistry()
     % does not change which converters the other items match.
     registry.add(NWBConverterDescriptor(Name="HintedOne", DisplayName="Hinted converter", ...
         AcceptedClasses="hinted.Class", ProducesNWBType="TimeSeries", ...
+        DefaultConverterArgs=struct("ClampMode", ""), ...
         ConverterArgHints=struct("ClampMode", ...
             "Set ClampMode to the mode the session was recorded in."), ...
         Function=mutate))
