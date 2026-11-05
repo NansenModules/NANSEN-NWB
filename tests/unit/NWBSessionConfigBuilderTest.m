@@ -170,6 +170,18 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
             testCase.verifyEqual(sourceInfo.Format, "")
         end
 
+        function recordsTheFileTypeAsExtensionEvidence(testCase)
+            % With the default adapter and no data type, the file type is
+            % the only evidence the model holds for a variable.
+            model = variableModelStub(struct( ...
+                "DataType", "", "FileAdapter", "Default", "FileType", ".tif"));
+
+            sourceInfo = describeVariable("twoPhotonRecording", model);
+
+            testCase.verifyEqual(sourceInfo.FileType, ".tif")
+            testCase.verifyEqual(sourceInfo.MatlabClass, "")
+        end
+
         function describesNothingForAVariableTheModelLacks(testCase)
             model = variableModelStub(struct("DataType", "struct"), IsExistingEntry=false);
 

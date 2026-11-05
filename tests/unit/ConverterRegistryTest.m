@@ -142,6 +142,30 @@ classdef ConverterRegistryTest < matlab.unittest.TestCase
             testCase.verifyEqual(descriptors(1).Name, "ExtensionConverter")
         end
 
+        function matchesTheVariableModelsFileTypeAsAnExtension(testCase)
+            % Before any session is chosen there is no file path, so the
+            % variable model's FileType is the only hint of the file the
+            % variable will come from.
+            registry = testCase.registryWithRankingConverters();
+            sourceInfo = sourceEvidence(FileType=".tif");
+
+            [descriptors, ranks] = registry.findForSourceInfo(sourceInfo);
+
+            testCase.verifyEqual(descriptors(1).Name, "ExtensionConverter")
+            testCase.verifyGreaterThan(ranks(1), ranks(end))
+        end
+
+        function anExtensionAloneRulesNothingOut(testCase)
+            % A .mat file can hold data for any converter, so an extension
+            % suggests matches without hiding the rest.
+            registry = testCase.registryWithRankingConverters();
+            sourceInfo = sourceEvidence(FileType=".mat");
+
+            descriptors = registry.findForSourceInfo(sourceInfo);
+
+            testCase.verifyNumElements(descriptors, numel(registry.list()))
+        end
+
         function doesNotMatchAConverterForAnUnrelatedVariable(testCase)
             % The point of separating class and format evidence: a
             % converter that reads ScanImage files must not be offered
@@ -185,6 +209,25 @@ classdef ConverterRegistryTest < matlab.unittest.TestCase
 
             testCase.verifyFalse(any([descriptors.Name] == "FormatAndClassConverter"))
             testCase.verifyEqual(descriptors(1).Name, "FormatConverter")
+        end
+
+        function ignoresAnExtensionMatchForAClassTheConverterRejects(testCase)
+            % Symmetric with the format rule: an extension cannot override
+            % the classes the converter says it takes.
+            import nansen.module.nwb.conversion.NWBConverterDescriptor
+            registry = testCase.registryWithRankingConverters();
+            registry.add(NWBConverterDescriptor( ...
+                Name="ExtensionAndClassConverter", ...
+                AcceptedFormats="tif", ...
+                AcceptedClasses="nansen.stack.ImageStack", ...
+                ProducesNWBType="ImageSeries", ...
+                Function=@(context) context.NwbFile))
+
+            descriptors = registry.findForSourceInfo( ...
+                sourceEvidence(MatlabClass="timetable", FileType=".tif"));
+
+            testCase.verifyFalse(any([descriptors.Name] == "ExtensionAndClassConverter"))
+            testCase.verifyEqual(descriptors(1).Name, "ClassConverter")
         end
 
         function letsTheTargetTypeBreakATie(testCase)
@@ -382,6 +425,7 @@ function sourceInfo = sourceEvidence(options)
     arguments
         options.MatlabClass (1,1) string = ""
         options.Format (1,1) string = ""
+        options.FileType (1,1) string = ""
         options.Modality (1,1) string = ""
         options.Path (1,:) string = strings(1, 0)
     end
@@ -389,6 +433,7 @@ function sourceInfo = sourceEvidence(options)
     sourceInfo = nansen.module.nwb.config.NWBDataItemConfig.emptySourceInfo();
     sourceInfo.MatlabClass = options.MatlabClass;
     sourceInfo.Format = options.Format;
+    sourceInfo.FileType = options.FileType;
     sourceInfo.Modality = options.Modality;
     sourceInfo.Path = options.Path;
 end

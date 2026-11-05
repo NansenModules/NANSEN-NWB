@@ -144,15 +144,18 @@ classdef ConverterRegistry < handle
             %   DESCRIPTORS = findForSourceInfo(OBJ,sourceInfo) returns the
             %   converters that can handle a variable described by
             %   sourceInfo, best match first. sourceInfo is the struct on
-            %   NWBDataItemConfig, carrying MatlabClass, Format, Modality
-            %   and Path.
+            %   NWBDataItemConfig, carrying MatlabClass, Format, FileType,
+            %   Modality and Path.
             %
             %   [DESCRIPTORS,RANKS] = findForSourceInfo(...) also returns
             %   the match strength of each, so a caller can separate exact
             %   matches from converters that merely accept anything.
             %
             %   With no evidence at all every converter is returned, since
-            %   there is nothing to discriminate on.
+            %   there is nothing to discriminate on. A file extension —
+            %   FileType, or the extension of Path — is matched but never
+            %   rules a converter out: a .mat file can hold data for any
+            %   converter.
 
             arguments
                 obj
@@ -426,10 +429,13 @@ classdef ConverterRegistry < handle
                 return
             end
 
-            % A path only suggests a format, so it ranks below a format the
-            % session actually recorded.
-            extensions = obj.pathExtensions(getEvidence(sourceInfo, "Path"));
-            if ~isempty(extensions) && any(ismember(formats, extensions))
+            % An extension only suggests a format, so it ranks below a
+            % format the project actually recorded. It comes from the
+            % variable model's FileType, or from the data item's file path.
+            extensions = [obj.pathExtensions(getEvidence(sourceInfo, "Path")), ...
+                obj.normalizeMatchText(getEvidence(sourceInfo, "FileType"))];
+            if ~isempty(extensions) && any(ismember(formats, extensions)) ...
+                    && ~isClassRuledOut
                 rank = obj.RANK_EXTENSION;
                 return
             end
@@ -439,8 +445,11 @@ classdef ConverterRegistry < handle
                 return
             end
 
-            % No evidence at all cannot rule anything out.
-            if isempty(sourceFormat) && isempty(sourceClass) && isempty(extensions)
+            % Format and class evidence name the source exactly, so a
+            % converter matching neither is ruled out. An extension is too
+            % weak to rule anything out: a .mat file can hold data for any
+            % converter.
+            if isempty(sourceFormat) && isempty(sourceClass)
                 rank = obj.RANK_WILDCARD;
                 return
             end
