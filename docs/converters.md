@@ -95,7 +95,7 @@ The constructor validates the descriptor, so an inconsistent one fails where it 
 | `ConverterArgHints` | Per-argument guidance the configurator shows, with status `set converter args`, while that argument has no value in the item or the defaults |
 | `Function` | Handle taking one context. Required |
 
-A text argument in `DefaultConverterArgs` may bring a companion field named with a trailing underscore that lists its valid values, as in `"IcephysExperimentType_", {{'current_clamp', 'voltage_clamp', 'izero'}}`. The configurator's argument editor then offers the argument as a dropdown, with a `<not set>` entry that stands for leaving it blank. The companion configures the editor only: it is stripped when the item is saved and never read by a converter.
+A text argument in `DefaultConverterArgs` may bring a companion field named with a trailing underscore that lists its valid values, as in `"IcephysExperimentType_", {{'current_clamp', 'voltage_clamp', 'izero'}}`. This is NANSEN's config-field convention, and the configurator's argument editor, `structeditor` through `tools.editStruct`, offers such an argument as a dropdown of those values. The companion configures the editor only: it is stripped when the item is saved and never read by a converter.
 
 ### Why classes and formats are separate
 
