@@ -82,14 +82,7 @@ Converters backed by [NeuroConv](https://neuroconv.readthedocs.io/) data interfa
 
    `report.Message` says what is missing when `isAvailable` is false. `hasNeuroconv` keeps its result for the MATLAB session, and `"Refresh"` checks again.
 
-With the versions in `python/requirements.txt`, the NeuroConv converters behave as follows:
-
-| Converter | With these versions |
-|---|---|
-| `NeuroConvAbfInterface` | Converts. NeuroConv 0.10 deprecates `AbfInterface` and removes it in 0.12, so each conversion prints a `FutureWarning`. |
-| `NeuroConvTiffImagingInterface` | Converts. |
-| `NeuroConvImageInterface` | Fails. NeuroConv 0.10.2 cannot append an image to an existing NWB file (`'chunks' must have same rank as dataset shape`), and `writeNwbFile` always appends. |
-| `NeuroConvScanImageImagingInterface`, `NeuroConvSuite2pSegmentationInterface`, `NeuroConvDeepLabCutInterface` | Their packages are installed; no conversion has been checked with these versions. |
+Not every NeuroConv converter works with the versions in `python/requirements.txt`. [docs/neuroconv-converters.md](docs/neuroconv-converters.md) lists which ones convert.
 
 ## Custom converters
 
