@@ -56,6 +56,24 @@ classdef ConverterRegistryTest < matlab.unittest.TestCase
 
             testCase.verifyTrue(any([descriptors.RequiresPython]))
         end
+
+        function offersTheAbfConverterFirstForAnAbfFile(testCase)
+            % The interface reads its electrodes and recording tables from
+            % the file headers, and is given only the session's own file,
+            % so sessions sharing a folder keep their recordings apart.
+            % The descriptor's defaults are what make that work without
+            % per-item configuration.
+            registry = nansen.module.nwb.conversion.ConverterRegistry();
+            sourceInfo = sourceEvidence(Path="/data/sub-01/2026_09_08_0001.abf");
+
+            descriptors = registry.findForSourceInfo(sourceInfo);
+
+            testCase.verifyEqual(descriptors(1).Name, "NeuroConvAbfInterface")
+            defaults = descriptors(1).DefaultConverterArgs;
+            testCase.verifyEqual(string(defaults.InterfaceClassName), "AbfInterface")
+            testCase.verifyEqual(string(defaults.SourcePathMode), "fileList")
+            testCase.verifyTrue(defaults.UseInterfaceMetadata)
+        end
     end
 
     methods (Test) % Ranking converters against source evidence

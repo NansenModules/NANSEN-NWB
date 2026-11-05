@@ -12,6 +12,10 @@ function result = convertWithNeuroconv(context)
 %   metadata section, which is what makes that split work; the section
 %   itself is still required, so it is sent empty.
 %
+%   An interface times its data from the start of its own recording. The
+%   data are shifted so that they count from the session_start_time of the
+%   file being appended to.
+%
 %   Converter arguments:
 %       InterfaceClassName - NeuroConv interface to run, for example
 %                            "ScanImageImagingInterface"
@@ -21,9 +25,24 @@ function result = convertWithNeuroconv(context)
 %       RequiredInterfaceArgs - Names in InterfaceArgs the interface needs
 %       PythonExecutable   - Python interpreter to use, when not the default
 %       RunConversionArgs  - Extra arguments forwarded to run_conversion
+%       UseInterfaceMetadata - Whether to start from the metadata the
+%                            interface reads out of its own files, with
+%                            the item's metadata laid over it. Needed by
+%                            interfaces that derive electrodes or tables
+%                            from file headers, such as AbfInterface
+%       IcephysExperimentType - For AbfInterface: "current_clamp",
+%                            "voltage_clamp" or "izero", the clamp mode
+%                            of every file's recording session. NeuroConv
+%                            needs it for ABF 2 files with a protocol and
+%                            cannot read it from the file. Only one
+%                            AbfInterface can write into an NWB file, so
+%                            a session's ABF files go in one data item
 %
 %   Errors:
 %     nansen:nwb:missingConverterArg - InterfaceClassName is not set.
+%     nansen:nwb:invalidConverterArg - IcephysExperimentType is not one
+%                     of the values above, or the interface's arguments
+%                     have no file_paths.
 %     nansen:nwb:missingOutputFile - the NWB file to append to is absent.
 %
 %   See also nansen.module.nwb.neuroconv.runConversion,
@@ -69,8 +88,23 @@ function result = convertWithNeuroconv(context)
         runArguments = [runArguments, {"RunConversionArgs", runConversionArgs}];
     end
 
+    useInterfaceMetadata = getConverterArg(args, "UseInterfaceMetadata", false);
+    runArguments = [runArguments, {"UseInterfaceMetadata", logical(useInterfaceMetadata)}];
+
+    fileStartTime = nansen.module.nwb.neuroconv.internal.readFileSessionStartTime(context.FilePath);
+    if ~isempty(fileStartTime)
+        runArguments = [runArguments, {"AlignToStartTime", fileStartTime}];
+    end
+
+    metadata = itemMetadata(context);
+    experimentType = string(getConverterArg(args, "IcephysExperimentType", ""));
+    if strlength(experimentType) > 0
+        metadata = nansen.module.nwb.neuroconv.internal.addIcephysExperimentType( ...
+            metadata, sourceArg, experimentType);
+    end
+
     nansen.module.nwb.neuroconv.runConversion(interfaceClassName, sourceArg, ...
-        context.FilePath, itemMetadata(context), runArguments{:});
+        context.FilePath, metadata, runArguments{:});
 
     result = struct("DidWriteFile", true);
 end

@@ -18,6 +18,10 @@ function sourceArg = resolveSourceArg(dataItem, converterArgs)
 %       "grandparentFolder" - The folder two levels above it, such as
 %                             the suite2p folder for a file in plane0
 %       "fileList"          - Every recorded path, as a cell array
+%       "siblingFiles"      - Every file beside the data item's path with
+%                             the same extension, sorted by name, as a
+%                             cell array. For formats that split one
+%                             session across many files, such as ABF.
 %
 %   Constructor arguments other than the path, such as the sampling
 %   frequency of a TIFF stack, go in converterArgs.InterfaceArgs, a struct
@@ -69,7 +73,7 @@ function sourceArg = resolveSourceArg(dataItem, converterArgs)
     sourcePaths = resolveSourcePaths(dataItem, sourcePathMode);
 
     sourceArg = struct();
-    if sourcePathMode == "fileList"
+    if any(sourcePathMode == ["fileList", "siblingFiles"])
         sourceArg.(sourceArgumentName) = cellstr(sourcePaths);
     else
         sourceArg.(sourceArgumentName) = sourcePaths(1);
@@ -115,12 +119,50 @@ function sourcePaths = resolveSourcePaths(dataItem, sourcePathMode)
         case "fileList"
             sourcePaths = recordedPaths;
 
+        case "siblingFiles"
+            sourcePaths = listSiblingFiles(recordedPaths(1));
+
         otherwise
             error("nansen:nwb:invalidConverterArg", ...
                 ['''%s'' is not a supported SourcePathMode. Use one of: ', ...
                  'file, path, folder, parentFolder, grandparentFolder, ', ...
-                 'fileList.'], sourcePathMode)
+                 'fileList, siblingFiles.'], sourcePathMode)
     end
+end
+
+function siblingPaths = listSiblingFiles(filePath)
+%listSiblingFiles - Every file beside filePath with its extension, by name
+%
+%   NANSEN records one path per variable, but a format such as ABF splits
+%   one session across many files that NeuroConv takes together. The
+%   extension comparison ignores case: Axon writes ".ABF", and a session
+%   folder may hold a mix.
+
+    [folder, ~, extension] = fileparts(filePath);
+
+    if strlength(extension) == 0
+        error("nansen:nwb:invalidConverterArg", ...
+            ['SourcePathMode "siblingFiles" needs a path with a file ', ...
+             'extension to match on, but ''%s'' has none.'], filePath)
+    end
+
+    listing = dir(folder);
+    listing = listing(~[listing.isdir]);
+
+    names = strings(1, 0);
+    if ~isempty(listing)
+        names = string({listing.name});
+    end
+    names = names(endsWith(names, extension, IgnoreCase=true) & ~startsWith(names, "."));
+
+    if isempty(names)
+        error("nansen:nwb:missingSourcePath", ...
+            ['No %s files were found beside ''%s'', so there is nothing to ', ...
+             'hand to NeuroConv. Check that the session folder is reachable.'], ...
+            extension, filePath)
+    end
+
+    siblingPaths = reshape(string(fullfile(folder, sort(names))), 1, []);
 end
 
 function recordedPaths = getRecordedPaths(dataItem)
