@@ -71,12 +71,13 @@ classdef NWBSessionConfigBuilder
             %   folder records no time of day gets it from the recording
             %   itself this way.
             %
-            %   CONFIG = buildConfig(...,SubjectAge=TEXT) also fills the
-            %   subject's age from TEXT when the subject record supplies
-            %   none, as a session table does when it carries the
-            %   subject's state at the time of the session. TEXT is an
-            %   ISO 8601 duration such as "P90D", a value and unit such
-            %   as "6 month" or "90 days", or a range such as "6-8 weeks".
+            %   CONFIG = buildConfig(...,SubjectAge=TEXT) also sets the
+            %   subject's age from TEXT, as a session table does when it
+            %   carries the subject's state at the time of the session.
+            %   It replaces any age the subject record gives, being the
+            %   age at this session. TEXT is an ISO 8601 duration such as
+            %   "P90D", a value and unit such as "6 month" or "90 days",
+            %   or a range such as "6-8 weeks".
             %
             %   Errors:
             %     nansen:nwb:missingSessionIdentifier - the session has no
