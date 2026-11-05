@@ -1,69 +1,86 @@
-# Nansen-NWB
-Development of NWB integration into Nansen (NWB hackaton participation project)
+# NANSEN-NWB
 
-## Requirements and Installation
-NANSEN-NWB requires **MATLAB R2022b** or later, [matnwb](https://github.com/NeurodataWithoutBorders/matnwb) and [NANSEN](https://github.com/VervaekeLab/NANSEN).
+A [NANSEN](https://github.com/VervaekeLab/NANSEN) module for converting the sessions of a NANSEN project to [NWB](https://www.nwb.org/) files. You configure once per project which data variables go into the NWB file and how they are converted, then write one file per session.
 
-### Python
+## Requirements
 
-Converters backed by [NeuroConv](https://neuroconv.readthedocs.io/) data interfaces, and the NWB Inspector check that `writeNwbFile` runs on each written file, call Python through MATLAB's `py.*` interface. Everything else works without Python. Install the packages in `python/requirements.txt`, at the versions listed there, into the Python MATLAB is configured for, or into a virtual environment that you point MATLAB at:
+- MATLAB R2022b or later
+- [NANSEN](https://github.com/VervaekeLab/NANSEN)
+- [matnwb](https://github.com/NeurodataWithoutBorders/matnwb)
+- [entity-table](https://github.com/ehennestad/entity-table), at the commit pinned in `requirements.txt`
+- Optional: Python with the packages in `python/requirements.txt`, for the NeuroConv-based converters and the NWB Inspector check (see [Python](#python))
+
+## Installation
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/NansenModules/NANSEN-NWB.git
+   ```
+
+2. In MATLAB, add the repository folder to the path and install entity-table:
+
+   ```matlab
+   addpath("path/to/NANSEN-NWB")
+   matbox.installRequirements("path/to/NANSEN-NWB")
+   ```
+
+   NANSEN lists every `+nansen/+module` package on the MATLAB path as a module.
+
+3. In NANSEN, open **Nansen ▸ Configure ▸ Modules...** and select **NANSEN-NWB** for your project.
+
+## Getting started
+
+1. **Define data variables.** The configurator lists the project's data variables, so the project needs at least one (**Nansen ▸ Configure ▸ Variables...**).
+2. **Configure the conversion.** Open **Tools ▸ Nwb ▸ Configure Nwb File**. For each data variable, pick a converter, where its output goes in the NWB file, and the metadata the converter takes. The configuration is saved as `nwb_conversion_configuration.json` in the project's `nwb` configuration folder.
+3. **Add project-wide metadata (optional).** Put a `nwb_metadata_defaults.json` in the same folder to fill fields that no session carries:
+
+   ```json
+   {
+     "SubjectMetadata": { "species": "Mus musculus" },
+     "GeneralMetadata": {
+       "institution": "University of Oslo",
+       "lab": "Example lab",
+       "experimenter": ["Lastname, Firstname"],
+       "keywords": ["two-photon", "hippocampus"]
+     }
+   }
+   ```
+
+   Values from the session take precedence over these defaults.
+4. **Write the files.** Select sessions in the session table and run **Data ▸ Nwb ▸ Write Nwb File**. Each session gets `sub-<subjectID>_ses-<sessionID>.nwb` in its session folder, with session, subject and file metadata filled from the session table, the project's Subject table if it has one, and the defaults.
+
+## Python
+
+The NeuroConv converters and the NWB Inspector check after each write run through MATLAB's Python interface. Everything else works without Python.
+
+Create a virtual environment and install the packages listed in `python/requirements.txt` of the cloned NANSEN-NWB repository (commands for macOS and Linux):
+
+```bash
+cd path/to/NANSEN-NWB
+python -m venv ~/.venvs/nansen-nwb
+~/.venvs/nansen-nwb/bin/pip install -r python/requirements.txt
+```
+
+Then point MATLAB at that environment and check that NeuroConv is found:
 
 ```matlab
 pyenv(Version="~/.venvs/nansen-nwb/bin/python", ExecutionMode="OutOfProcess")
 [isAvailable, report] = nansen.module.nwb.neuroconv.hasNeuroconv()
 ```
 
-`report.Message` says what is missing when `isAvailable` is false.
+When `isAvailable` is false, `report.Message` says what is missing.
 
-The configurator's list is drawn by [entity-table](https://github.com/ehennestad/entity-table), pinned in `requirements.txt`; install it with `matbox.installRequirements(<this folder>)`.
+## Custom converters
 
-## Configuring a conversion
+The configurator offers the converters in `+nansen/+module/+nwb/+conversion/+builtin`, the NeuroConv data interfaces, and any converter you register from your own folder:
 
-`Tools > NWB > Configure NWB File` in NANSEN opens the configurator, `nansen.module.nwb.gui.NWBConfiguratorApp`: one row per data variable, and a panel for the selected one that sets the converter, where its output goes in the file, and the metadata and arguments the converter takes. Converters come from the registry: the ones in `+conversion/+builtin`, the NeuroConv data interfaces, and any a lab registers from its own folder with `nansen.module.nwb.registerConverterFolder`; `docs/converters.md` says how to write one. What the panel says a conversion would do with an item is what `writeNwbFile` does, since both ask `ConverterRegistry.resolveForItem`.
+```matlab
+nansen.module.nwb.registerConverterFolder("/lab/code/nwbconverters")
+```
 
-The configuration is saved as JSON in the project's `nwb` configuration folder, where `nwb_metadata_defaults.json` may hold what every conversion in the project shares: institution, lab, experimenter, keywords, species. A project that still has a pilot `.mat` configuration has it converted when the configurator opens, and the JSON is saved beside it.
+[docs/converters.md](docs/converters.md) describes how to write a converter.
 
-Dynamic tables, such as the electrodes table the pilot configurator edited on its Tables page, have no place in the JSON configuration. A converter that needs one builds it, as the ROI converters build the plane segmentation.
+## License
 
-`Data > nwb > Write NWB file` converts one session: it fills the file-level metadata from the session, the subject table and the defaults, runs each item's converter, and checks the written file with NWB Inspector when Python has it.
-
-## Project Description
-
-Create a set of classes to interact with NWB data (read/write) from NANSEN. NANSEN is a matlab package for managing, processing and visualizing calcium imaging data: https://github.com/VervaekeLab/NANSEN
-
-## Objectives
-
-<!-- Briefly describe the objectives of your project. What would you like to achieve?-->
-
-1. Objective A: Create a list of data variables with names according to the NWB Schemas
-2. Objective B: Create a data input/output interface for NWB files. Read and write specific variables to NWB files.
-3. Objective C: Learn more about how other people use NWB and what kind of data readers/writers already exists.
-
-## Approach and Plan
-
-1. Create an abstract VariableFileAdapter class. A class providing methods for a) reading and writing a predefined variable from/to a specified file format and b) specify how to open data for visualization.
-2. Create an abstract DataIOModel. Class interface to read/write data from/to different datalocations, using different variable file-adapters
-3. Create implementations of VariableFileAdapter for the NWB format
-4. Use classes above to read experiment dataset from my phd work and save it to NWB file.
-5. Use classes above to read an NWB dataset into a Nansen project.
-
-## Progress and Next Steps
-
-<!--Populate this section as you are making progress before/during/after the hackathon-->
-<!--Describe the progress you have made on the project, e.g., which objectives you have achieved and how.-->
-<!--Describe the next steps you are planning to take to complete the project.-->
-
-## Materials
-
-<!--If available add links to the materials relevant to the project, e.g., the code generated for the project or data used-->
-<!--If available add pictures and links to videos that demonstrate what has been accomplished.-->
-<!--![Description of picture](Example2.jpg)-->
-
-See https://github.com/NansenModules/NANSEN-NWB.git for details
-
-## Background and References
-
-<!--Use this space for information that may help people better understand your project, like links to papers, source code, or data ,e.g:-->
-<!-- - Source code: https://github.com/YourUser/YourRepository -->
-<!-- - Documentation: https://link.to.docs -->
-<!-- - Test data: https://link.to.test.data -->
+MIT. See [LICENSE](LICENSE).
