@@ -146,27 +146,65 @@ classdef neuroconvBridgeTest < matlab.unittest.TestCase
             testCase.verifyEqual(string(sourceArg.file_paths), "/data/170518_1a.ABF")
         end
 
+        function namesAnIcephysSessionForEachFile(testCase)
+            sourceArg = struct("file_paths", {{'/data/170518_1a.ABF', '/data/170518_1b.ABF'}});
+
+            metadata = addExperimentType(struct(), sourceArg, "current_clamp");
+
+            sessions = metadata.Icephys.Sessions;
+            testCase.verifyClass(sessions, "cell")
+            testCase.verifyEqual(cellfun(@(s) string(s.name), sessions), ...
+                ["170518_1a.ABF", "170518_1b.ABF"])
+            testCase.verifyEqual(string(sessions{1}.icephys_experiment_type), "current_clamp")
+        end
+
+        function keepsASingleSessionAList(testCase)
+            % NeuroConv merges a list of sessions by name; one session
+            % sent as a dict would replace the list.
+            sourceArg = struct("file_paths", {{'/data/170518_1a.ABF'}});
+
+            metadata = addExperimentType(struct(), sourceArg, "izero");
+
+            testCase.verifyClass(metadata.Icephys.Sessions, "cell")
+            testCase.verifyNumElements(metadata.Icephys.Sessions, 1)
+        end
+
         function rejectsAnUnknownIcephysExperimentType(testCase)
             % NeuroConv's metadata schema does not check the value, so a
             % typo would only fail deep inside the conversion.
-            filePath = fullfile(tempdir, "neuroconvBridgeTest_target.nwb");
-            writelines("not an NWB file", filePath)
-            testCase.addTeardown(@() delete(filePath))
-
-            sourceInfo = nansen.module.nwb.config.NWBDataItemConfig.emptySourceInfo();
-            sourceInfo.Path = "/data/170518_1a.ABF";
-            context = struct( ...
-                "DataItem", nansen.module.nwb.config.NWBDataItemConfig( ...
-                    VariableName="Vm", SourceInfo=sourceInfo), ...
-                "FilePath", filePath, ...
-                "Metadata", struct(), ...
-                "ConverterArgs", struct("InterfaceClassName", "AbfInterface", ...
-                    "SourceArgumentName", "file_paths", "SourcePathMode", "fileList", ...
-                    "IcephysExperimentType", "currentclamp"));
+            sourceArg = struct("file_paths", {{'/data/170518_1a.ABF'}});
 
             testCase.verifyError( ...
-                @() nansen.module.nwb.conversion.builtin.convertWithNeuroconv(context), ...
+                @() addExperimentType(struct(), sourceArg, "currentclamp"), ...
                 "nansen:nwb:invalidConverterArg")
+        end
+
+        function rejectsAnExperimentTypeWithoutFilePaths(testCase)
+            % An explicit SourceArg need not name its files file_paths.
+            testCase.verifyError( ...
+                @() addExperimentType(struct(), struct("file_path", "/data/a.abf"), "current_clamp"), ...
+                "nansen:nwb:invalidConverterArg")
+        end
+
+        function rejectsSiblingFilesForAPathWithoutExtension(testCase)
+            testCase.verifyError( ...
+                @() resolveFor("/data/recording", ...
+                    struct("SourceArgumentName", "file_paths", ...
+                        "SourcePathMode", "siblingFiles")), ...
+                "nansen:nwb:invalidConverterArg")
+        end
+
+        function acceptsADescriptorWithSiblingFiles(testCase)
+            descriptor = nansen.module.nwb.conversion.NWBConverterDescriptor( ...
+                Name="SiblingAbf", Source="neuroconv", AcceptedFormats="abf", ...
+                ProducesNWBType="PatchClampSeries", ExecutionMode="external", ...
+                PlacementPolicy="converter", RequiresPython=true, NeedsData=false, ...
+                DefaultConverterArgs=struct("InterfaceClassName", "AbfInterface", ...
+                    "SourceArgumentName", "file_paths", "SourcePathMode", "siblingFiles"), ...
+                Function=@nansen.module.nwb.conversion.builtin.convertWithNeuroconv);
+
+            testCase.verifyEqual(string(descriptor.DefaultConverterArgs.SourcePathMode), ...
+                "siblingFiles")
         end
 
         function readsTheStartTimeOfAnNwbFile(testCase)
@@ -528,6 +566,13 @@ function offsets = alignedOffsets(interface)
 %alignedOffsets - The offsets a stub interface was asked to shift by
 
     offsets = cellfun(@double, cell(interface.aligned));
+end
+
+function metadata = addExperimentType(metadata, sourceArg, experimentType)
+%addExperimentType - Shorthand for addIcephysExperimentType
+
+    metadata = nansen.module.nwb.neuroconv.internal.addIcephysExperimentType( ...
+        metadata, sourceArg, experimentType);
 end
 
 function sourceArg = resolveFor(paths, converterArgs)
