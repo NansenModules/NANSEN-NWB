@@ -784,8 +784,13 @@ function converterArgs = withPlaceholderDefaults(dataItem)
     try
         descriptor = nansen.module.nwb.conversion.ConverterRegistry.instance() ...
             .resolveForItem(dataItem);
-    catch
+    catch cause
         % An item no converter resolves is reported when it converts.
+        % Anything else is a fault that would leave placeholders unfilled.
+        if ~ismember(string(cause.identifier), ["nansen:nwb:unknownConverter", ...
+                "nansen:nwb:unresolvedConverter", "nansen:nwb:ambiguousConverter"])
+            rethrow(cause)
+        end
         return
     end
 
@@ -794,11 +799,7 @@ function converterArgs = withPlaceholderDefaults(dataItem)
         return
     end
 
-    itemArgs = converterArgs;
-    converterArgs = defaultArgs;
-    for fieldName = string(fieldnames(itemArgs))'
-        converterArgs.(fieldName) = itemArgs.(fieldName);
-    end
+    converterArgs = nansen.module.nwb.internal.mergeConverterArgs(defaultArgs, converterArgs);
 end
 
 function tf = holdsPlaceholder(value)

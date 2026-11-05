@@ -445,6 +445,28 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
             testCase.verifyEqual(converterArgs.Gain, 5)
         end
 
+        function letsAnItemReplaceADefaultHoldingAPlaceholder(testCase)
+            % The item's ElectrodeMetadata replaces the default whole, so
+            % the placeholder in the default does not need a column.
+            import nansen.module.nwb.conversion.ConverterRegistry
+            ConverterRegistry.instance(Refresh=true);
+            testCase.addTeardown(@() ConverterRegistry.instance(Refresh=true));
+            ConverterRegistry.instance().add(nansen.module.nwb.conversion.NWBConverterDescriptor( ...
+                Name="SessionArgsConverter", AcceptedClasses="*", ...
+                ProducesNWBType="TimeSeries", Function=@(context) context.NwbFile, ...
+                DefaultConverterArgs=struct("ElectrodeMetadata", ...
+                    struct("cell_id", "${session.cell_id}"))));
+
+            item = dataItem("abf");
+            item.ConverterName = "SessionArgsConverter";
+            item.ConverterArgs = struct("ElectrodeMetadata", struct("name", "pipette"));
+
+            config = buildFor(sessionStub(), DataItems=item);
+
+            testCase.verifyEqual(config.DataItems(1).ConverterArgs.ElectrodeMetadata, ...
+                struct("name", "pipette"))
+        end
+
         function fillsAPlaceholderFromASessionObject(testCase)
             item = dataItem("abf");
             item.ConverterArgs = struct("cell_id", "${session.cell_id}");
