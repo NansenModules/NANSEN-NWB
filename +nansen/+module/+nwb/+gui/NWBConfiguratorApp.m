@@ -690,8 +690,9 @@ classdef NWBConfiguratorApp < handle
             container.Layout.Row = [1, 2];
             container.Layout.Column = 2;
 
+            % The label column fits its longest label, "Converter arguments".
             panel = uigridlayout(container, [14, 2]);
-            panel.ColumnWidth = {110, "1x"};
+            panel.ColumnWidth = {130, "1x"};
             panel.RowHeight = {28, 24, 48, 36, 24, 24, 24, 24, 24, 24, 24, 8, "1x", 0};
             panel.Padding = [12, 8, 12, 8];
             panel.RowSpacing = 6;
@@ -738,7 +739,7 @@ classdef NWBConfiguratorApp < handle
             [obj.MetadataButton, obj.MetadataStatusLabel] = obj.addEditRow(panel, 10, "Metadata");
             obj.MetadataButton.ButtonPushedFcn = @(~, ~) obj.runUiAction(@() obj.editMetadata());
 
-            [obj.ArgsButton, obj.ArgsStatusLabel] = obj.addEditRow(panel, 11, "Arguments");
+            [obj.ArgsButton, obj.ArgsStatusLabel] = obj.addEditRow(panel, 11, "Converter arguments");
             obj.ArgsButton.ButtonPushedFcn = @(~, ~) obj.runUiAction(@() obj.editConverterArgs());
 
             obj.StatusLabel = uilabel(panel, "Text", "", "WordWrap", "on", "VerticalAlignment", "top");
@@ -1199,7 +1200,7 @@ classdef NWBConfiguratorApp < handle
 
             unsetHintedName = firstUnsetHintedArgument(item, descriptor);
             if strlength(unsetHintedName) > 0
-                resolution.Status = "set converter args";
+                resolution.Status = "set converter arguments";
                 resolution.Message = descriptor.ConverterArgHints.(unsetHintedName);
                 return
             end

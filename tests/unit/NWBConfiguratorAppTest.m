@@ -227,7 +227,7 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
 
             state = app.panelState();
 
-            testCase.verifyEqual(state.Status, "set converter args")
+            testCase.verifyEqual(state.Status, "set converter arguments")
             testCase.verifySubstring(state.Message, "ClampMode")
         end
 
