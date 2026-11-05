@@ -429,6 +429,19 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
                 "nansen:nwb:invalidSubjectAge")
         end
 
+        function rejectsASessionStartTimeThatIsNaT(testCase)
+            testCase.verifyError( ...
+                @() buildFor(sessionStub(), SessionStartTime=NaT(TimeZone="UTC")), ...
+                "nansen:nwb:invalidSessionStartTime")
+        end
+
+        function rejectsMoreThanOneSessionStartTime(testCase)
+            startTimes = datetime(2026, 5, 10, 9, 0, 0, TimeZone="UTC") + hours(0:1);
+
+            testCase.verifyError(@() buildFor(sessionStub(), SessionStartTime=startTimes), ...
+                "nansen:nwb:invalidSessionStartTime")
+        end
+
         function rejectsAMissingSubjectIdentifier(testCase)
             % A missing string is not empty and has no length to compare.
             session = sessionStub();

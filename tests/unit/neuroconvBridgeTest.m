@@ -318,6 +318,53 @@ classdef neuroconvBridgeTest < matlab.unittest.TestCase
             testCase.verifyEqual(value, datetime(2017, 5, 18, 8, 42, 7.25, TimeZone="UTC"))
         end
 
+        function readsAZeroOffsetAsUtc(testCase)
+            testCase.assumePythonIsAvailable()
+
+            zone = py.datetime.timezone(py.datetime.timedelta(int32(0)));
+            pythonValue = py.datetime.datetime(int32(2017), int32(5), int32(18), ...
+                int32(10), int32(42), int32(7), pyargs("tzinfo", zone));
+
+            value = nansen.module.nwb.neuroconv.fromPythonDatetime(pythonValue);
+
+            testCase.verifyEqual(string(value.TimeZone), "UTC")
+        end
+
+        function readsANegativeOffset(testCase)
+            testCase.assumePythonIsAvailable()
+
+            zone = py.datetime.timezone(py.datetime.timedelta(pyargs("hours", int32(-5), ...
+                "minutes", int32(-30))));
+            pythonValue = py.datetime.datetime(int32(2017), int32(5), int32(18), ...
+                int32(10), int32(42), int32(7), pyargs("tzinfo", zone));
+
+            value = nansen.module.nwb.neuroconv.fromPythonDatetime(pythonValue);
+
+            testCase.verifyEqual(string(value.TimeZone), "-05:30")
+            testCase.verifyEqual(value, datetime(2017, 5, 18, 16, 12, 7, TimeZone="UTC"))
+        end
+
+        function leavesPythonAloneWhenNoExecutableIsNamed(testCase)
+            environmentBefore = pyenv();
+
+            nansen.module.nwb.neuroconv.internal.configurePython("", "OutOfProcess")
+
+            testCase.verifyEqual(string(pyenv().Executable), string(environmentBefore.Executable))
+        end
+
+        function refusesASecondPythonInOneSession(testCase)
+            % MATLAB keeps the Python it loaded first, so a different one
+            % cannot be honoured without a restart.
+            environment = pyenv();
+            testCase.assumeEqual(string(environment.Status), "Loaded", ...
+                "Python is not loaded in this MATLAB session.")
+
+            testCase.verifyError( ...
+                @() nansen.module.nwb.neuroconv.internal.configurePython( ...
+                    "/no/such/python", "OutOfProcess"), ...
+                "nansen:nwb:pythonAlreadyLoaded")
+        end
+
         function readsANaivePythonDatetimeWithoutAZone(testCase)
             testCase.assumePythonIsAvailable()
 
