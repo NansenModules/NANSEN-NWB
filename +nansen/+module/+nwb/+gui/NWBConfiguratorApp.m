@@ -1256,11 +1256,7 @@ end
 function sourceInfo = sourceInfoFor(variableName)
 %sourceInfoFor - Source evidence for a variable, from the project's variable model
 
-    try
-        sourceInfo = nansen.module.nwb.session.NWBSessionConfigBuilder.sourceInfoForVariable(variableName);
-    catch
-        sourceInfo = nansen.module.nwb.config.NWBDataItemConfig.emptySourceInfo();
-    end
+    sourceInfo = nansen.module.nwb.session.NWBSessionConfigBuilder.sourceInfoForVariable(variableName);
 end
 
 function typeName = resolvedType(descriptor, item)
