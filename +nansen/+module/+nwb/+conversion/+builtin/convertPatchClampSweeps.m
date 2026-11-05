@@ -27,6 +27,10 @@ function nwbFile = convertPatchClampSweeps(context)
 %   series says so. A file whose start times do not match its sweeps is
 %   warned about and handled the same way.
 %
+%   A series is named after the item, the channel when the recording has
+%   several, and the sweep number. A channel without a name, or with a
+%   name another channel shares, is named "ch<N>".
+%
 %   Converter arguments:
 %       DeviceMetadata      - name, description and manufacturer of the
 %                             amplifier; the name defaults to "Amplifier"
@@ -104,7 +108,7 @@ function nwbFile = convertPatchClampSweeps(context)
     end
 
     baseName = string(context.Placement.Name);
-    channelNames = string(recording.ChannelNames);
+    labels = channelLabels(string(recording.ChannelNames), numChannels);
 
     for channel = channelIndex
         [seriesConstructor, storedUnit, conversion, isStimulus] = seriesForUnit( ...
@@ -127,7 +131,7 @@ function nwbFile = convertPatchClampSweeps(context)
                 'stimulus_description', char(stimulusDescription), ...
                 metadataNvPairs{:});
 
-            targetGroup.set(char(seriesName(baseName, channelNames, channel, ...
+            targetGroup.set(char(seriesName(baseName, labels(channel), ...
                 numChannels, sweep)), series);
         end
     end
@@ -260,19 +264,32 @@ function [constructor, storedUnit, conversion, isStimulus] = seriesForUnit(unit,
     end
 end
 
-function name = seriesName(baseName, channelNames, channel, numChannels, sweep)
+function labels = channelLabels(channelNames, numChannels)
+%channelLabels - The label each channel's series names carry
+%
+%   A channel's own name, or "ch<N>" when the name is blank or another
+%   channel has it too: two series with one name would leave only the
+%   second in the file.
+
+    names = strings(1, numChannels);
+    numNamed = min(numel(channelNames), numChannels);
+    names(1:numNamed) = strtrim(channelNames(1:numNamed));
+
+    [~, ~, groupIndex] = unique(names);
+    counts = accumarray(groupIndex(:), 1);
+    isShared = reshape(counts(groupIndex) > 1, 1, []);
+
+    labels = "ch" + (1:numChannels);
+    isUsable = strlength(names) > 0 & ~isShared;
+    labels(isUsable) = names(isUsable);
+end
+
+function name = seriesName(baseName, channelLabel, numChannels, sweep)
 %seriesName - <item>[_<channel>]_sweep<nnn>
 
     name = baseName;
     if numChannels > 1
-        channelName = "";
-        if numel(channelNames) >= channel
-            channelName = strtrim(channelNames(channel));
-        end
-        if strlength(channelName) == 0
-            channelName = "ch" + channel;
-        end
-        name = name + "_" + channelName;
+        name = name + "_" + channelLabel;
     end
     name = name + sprintf("_sweep%03d", sweep);
 end

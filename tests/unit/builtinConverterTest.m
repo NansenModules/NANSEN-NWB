@@ -299,6 +299,27 @@ classdef builtinConverterTest < matlab.unittest.TestCase
             testCase.verifySubstring(string(series.comments), "do not match")
         end
 
+        function namesChannelsThatShareANameByNumber(testCase)
+            % Two series with one name would leave only the second.
+            recording = patchClampRecording(["mV", "mV"], 1);
+            recording.ChannelNames = ["IN 0", "IN 0"];
+
+            nwbFile = testCase.convert(recording, "PatchClampSweeps", NWBVariableName="cell");
+
+            testCase.verifyEqual(sort(string(nwbFile.acquisition.keys())), ...
+                ["cell_ch1_sweep001", "cell_ch2_sweep001"])
+        end
+
+        function namesChannelsByTheirOwnNames(testCase)
+            recording = patchClampRecording(["mV", "pA"], 1);
+            recording.ChannelNames = ["Vm", "Im"];
+
+            nwbFile = testCase.convert(recording, "PatchClampSweeps", NWBVariableName="cell");
+
+            testCase.verifyTrue(nwbFile.acquisition.isKey("cell_Vm_sweep001"))
+            testCase.verifyTrue(nwbFile.stimulus_presentation.isKey("cell_Im_sweep001"))
+        end
+
         function rejectsAChannelInAUnitThatIsNeitherVoltageNorCurrent(testCase)
             testCase.verifyError( ...
                 @() testCase.convert(patchClampRecording("degC", 1), "PatchClampSweeps"), ...
