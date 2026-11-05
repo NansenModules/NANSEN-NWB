@@ -1134,6 +1134,13 @@ classdef NWBConfiguratorApp < handle
                 return
             end
 
+            unsetHintedName = firstUnsetHintedArgument(item, descriptor);
+            if strlength(unsetHintedName) > 0
+                resolution.Status = "set converter args";
+                resolution.Message = descriptor.ConverterArgHints.(unsetHintedName);
+                return
+            end
+
             placementText = primaryGroup;
             if primaryGroup == "Processing" && strlength(moduleName) > 0
                 placementText = placementText + "/" + moduleName;
@@ -1289,4 +1296,39 @@ function tf = isUnsetText(value)
 
     value = strtrim(string(value));
     tf = ismissing(value) || strlength(value) == 0 || startsWith(value, "<");
+end
+
+function name = firstUnsetHintedArgument(item, descriptor)
+%firstUnsetHintedArgument - The first hinted argument the item leaves unset
+%   A converter declares hints for arguments the user must usually supply.
+%   An argument counts as set when the item or the converter's defaults
+%   give it any value other than blank text.
+
+    name = "";
+    hintNames = string(fieldnames(descriptor.ConverterArgHints));
+    if isempty(hintNames)
+        return
+    end
+
+    effectiveArgs = nansen.module.nwb.internal.mergeConverterArgs( ...
+        descriptor.DefaultConverterArgs, item.ConverterArgs);
+    for i = 1:numel(hintNames)
+        if isUnsetArgument(effectiveArgs, hintNames(i))
+            name = hintNames(i);
+            return
+        end
+    end
+end
+
+function tf = isUnsetArgument(args, name)
+%isUnsetArgument - Whether a converter argument is absent or blank text
+
+    if ~isfield(args, name)
+        tf = true;
+        return
+    end
+    value = args.(name);
+    isTextScalar = (ischar(value) && (isrow(value) || isempty(value))) ...
+        || (isstring(value) && isscalar(value));
+    tf = isTextScalar && strlength(strtrim(string(value))) == 0;
 end

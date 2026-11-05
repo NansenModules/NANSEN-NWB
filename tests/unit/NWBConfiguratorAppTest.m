@@ -217,6 +217,29 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
             testCase.verifyEqual(state.Status, "ambiguous")
             testCase.verifySubstring(state.Message, "ClassMatch")
         end
+
+        function guidesTowardAHintedArgumentLeftUnset(testCase, ListBackend)
+            % HintedOne hints its ClampMode argument, which neither the
+            % item nor the converter's defaults set.
+            item = speedItem();
+            item.ConverterName = "HintedOne";
+            app = testCase.createApp(configurationWith(item), ListBackend);
+
+            state = app.panelState();
+
+            testCase.verifyEqual(state.Status, "set converter args")
+            testCase.verifySubstring(state.Message, "ClampMode")
+        end
+
+        function clearsTheHintOnceTheArgumentIsSet(testCase, ListBackend)
+            item = speedItem();
+            item.ConverterName = "HintedOne";
+            app = testCase.createApp(configurationWith(item), ListBackend);
+
+            app.setConverterArgs(struct("ClampMode", "current_clamp"))
+
+            testCase.verifyEqual(app.panelState().Status, "ok")
+        end
     end
 
     methods (Test) % Edits made in the list
@@ -396,6 +419,13 @@ function registry = testRegistry()
         NWBModuleTags="ophys", PlacementPolicy="converter", Function=mutate))
     registry.add(NWBConverterDescriptor(Name="GenericNeurodataType", DisplayName="Generic", ...
         AcceptedClasses="*", ProducesNWBType="*", NWBModuleTags="*", Function=mutate))
+    % Accepts a class no item records, so it is only reached by name and
+    % does not change which converters the other items match.
+    registry.add(NWBConverterDescriptor(Name="HintedOne", DisplayName="Hinted converter", ...
+        AcceptedClasses="hinted.Class", ProducesNWBType="TimeSeries", ...
+        ConverterArgHints=struct("ClampMode", ...
+            "Set ClampMode to the mode the session was recorded in."), ...
+        Function=mutate))
     registry.add(NWBConverterDescriptor(Name="PythonOne", DisplayName="Python converter", ...
         Source="neuroconv", AcceptedFormats="pyfmt", ProducesNWBType="TimeSeries", ...
         ExecutionMode="external", PlacementPolicy="converter", RequiresPython=true, ...

@@ -38,6 +38,7 @@ classdef NWBConverterDescriptor
 %       NeedsData               - Whether the runner resolves the data
 %       MetadataSchema          - Fields and defaults for the metadata form
 %       DefaultConverterArgs    - Arguments merged under per-item arguments
+%       ConverterArgHints       - Guidance shown while an argument is unset
 %       Function                - Handle taking one conversion context
 %
 %   See also nansen.module.nwb.conversion.ConverterRegistry,
@@ -67,6 +68,7 @@ classdef NWBConverterDescriptor
         NeedsData (1,1) logical = true      % Whether the runner resolves the data
         MetadataSchema = struct()           % Fields and defaults for the metadata form
         DefaultConverterArgs (1,1) struct = struct() % Arguments merged under per-item arguments
+        ConverterArgHints (1,1) struct = struct() % Guidance per argument name, shown while that argument is unset
         Function                            % Handle taking one conversion context
     end
 
@@ -93,6 +95,7 @@ classdef NWBConverterDescriptor
                 options.NeedsData (1,1) logical = true
                 options.MetadataSchema = struct()
                 options.DefaultConverterArgs (1,1) struct = struct()
+                options.ConverterArgHints (1,1) struct = struct()
                 options.Function (1,1) function_handle
             end
 
@@ -116,6 +119,7 @@ classdef NWBConverterDescriptor
             obj.NeedsData = options.NeedsData;
             obj.MetadataSchema = options.MetadataSchema;
             obj.DefaultConverterArgs = options.DefaultConverterArgs;
+            obj.ConverterArgHints = options.ConverterArgHints;
             obj.Function = options.Function;
 
             obj.validate()
@@ -155,6 +159,8 @@ classdef NWBConverterDescriptor
                 obj.fail("MetadataSchema must be a struct or a function handle.")
             end
 
+            obj.assertValidConverterArgHints()
+
             % An external converter writes the file itself, so the runner
             % cannot place its output afterwards.
             if obj.ExecutionMode == "external" && obj.PlacementPolicy ~= "converter"
@@ -189,6 +195,7 @@ classdef NWBConverterDescriptor
             S.NeedsData = obj.NeedsData;
             S.MetadataSchema = obj.MetadataSchema;
             S.DefaultConverterArgs = obj.DefaultConverterArgs;
+            S.ConverterArgHints = obj.ConverterArgHints;
             S.Function = func2str(obj.Function);
         end
     end
@@ -248,6 +255,7 @@ classdef NWBConverterDescriptor
                 "NeedsData", logical(S.NeedsData), ...
                 "MetadataSchema", S.MetadataSchema, ...
                 "DefaultConverterArgs", S.DefaultConverterArgs, ...
+                "ConverterArgHints", S.ConverterArgHints, ...
                 "Function", functionHandle);
         end
 
@@ -270,7 +278,8 @@ classdef NWBConverterDescriptor
                 "RequiresPython", false, ...
                 "NeedsData", true, ...
                 "MetadataSchema", struct(), ...
-                "DefaultConverterArgs", struct());
+                "DefaultConverterArgs", struct(), ...
+                "ConverterArgHints", struct());
 
             fieldNames = fieldnames(defaults);
             for i = 1:numel(fieldNames)
@@ -319,6 +328,20 @@ classdef NWBConverterDescriptor
             if numInputs ~= 1 && numInputs >= 0
                 obj.fail(['Function must accept one conversion context ', ...
                     'argument, but takes %d.'], numInputs)
+            end
+        end
+
+        function assertValidConverterArgHints(obj)
+            %assertValidConverterArgHints - Require non-empty text per hint
+
+            hintNames = string(fieldnames(obj.ConverterArgHints));
+            for i = 1:numel(hintNames)
+                value = obj.ConverterArgHints.(hintNames(i));
+                isTextScalar = (ischar(value) && (isrow(value) || isempty(value))) ...
+                    || (isstring(value) && isscalar(value));
+                if ~isTextScalar || strlength(strtrim(string(value))) == 0
+                    obj.fail("ConverterArgHints.%s must be non-empty text.", hintNames(i))
+                end
             end
         end
 

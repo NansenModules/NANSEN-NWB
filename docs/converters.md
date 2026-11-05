@@ -92,6 +92,7 @@ The constructor validates the descriptor, so an inconsistent one fails where it 
 | `NeedsData` | Whether the runner should resolve the data at all |
 | `MetadataSchema` | Fields and defaults for the metadata form |
 | `DefaultConverterArgs` | Arguments merged under the item's own |
+| `ConverterArgHints` | Per-argument guidance the configurator shows, with status `set converter args`, while that argument has no value in the item or the defaults |
 | `Function` | Handle taking one context. Required |
 
 ### Why classes and formats are separate
