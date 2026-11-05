@@ -227,7 +227,7 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
 
             state = app.panelState();
 
-            testCase.verifyEqual(state.Status, "set converter args")
+            testCase.verifyEqual(state.Status, "set converter arguments")
             testCase.verifySubstring(state.Message, "ClampMode")
         end
 
@@ -239,6 +239,62 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
             app.setConverterArgs(struct("ClampMode", "current_clamp"))
 
             testCase.verifyEqual(app.panelState().Status, "ok")
+        end
+
+        function flagsANeuroconvBackedConverter(testCase, ListBackend)
+            % The panel greys the metadata editor for a NeuroConv item,
+            % whose metadata comes from its source files.
+            item = speedItem();
+            item.ConverterName = "PythonOne";
+            app = testCase.createApp(configurationWith(item), ListBackend);
+
+            testCase.verifyTrue(app.panelState().IsNeuroconv)
+        end
+
+        function flagsAnItemResolvedToANeuroconvConverter(testCase, ListBackend)
+            % An item left to the runner counts as NeuroConv-backed when
+            % its source resolves to a NeuroConv converter.
+            app = testCase.createApp(configurationWith(tracesItem()), ListBackend);
+
+            testCase.verifyTrue(app.panelState().IsNeuroconv)
+        end
+
+        function reportsEditableArgumentsFromConverterDefaults(testCase, ListBackend)
+            % HintedOne declares a default argument the item leaves unset:
+            % the editor has a field to open on, the item none of its own.
+            item = speedItem();
+            item.ConverterName = "HintedOne";
+            app = testCase.createApp(configurationWith(item), ListBackend);
+
+            state = app.panelState();
+
+            testCase.verifyTrue(state.HasEditableArgs)
+            testCase.verifyFalse(state.HasConverterArgs)
+        end
+
+        function reportsNoEditableArgumentsForABareConverter(testCase, ListBackend)
+            % ClassMatch declares no default arguments and the item sets
+            % none, so the argument editor has nothing to open on.
+            item = speedItem();
+            item.ConverterName = "ClassMatch";
+            app = testCase.createApp(configurationWith(item), ListBackend);
+
+            state = app.panelState();
+
+            testCase.verifyFalse(state.HasEditableArgs)
+            testCase.verifyFalse(state.IsNeuroconv)
+        end
+
+        function countsItemArgumentsAsEditable(testCase, ListBackend)
+            item = speedItem();
+            item.ConverterName = "ClassMatch";
+            app = testCase.createApp(configurationWith(item), ListBackend);
+
+            app.setConverterArgs(struct("Gain", 2))
+
+            state = app.panelState();
+            testCase.verifyTrue(state.HasEditableArgs)
+            testCase.verifyTrue(state.HasConverterArgs)
         end
     end
 
@@ -395,6 +451,15 @@ function item = pupilItem()
     sourceInfo.MatlabClass = "timetable";
     item = nansen.module.nwb.config.NWBDataItemConfig( ...
         VariableName="pupil", NWBVariableName="pupil", SourceInfo=sourceInfo);
+end
+
+function item = tracesItem()
+%tracesItem - An item whose source names the format only PythonOne accepts
+
+    sourceInfo = nansen.module.nwb.config.NWBDataItemConfig.emptySourceInfo();
+    sourceInfo.Format = "pyfmt";
+    item = nansen.module.nwb.config.NWBDataItemConfig( ...
+        VariableName="traces", NWBVariableName="traces", SourceInfo=sourceInfo);
 end
 
 function registry = testRegistry()

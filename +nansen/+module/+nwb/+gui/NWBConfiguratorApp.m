@@ -60,7 +60,8 @@ classdef NWBConfiguratorApp < handle
         NO_MODULE_LABEL = "(none)"
         FIGURE_SIZE = [1180, 660]
         CONTROL_HEIGHT = 22                 % Height of a MATLAB button or dropdown
-        LIST_COLUMN_WIDTHS = [150, 150, 240, 140, 150, 120] % Preferred widths of the list's columns
+        EDIT_BUTTON_WIDTH = 70              % Width of an Edit... button
+        LIST_COLUMN_WIDTHS = [150, 150, 240, 140, 150, 160] % Widths of the list's columns; the last, Status, is fixed
         MIN_LIST_COLUMN_WIDTH = 70          % Below this a column is not narrowed further
         LIST_SCROLLBAR_ALLOWANCE = 16       % Width kept free for the list's vertical scrollbar
         UITABLE_ROW_NUMBER_WIDTH = 42       % Width of the row numbers a uitable shows
@@ -101,10 +102,10 @@ classdef NWBConfiguratorApp < handle
         PlacementModuleRow
         PlacementModuleDropdown
         NameField
-        MetadataLabel
         MetadataButton
-        ArgsLabel
+        MetadataStatusLabel
         ArgsButton
+        ArgsStatusLabel
         StatusLabel
         PanelControls
     end
@@ -427,17 +428,24 @@ classdef NWBConfiguratorApp < handle
             %panelState - What the panel shows for the selected item
             %   STATE = panelState(APP) returns a struct with the fields
             %   the panel is drawn from: Variable, ConverterName,
-            %   ConverterLabel, Description, IsGeneric, NWBModule,
-            %   TargetNWBType, PrimaryGroup, PlacementOwnedByConverter,
-            %   NWBName, HasMetadata, HasConverterArgs, Status, Message
-            %   and NeedsPython. With nothing selected, Variable is "".
+            %   ConverterLabel, Description, IsGeneric, IsNeuroconv,
+            %   NWBModule, TargetNWBType, PrimaryGroup,
+            %   PlacementOwnedByConverter, NWBName, HasMetadata,
+            %   HasConverterArgs, HasEditableArgs, Status, Message and
+            %   NeedsPython. With nothing selected, Variable is "".
+            %
+            %   IsNeuroconv says the item's converter is NeuroConv-backed.
+            %   HasEditableArgs says the argument editor has fields to
+            %   open on: the converter's default arguments, or arguments
+            %   the item already carries.
 
             state = struct( ...
                 "Variable", "", "ConverterName", "", "ConverterLabel", obj.AUTO_LABEL, ...
-                "Description", "", "IsGeneric", false, "NWBModule", "", ...
-                "TargetNWBType", "", "PrimaryGroup", "", ...
+                "Description", "", "IsGeneric", false, "IsNeuroconv", false, ...
+                "NWBModule", "", "TargetNWBType", "", "PrimaryGroup", "", ...
                 "PlacementOwnedByConverter", false, "NWBName", "", ...
                 "HasMetadata", false, "HasConverterArgs", false, ...
+                "HasEditableArgs", false, ...
                 "Status", "", "Message", "", "NeedsPython", false);
 
             if strlength(obj.SelectedVariable) == 0
@@ -457,6 +465,7 @@ classdef NWBConfiguratorApp < handle
             state.NWBName = item.NWBVariableName;
             state.HasMetadata = ~isempty(fieldnames(item.Metadata));
             state.HasConverterArgs = ~isempty(fieldnames(item.ConverterArgs));
+            state.HasEditableArgs = state.HasConverterArgs;
             state.Status = resolution.Status;
             state.Message = resolution.Message;
             state.NeedsPython = resolution.Status == "needs Python";
@@ -468,14 +477,12 @@ classdef NWBConfiguratorApp < handle
                 if obj.isRegistered(converterName)
                     descriptor = obj.Registry.get(converterName);
                     state.Description = descriptor.Description;
-                    state.IsGeneric = descriptor.Name == obj.GENERIC_CONVERTER;
-                    state.PlacementOwnedByConverter = ownsPlacement(descriptor);
+                    state = obj.addDescriptorFacts(state, descriptor);
                 end
             elseif ~isempty(resolution.Descriptor)
                 state.Description = "Resolved to " + resolution.Descriptor.DisplayName ...
                     + ": " + resolution.Descriptor.Description;
-                state.IsGeneric = resolution.Descriptor.Name == obj.GENERIC_CONVERTER;
-                state.PlacementOwnedByConverter = ownsPlacement(resolution.Descriptor);
+                state = obj.addDescriptorFacts(state, resolution.Descriptor);
             end
         end
 
@@ -644,14 +651,19 @@ classdef NWBConfiguratorApp < handle
         function fitColumnsToWidth(obj, availableWidth)
             % Both backends give each column a fixed width in pixels, and
             % macOS hides a scrollbar until the list is scrolled, so a list
-            % wider than its panel looks cut off. The columns share the
-            % width in proportion to their preferred widths, and the list
-            % scrolls sideways only once they reach their minimum.
+            % wider than its panel looks cut off. The Status column keeps
+            % its full width so its longest badge is not cut; the other
+            % columns share what remains in proportion to their preferred
+            % widths, and the list scrolls sideways only once they reach
+            % their minimum.
             usableWidth = availableWidth - obj.LIST_SCROLLBAR_ALLOWANCE;
             if obj.ListBackend == "uitable"
                 usableWidth = usableWidth - obj.UITABLE_ROW_NUMBER_WIDTH;
             end
-            widths = floor(obj.LIST_COLUMN_WIDTHS / sum(obj.LIST_COLUMN_WIDTHS) * usableWidth);
+            statusWidth = obj.LIST_COLUMN_WIDTHS(end);
+            flexibleWidths = obj.LIST_COLUMN_WIDTHS(1:end-1);
+            flexibleSpace = usableWidth - statusWidth;
+            widths = [floor(flexibleWidths / sum(flexibleWidths) * flexibleSpace), statusWidth];
             widths = max(widths, obj.MIN_LIST_COLUMN_WIDTH);
 
             % Setting the widths redraws the list, so it is skipped when
@@ -683,8 +695,9 @@ classdef NWBConfiguratorApp < handle
             container.Layout.Row = [1, 2];
             container.Layout.Column = 2;
 
+            % The label column fits its longest label, "Converter arguments".
             panel = uigridlayout(container, [14, 2]);
-            panel.ColumnWidth = {110, "1x"};
+            panel.ColumnWidth = {130, "1x"};
             panel.RowHeight = {28, 24, 48, 36, 24, 24, 24, 24, 24, 24, 24, 8, "1x", 0};
             panel.Padding = [12, 8, 12, 8];
             panel.RowSpacing = 6;
@@ -728,15 +741,11 @@ classdef NWBConfiguratorApp < handle
             obj.NameField.ValueChangedFcn = ...
                 @(src, ~) obj.runUiAction(@() obj.setNWBName(string(src.Value)));
 
-            [obj.MetadataButton, metadataRow] = obj.addRow(panel, 10, "Metadata", @uibutton);
-            obj.MetadataButton.Text = "Edit...";
+            [obj.MetadataButton, obj.MetadataStatusLabel] = obj.addEditRow(panel, 10, "Metadata");
             obj.MetadataButton.ButtonPushedFcn = @(~, ~) obj.runUiAction(@() obj.editMetadata());
-            obj.MetadataLabel = metadataRow;
 
-            [obj.ArgsButton, argsRow] = obj.addRow(panel, 11, "Arguments", @uibutton);
-            obj.ArgsButton.Text = "Edit...";
+            [obj.ArgsButton, obj.ArgsStatusLabel] = obj.addEditRow(panel, 11, "Converter arguments");
             obj.ArgsButton.ButtonPushedFcn = @(~, ~) obj.runUiAction(@() obj.editConverterArgs());
-            obj.ArgsLabel = argsRow;
 
             obj.StatusLabel = uilabel(panel, "Text", "", "WordWrap", "on", "VerticalAlignment", "top");
             obj.StatusLabel.Layout.Row = 13;
@@ -753,6 +762,28 @@ classdef NWBConfiguratorApp < handle
             control = createFcn(panel);
             control.Layout.Row = row;
             control.Layout.Column = 2;
+        end
+
+        function [button, statusLabel] = addEditRow(obj, panel, row, labelText)
+            %addEditRow - A row with a narrow Edit button and a status word
+            %   The label column is too narrow for a status word, so the
+            %   status label sits beside the button, where it has the rest
+            %   of the row.
+
+            label = uilabel(panel, "Text", labelText);
+            label.Layout.Row = row;
+            label.Layout.Column = 1;
+
+            grid = uigridlayout(panel, [1, 2]);
+            grid.Layout.Row = row;
+            grid.Layout.Column = 2;
+            grid.ColumnWidth = {obj.EDIT_BUTTON_WIDTH, "1x"};
+            grid.RowHeight = {"1x"};
+            grid.Padding = [0, 0, 0, 0];
+            grid.ColumnSpacing = 8;
+
+            button = uibutton(grid, "Text", "Edit...");
+            statusLabel = uilabel(grid, "Text", "", "FontSize", 11);
         end
 
         function createSaveControls(obj, root)
@@ -785,8 +816,8 @@ classdef NWBConfiguratorApp < handle
                     obj.PlacementModuleRow, obj.PlacementModuleDropdown], false)
                 obj.GroupDropdown.Value = obj.GroupDropdown.Items{1};
                 obj.NameField.Value = '';
-                obj.MetadataLabel.Text = "Metadata";
-                obj.ArgsLabel.Text = "Arguments";
+                obj.MetadataStatusLabel.Text = "";
+                obj.ArgsStatusLabel.Text = "";
                 obj.StatusLabel.Text = "Select an item, or add a data variable above.";
                 return
             end
@@ -818,8 +849,27 @@ classdef NWBConfiguratorApp < handle
             end
 
             obj.NameField.Value = char(state.NWBName);
-            obj.MetadataLabel.Text = "Metadata: " + statusWord(state.HasMetadata);
-            obj.ArgsLabel.Text = "Arguments: " + statusWord(state.HasConverterArgs);
+
+            % A NeuroConv converter reads its metadata out of the source
+            % files, and the editor's template describes a matnwb type, so
+            % the editor only opens on metadata the item already carries.
+            canEditMetadata = ~state.IsNeuroconv || state.HasMetadata;
+            obj.MetadataButton.Enable = canEditMetadata;
+            if canEditMetadata
+                obj.MetadataStatusLabel.Text = statusWord(state.HasMetadata);
+            else
+                obj.MetadataStatusLabel.Text = "from source files";
+            end
+
+            % The argument editor only edits fields the converter's
+            % defaults or the item already hold, so without either there
+            % is nothing for it to open on.
+            obj.ArgsButton.Enable = state.HasEditableArgs;
+            if state.HasEditableArgs
+                obj.ArgsStatusLabel.Text = statusWord(state.HasConverterArgs);
+            else
+                obj.ArgsStatusLabel.Text = "none";
+            end
 
             obj.StatusLabel.Text = upper(extractBefore(state.Status + " ", 2)) ...
                 + extractAfter(state.Status + " ", 1) + newline + state.Message;
@@ -1099,6 +1149,16 @@ classdef NWBConfiguratorApp < handle
             names = reshape(names, 1, []);
         end
 
+        function state = addDescriptorFacts(obj, state, descriptor)
+            %addDescriptorFacts - Panel facts read off a converter descriptor
+
+            state.IsGeneric = descriptor.Name == obj.GENERIC_CONVERTER;
+            state.IsNeuroconv = descriptor.Source == "neuroconv";
+            state.HasEditableArgs = state.HasEditableArgs ...
+                || ~isempty(fieldnames(descriptor.DefaultConverterArgs));
+            state.PlacementOwnedByConverter = ownsPlacement(descriptor);
+        end
+
         function resolution = describeResolution(obj, item)
             %describeResolution - What the runner would do with an item
 
@@ -1145,7 +1205,7 @@ classdef NWBConfiguratorApp < handle
 
             unsetHintedName = firstUnsetHintedArgument(item, descriptor);
             if strlength(unsetHintedName) > 0
-                resolution.Status = "set converter args";
+                resolution.Status = "set converter arguments";
                 resolution.Message = descriptor.ConverterArgHints.(unsetHintedName);
                 return
             end
