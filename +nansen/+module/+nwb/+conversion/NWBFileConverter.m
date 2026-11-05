@@ -328,7 +328,7 @@ classdef NWBFileConverter < handle
         function runConverter(obj, dataItem, descriptor)
             %runConverter - Invoke one converter and take up its result
 
-            converterArgs = obj.mergeConverterArgs( ...
+            converterArgs = nansen.module.nwb.internal.mergeConverterArgs( ...
                 descriptor.DefaultConverterArgs, dataItem.ConverterArgs);
 
             data = [];
@@ -658,17 +658,6 @@ classdef NWBFileConverter < handle
                      'containers.Map, or a struct with a field named after ', ...
                      'each variable. ''%s'' could not be resolved from a ', ...
                      '%s.'], variableName, class(obj.DataResolver))
-            end
-        end
-
-        function converterArgs = mergeConverterArgs(~, defaultArgs, itemArgs)
-            %mergeConverterArgs - Lay per-item arguments over the defaults
-
-            converterArgs = defaultArgs;
-
-            fieldNames = fieldnames(itemArgs);
-            for i = 1:numel(fieldNames)
-                converterArgs.(fieldNames{i}) = itemArgs.(fieldNames{i});
             end
         end
 
