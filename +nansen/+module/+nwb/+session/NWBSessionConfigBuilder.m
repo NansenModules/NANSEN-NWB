@@ -13,6 +13,8 @@ classdef NWBSessionConfigBuilder
 %   NWBSessionConfigBuilder functions:
 %       buildConfig               - Build a configuration for one session
 %       sourceInfoForItem         - Describe one variable's source
+%       sourceInfoForVariable     - Describe a variable's source without a session
+%       sourceInfoFromVariableInfo - Evidence from a variable model entry
 %       subjectMetadataFromRecord - Map a subject record to NWB fields
 %
 %   See also nansen.module.nwb.config.NWBFileConfiguration,
@@ -189,15 +191,78 @@ classdef NWBSessionConfigBuilder
             end
 
             if isstruct(variableInfo)
-                sourceInfo.MatlabClass = readField(variableInfo, "DataType");
+                evidence = nansen.module.nwb.session.NWBSessionConfigBuilder ...
+                    .sourceInfoFromVariableInfo(variableInfo);
+                sourceInfo.MatlabClass = evidence.MatlabClass;
+                sourceInfo.Format = evidence.Format;
+            end
+        end
 
-                % A named file adapter identifies the source format: a
-                % Suite2p adapter means Suite2p output whatever the file
-                % is called. The default adapter says nothing.
-                fileAdapter = readField(variableInfo, "FileAdapter");
-                if fileAdapter ~= "Default"
-                    sourceInfo.Format = fileAdapter;
+        function sourceInfo = sourceInfoForVariable(variableName, variableModel)
+            %sourceInfoForVariable - Describe a variable's source without a session
+            %   sourceInfo = sourceInfoForVariable(variableName) returns
+            %   the class and format evidence the current project's
+            %   variable model records for the variable: what a
+            %   configurator needs to suggest converters before any
+            %   session is chosen. There is no file path, since a path
+            %   belongs to a session.
+            %
+            %   sourceInfo = sourceInfoForVariable(variableName,variableModel)
+            %   reads the given model instead of the current project's.
+            %
+            %   The evidence is empty when there is no current project or
+            %   the model has no such variable; neither is an error while
+            %   configuring.
+
+            arguments
+                variableName (1,1) string
+                variableModel = []
+            end
+
+            sourceInfo = nansen.module.nwb.config.NWBDataItemConfig.emptySourceInfo();
+
+            if isempty(variableModel)
+                try
+                    variableModel = nansen.VariableModel();
+                catch
+                    return
                 end
+                if isempty(variableModel)
+                    return
+                end
+            end
+
+            try
+                [variableInfo, isExistingEntry] = variableModel.getVariableStructure(char(variableName));
+            catch
+                return
+            end
+            if ~isExistingEntry
+                return
+            end
+
+            sourceInfo = nansen.module.nwb.session.NWBSessionConfigBuilder ...
+                .sourceInfoFromVariableInfo(variableInfo);
+        end
+
+        function sourceInfo = sourceInfoFromVariableInfo(variableInfo)
+            %sourceInfoFromVariableInfo - Evidence from a variable model entry
+            %   sourceInfo = sourceInfoFromVariableInfo(variableInfo) reads
+            %   the DataType and FileAdapter fields of a variable model
+            %   entry. A named file adapter identifies the source format:
+            %   a Suite2p adapter means Suite2p output whatever the file is
+            %   called. The default adapter says nothing.
+
+            sourceInfo = nansen.module.nwb.config.NWBDataItemConfig.emptySourceInfo();
+            if ~isstruct(variableInfo)
+                return
+            end
+
+            sourceInfo.MatlabClass = readField(variableInfo, "DataType");
+
+            fileAdapter = readField(variableInfo, "FileAdapter");
+            if fileAdapter ~= "Default"
+                sourceInfo.Format = fileAdapter;
             end
         end
 

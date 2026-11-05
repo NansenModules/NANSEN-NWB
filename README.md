@@ -15,6 +15,18 @@ pyenv(Version="~/.venvs/nansen-nwb/bin/python", ExecutionMode="OutOfProcess")
 
 `report.Message` says what is missing when `isAvailable` is false.
 
+The configurator's list is drawn by [entity-table](https://github.com/ehennestad/entity-table), pinned in `requirements.txt`; install it with `matbox.installRequirements(<this folder>)`.
+
+## Configuring a conversion
+
+`Tools > NWB > Configure NWB File` in NANSEN opens the configurator, `nansen.module.nwb.gui.NWBConfiguratorApp`: one row per data variable, and a panel for the selected one that sets the converter, where its output goes in the file, and the metadata and arguments the converter takes. Converters come from the registry: the ones in `+conversion/+builtin`, the NeuroConv data interfaces, and any a lab registers from its own folder with `nansen.module.nwb.registerConverterFolder`; `docs/converters.md` says how to write one. What the panel says a conversion would do with an item is what `writeNwbFile` does, since both ask `ConverterRegistry.resolveForItem`.
+
+The configuration is saved as JSON in the project's `nwb` configuration folder, where `nwb_metadata_defaults.json` may hold what every conversion in the project shares: institution, lab, experimenter, keywords, species. A project that still has a pilot `.mat` configuration has it converted when the configurator opens, and the JSON is saved beside it.
+
+Dynamic tables, such as the electrodes table the pilot configurator edited on its Tables page, have no place in the JSON configuration. A converter that needs one builds it, as the ROI converters build the plane segmentation.
+
+`Data > nwb > Write NWB file` converts one session: it fills the file-level metadata from the session, the subject table and the defaults, runs each item's converter, and checks the written file with NWB Inspector when Python has it.
+
 ## Project Description
 
 Create a set of classes to interact with NWB data (read/write) from NANSEN. NANSEN is a matlab package for managing, processing and visualizing calcium imaging data: https://github.com/VervaekeLab/NANSEN

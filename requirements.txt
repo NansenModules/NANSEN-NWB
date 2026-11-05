@@ -1,0 +1,7 @@
+# MATLAB dependencies of this module beyond NANSEN and matnwb, which
+# env('sharebrain') puts on the path. Install with MatBox:
+#   matbox.installRequirements(<this folder>)
+#
+# The configurator's list is an entity-table view. Pinned to a commit:
+# NANSEN tracks the repository's default branch, this module does not.
+https://github.com/ehennestad/entity-table@dd2c1d5f2694e49fb55a0ef3885455a32e329ce2
