@@ -516,6 +516,18 @@ function isoDuration = ageTextToIso8601(ageText)
     text = strtrim(ageText);
 
     if startsWith(text, "P")
+        % A duration, or a range of two, each with at least one number
+        % and its designator, such as "P90D", "P1Y6M" or "P6W/P8W".
+        durationPattern = '^P(?=\d|T\d)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+S)?)?$';
+        parts = split(text, "/");
+        isDuration = numel(parts) <= 2 && all(arrayfun( ...
+            @(part) ~isempty(regexp(char(part), durationPattern, 'once')), parts));
+        if ~isDuration
+            error("nansen:nwb:invalidSubjectAge", ...
+                ['''%s'' is not an ISO 8601 duration. Give one such as ', ...
+                 '"P90D" or "P6W/P8W", or a value and unit such as ', ...
+                 '"6 month".'], ageText)
+        end
         isoDuration = text;
         return
     end
