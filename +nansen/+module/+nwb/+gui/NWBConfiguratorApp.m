@@ -61,7 +61,7 @@ classdef NWBConfiguratorApp < handle
         FIGURE_SIZE = [1180, 660]
         CONTROL_HEIGHT = 22                 % Height of a MATLAB button or dropdown
         EDIT_BUTTON_WIDTH = 70              % Width of an Edit... button
-        LIST_COLUMN_WIDTHS = [150, 150, 240, 140, 150, 120] % Preferred widths of the list's columns
+        LIST_COLUMN_WIDTHS = [150, 150, 240, 140, 150, 160] % Widths of the list's columns; the last, Status, is fixed
         MIN_LIST_COLUMN_WIDTH = 70          % Below this a column is not narrowed further
         LIST_SCROLLBAR_ALLOWANCE = 16       % Width kept free for the list's vertical scrollbar
         UITABLE_ROW_NUMBER_WIDTH = 42       % Width of the row numbers a uitable shows
@@ -651,14 +651,19 @@ classdef NWBConfiguratorApp < handle
         function fitColumnsToWidth(obj, availableWidth)
             % Both backends give each column a fixed width in pixels, and
             % macOS hides a scrollbar until the list is scrolled, so a list
-            % wider than its panel looks cut off. The columns share the
-            % width in proportion to their preferred widths, and the list
-            % scrolls sideways only once they reach their minimum.
+            % wider than its panel looks cut off. The Status column keeps
+            % its full width so its longest badge is not cut; the other
+            % columns share what remains in proportion to their preferred
+            % widths, and the list scrolls sideways only once they reach
+            % their minimum.
             usableWidth = availableWidth - obj.LIST_SCROLLBAR_ALLOWANCE;
             if obj.ListBackend == "uitable"
                 usableWidth = usableWidth - obj.UITABLE_ROW_NUMBER_WIDTH;
             end
-            widths = floor(obj.LIST_COLUMN_WIDTHS / sum(obj.LIST_COLUMN_WIDTHS) * usableWidth);
+            statusWidth = obj.LIST_COLUMN_WIDTHS(end);
+            flexibleWidths = obj.LIST_COLUMN_WIDTHS(1:end-1);
+            flexibleSpace = usableWidth - statusWidth;
+            widths = [floor(flexibleWidths / sum(flexibleWidths) * flexibleSpace), statusWidth];
             widths = max(widths, obj.MIN_LIST_COLUMN_WIDTH);
 
             % Setting the widths redraws the list, so it is skipped when
