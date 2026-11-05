@@ -7,6 +7,9 @@ function configureNwbFile()
 %   writes ".json" beside it. A project with neither starts an empty
 %   configuration under the default name.
 %
+%   A project without data variables has nothing to configure, so the
+%   configurator is not opened and a dialog says what to do instead.
+%
 %   See also nansen.module.nwb.gui.NWBConfiguratorApp,
 %   nansen.module.nwb.config.convertLegacyConfiguration
 
@@ -14,6 +17,18 @@ function configureNwbFile()
     import nansen.module.nwb.config.convertLegacyConfiguration
 
     currentProject = nansen.getCurrentProject();
+
+    % Every item of a configuration converts one of the project's data
+    % variables; an empty configurator would offer nothing to add.
+    variableModel = nansen.VariableModel();
+    if variableModel.NumVariables == 0
+        errordlg(['This project has no data variables, so there is nothing ', ...
+            'to configure for NWB conversion. Add data variables to the ', ...
+            'project, then open the NWB configurator again.'], ...
+            'NWB configuration aborted')
+        return
+    end
+
     configurationFolder = currentProject.getConfigurationFolder('Subfolder', 'nwb');
     defaultFilePath = fullfile(configurationFolder, "nwb_conversion_configuration.json");
 
