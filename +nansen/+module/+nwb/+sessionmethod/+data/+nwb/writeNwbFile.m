@@ -65,6 +65,12 @@ import nansen.session.SessionMethod
 
     % Todo: Merge
 
+    % Both the filename below and the NWB identifier are built from the
+    % subject and session IDs. A blank one gives a name and an identifier
+    % that collide with another subject's, so it is rejected before the
+    % session folder is created or anything is written.
+    mustHaveSessionIdentifiers(sessionObject)
+
     % Create filepath
     % Todo: nwbConfig should specify data location. For now, use default
     % data location
@@ -72,17 +78,37 @@ import nansen.session.SessionMethod
 
     % We build the filename using BIDS/DandiArchive convention.
     % Todo: Add custom postfix via configuration
-    nwbFilename = sprintf('sub-%s_ses-%s.nwb', sessionObject.subjectID, sessionObject.sessionID);
-    nwbFilePath = fullfile(saveFolder, nwbFilename);
-    
-    if strcmp(params.WriteMode, 'Overwrite') && isfile(nwbFilePath)
-        delete(nwbFilePath);
+    % The IDs are converted to text first because NANSEN does not type
+    % them: sprintf would write a numeric ID as the character with that
+    % code rather than as digits.
+    nwbFilename = sprintf('sub-%s_ses-%s.nwb', ...
+        string(sessionObject.subjectID), string(sessionObject.sessionID));
+    targetFilePath = fullfile(saveFolder, nwbFilename);
+
+    % When overwriting, the new file is built under a work name and moved
+    % over the previous file only once it is complete, so an error part
+    % way through, or a data item that fails to convert, leaves the
+    % previous file in place and no half-written one beside it. Appending
+    % works on the file itself.
+    isOverwriting = strcmp(params.WriteMode, 'Overwrite');
+    if isOverwriting
+        nwbFilePath = workFilePath(targetFilePath);
+        % A work file left by an interrupted run would otherwise be read
+        % as the file to append to.
+        deleteIfFile(nwbFilePath)
+        removeWorkFile = onCleanup(@() deleteIfFile(nwbFilePath));
+    else
+        nwbFilePath = targetFilePath;
     end
 
     %% Open or create NWB file depending on if file exists.
-    if isfile(nwbFilePath)
+    % hasUnexportedChanges tracks whether the in-memory NwbFile is ahead of
+    % the file on disk. Custom converters below work on the file on disk,
+    % so pending changes must be flushed before one runs, and the final
+    % export can be skipped when nothing is pending.
+    if ~isOverwriting && isfile(nwbFilePath)
         nwbFile = nwbRead(nwbFilePath);
-        wasInitialized = false;
+        hasUnexportedChanges = false;
     else
         nwbFile = NwbFile(...
             'identifier', strjoin([projectName, string(sessionObject.subjectID), string(sessionObject.sessionID)], '_'), ...
@@ -90,16 +116,13 @@ import nansen.session.SessionMethod
             'session_start_time', getSessionStartTime(sessionObject, params.TimeZone), ...
             'general_session_id', sessionObject.sessionID);
 
-        wasInitialized = true;
+        hasUnexportedChanges = true;
     end
-
-    % Question: Is there anything against saving right away?
-    % % if wasInitialized
-    % %     nwbExport(nwbFile, nwbFilePath);
-    % % end
 
     % Create a map for holding resolved metadata / neurodata types.
     instanceMap = dictionary;
+
+    failedVariableNames = strings(1, 0);
 
     %% Todo Add general metadata like dataset info, subjects etc.:
     
@@ -123,6 +146,9 @@ import nansen.session.SessionMethod
             [metadata, instanceMap] = ...
                 nansen.module.nwb.internal.resolveMetadata(...
                     metadata, nwbDataType, nwbFile, instanceMap);
+            % resolveMetadata adds linked instances (devices, electrode
+            % groups, ...) to the in-memory NwbFile as a side effect.
+            hasUnexportedChanges = true;
         end
         
         % Run default or custom converter.
@@ -134,56 +160,103 @@ import nansen.session.SessionMethod
                         metadata, data, nwbDataType);
             catch ME
                 warning('Could not add %s to nwb file: Caused by\n %s\n', variableName, ME.message);
+                failedVariableNames(end+1) = string(variableName); %#ok<AGROW>
                 continue
             end
         else
+            % Custom converters receive the file path and read, extend and
+            % write the file on disk themselves. Flush pending in-memory
+            % changes first: the re-read below would otherwise replace them
+            % with the file's last exported state, and a converter running
+            % as the first item would not find a file at all.
+            if hasUnexportedChanges
+                nwbExport(nwbFile, nwbFilePath)
+            end
             customConverterFcn = variableConfiguration.Converter;
             feval(customConverterFcn, metadata, data, nwbFilePath);
             nwbFile = nwbRead(nwbFilePath);
+            hasUnexportedChanges = false;
+            % The objects resolveMetadata cached belong to the NwbFile just
+            % replaced. A later item linking to one of them would point
+            % outside the file being written, so they are resolved again
+            % against the re-read file.
+            instanceMap = dictionary;
             continue
         end
 
+        % Every member of nansen.module.nwb.enum.PrimaryGroupName, which the
+        % configurator offers, has a group here.
         switch variableConfiguration.PrimaryGroupName
             case 'Acquisition'
-                if isa(neuroData, 'struct')
-                    for j = 1:numel(neuroData)
-                        nwbFile.acquisition.set(neuroData(j).name, neuroData(j).data);
-                    end
-                else
-                    nwbFile.acquisition.set(variableName, neuroData);
-                end
+                targetGroup = nwbFile.acquisition;
 
             case 'Processing'
                 moduleName = variableConfiguration.NwbModule;
                 % Create or get processing module based on nwb module
                 processingModule = nansen.module.nwb.file.getProcessingModule(nwbFile, moduleName, 'No Description');
-                if isa(neuroData, 'struct')
-                    for j = 1:numel(neuroData)
-                        processingModule.nwbdatainterface.set(...
-                            neuroData(j).name, neuroData(j).data);
-                    end
-                else
-                    processingModule.nwbdatainterface.set(variableName, neuroData);
-                end
-                % Add to processing module
+                targetGroup = processingModule.nwbdatainterface;
+
+            case 'Analysis'
+                targetGroup = nwbFile.analysis;
+
+            case 'Intervals'
+                targetGroup = nwbFile.intervals;
+
+            case 'Stimulus'
+                targetGroup = nwbFile.stimulus_presentation;
+
+            otherwise
+                error("nansen:nwb:unsupportedPrimaryGroup", ...
+                    ['''%s'' is configured for the group ''%s'', which this ', ...
+                     'method cannot write to. Use Acquisition, Processing, ', ...
+                     'Analysis, Intervals or Stimulus.'], ...
+                    variableName, variableConfiguration.PrimaryGroupName)
         end
+
+        % types.untyped.Set is a handle class, so adding to targetGroup
+        % adds to the NwbFile.
+        if isa(neuroData, 'struct')
+            for j = 1:numel(neuroData)
+                targetGroup.set(neuroData(j).name, neuroData(j).data);
+            end
+        else
+            targetGroup.set(variableName, neuroData);
+        end
+
+        hasUnexportedChanges = true;
 
         % primaryGroupName = lower(variableConfiguration.PrimaryGroupName);
         % nwbVariableName = variableConfiguration.NWBVariableName;
         % nwbFile.(primaryGroupName).set(nwbVariableName, nwbData);
-        
+
         % nwbFile = nansen.module.nwb.convert.writeDataToFile(nwbFile, data, metadata, customConversinFcn); % anything else???
-    
+    end
+
+    % A file missing an item the configuration lists is not complete, so
+    % it does not replace the previous file. The work file is removed by
+    % the cleanup above.
+    if isOverwriting && ~isempty(failedVariableNames)
+        error("nansen:nwb:itemsFailed", ...
+            ['%d of %d data items could not be converted: %s. The new ', ...
+             'file was not written, so ''%s'' is as it was. The warnings ', ...
+             'above give the cause for each item.'], ...
+            numel(failedVariableNames), numel(configurationCatalog.DataItems), ...
+            strjoin(failedVariableNames, ", "), targetFilePath)
+    end
+
+    % Export pending changes once, after the last data item. NwbFile.export
+    % appends an entry to file_create_date on each call, so exporting more
+    % often than necessary stamps the file repeatedly and rewrites the
+    % whole file every pass.
+    if hasUnexportedChanges
         nwbExport(nwbFile, nwbFilePath)
     end
-    
-    % nwbExport(nwbFile, nwbFilePath)
-    fprintf('Finished writing file ''%s''\n', nwbFilePath)
 
-    %% Export the file
-    if wasInitialized
-        % nwbExport(obj.NWBObject, obj.PathName);
+    if isOverwriting
+        movefile(nwbFilePath, targetFilePath, 'f')
     end
+
+    fprintf('Finished writing file ''%s''\n', targetFilePath)
 end
 
 function params = getDefaultParameters()
@@ -192,6 +265,58 @@ function params = getDefaultParameters()
     params.ConfigurationFileName = "";
     params.TimeZone = "local";
     params.WriteMode = 'Overwrite'; % 'Overwrite' | 'Append'
+end
+
+function mustHaveSessionIdentifiers(sessionObject)
+% mustHaveSessionIdentifiers - Verify the session has a subject and session ID
+%
+%   A session with no subject ID would get the filename "sub-_ses-01.nwb"
+%   and an identifier with an empty subject part, both of which collide
+%   with any other subject sharing that session ID. NWB identifiers are
+%   required to be globally unique.
+
+    missingNames = string.empty;
+
+    if isBlank(sessionObject.subjectID)
+        missingNames(end+1) = "subjectID";
+    end
+    if isBlank(sessionObject.sessionID)
+        missingNames(end+1) = "sessionID";
+    end
+
+    if ~isempty(missingNames)
+        error("nansen:nwb:missingSessionIdentifier", ...
+            ['Session is missing a value for %s. These identify the NWB file ', ...
+             'and form its globally unique identifier. Set them for this ', ...
+             'session, or configure the data location so they can be detected ', ...
+             'from the session folder, before writing an NWB file.'], ...
+            strjoin(missingNames, " and "))
+    end
+end
+
+function tf = isBlank(value)
+% isBlank - True if a value holds no usable text
+%
+%   A missing string counts: strlength of one is NaN, which no comparison
+%   catches, and sprintf and strjoin refuse it further down.
+
+    text = strtrim(string(value));
+    tf = isempty(text) || ~isscalar(text) || ismissing(text) || strlength(text) == 0;
+end
+
+function filePath = workFilePath(targetFilePath)
+% workFilePath - Name of the file a new NWB file is built under
+
+    [folder, name, extension] = fileparts(targetFilePath);
+    filePath = fullfile(folder, [name, '.part', extension]);
+end
+
+function deleteIfFile(filePath)
+% deleteIfFile - Remove a file that may already be gone
+
+    if isfile(filePath)
+        delete(filePath)
+    end
 end
 
 function sessionStartTime = getSessionStartTime(sessionObject, timeZone)

@@ -9,12 +9,14 @@ function item = getDefaultFileConfigurationItem()
 %
 %   See also nansen.module.nwb.file.initializeNWBFileConfiguration
 
+    placeholders = nansen.module.nwb.internal.getUnsetPlaceholders();
+
     item = struct();
     item.VariableName = '';
     item.NWBVariableName = '';
-    item.PrimaryGroupName = '<Select a group>';
-    item.NwbModule = '<Select an NWB module>';
-    item.NeuroDataType = '<Select a neurodata type>';
+    item.PrimaryGroupName = char(placeholders.PrimaryGroupName);
+    item.NwbModule = char(placeholders.NwbModule);
+    item.NeuroDataType = char(placeholders.NeuroDataType);
     item.Converter = 'Default';
     item.DefaultMetadata = struct.empty;
 end

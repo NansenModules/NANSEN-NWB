@@ -32,10 +32,6 @@ classdef NWBVideoExporter < nansen.stack.ImageStackProcessor
         VARIABLE_PREFIX	= "" % defined in nansen.processing.DataMethod
     end
 
-    properties (Constant, Access = private)
-        TYPE_PACKAGE_PREFIX = "types.core"
-    end
-
     properties
         SemanticDataType (1,1) string ...
             {mustBeMember(SemanticDataType, {'Acquired', 'MotionCorrected'})} = "Acquired" % Whether the stack is acquired or corrected

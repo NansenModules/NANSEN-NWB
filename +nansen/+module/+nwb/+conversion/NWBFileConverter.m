@@ -183,12 +183,17 @@ classdef NWBFileConverter < handle
 
             % Todo: get or create image collection...
             imageCollectionName = "FovProjectionImages";
-            
-            result = obj.NwbFile.searchFor('types.core.Images', 'Name', imageCollectionName);
+
+            % searchFor and isa take the type as text, so the name is built
+            % through the lookup rather than spelled out. Constructor calls
+            % below stay as direct class references, which stay checkable.
+            imagesType = nansen.module.nwb.internal.lookup.getMatNWBTypeName('core', 'Images');
+
+            result = obj.NwbFile.searchFor(imagesType, 'Name', imageCollectionName);
             if result.Count == 1
                 imageCollection = result.values;
                 imageCollection = imageCollection{1};
-                assert(isa(imageCollection, 'types.core.Images'))
+                assert(isa(imageCollection, imagesType))
             else
                 assert(result.Count == 0, 'Expected there to be 0 result')
                 imageCollection = types.core.Images( ...
@@ -243,7 +248,7 @@ classdef NWBFileConverter < handle
                 obj.addProcessingModule(moduleName);
             end
             processingModule = obj.NwbFile.processing.get(moduleName);
-            if isa(data, 'types.hdmf_common.DynamicTable')
+            if isa(data, nansen.module.nwb.internal.lookup.getMatNWBTypeName('hdmf_common', 'DynamicTable'))
                 processingModule.dynamictable.set(name, data);
             else
                 processingModule.nwbdatainterface.set(name, data);

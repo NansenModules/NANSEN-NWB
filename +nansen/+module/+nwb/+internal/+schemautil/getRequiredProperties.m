@@ -23,6 +23,10 @@ function requiredProps = getRequiredProperties(typeName)
 %
 %   See also: schemes.internal.getRequiredPropsForClass
 
+    arguments
+        typeName (1,1) string
+    end
+
     import nansen.module.nwb.internal.lookup.getFullTypeName
 
     persistent requiredPropsCache
@@ -30,7 +34,6 @@ function requiredProps = getRequiredProperties(typeName)
         requiredPropsCache = dictionary;
     end
 
-    typeName = string(typeName);
     shortName = string( utility.string.getSimpleClassName(char(typeName)) );
 
     if ~requiredPropsCache.isConfigured() || ~isKey(requiredPropsCache, shortName)

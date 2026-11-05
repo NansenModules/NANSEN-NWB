@@ -173,7 +173,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             % vectordata nwb type has a dependent column...
             columnNames = obj.DynamicTable.Properties.VariableNames;
             columnFormat = cellfun(@(c) class( obj.DynamicTable.(c) ), columnNames, 'UniformOutput', false );
-            isNWBType = startsWith(columnFormat, 'types.core');
+            isNWBType = startsWith(columnFormat, nansen.module.nwb.internal.lookup.getMatNWBTypeName('core'));
 
             nwbTypeInd = find(isNWBType);
             for idx = nwbTypeInd
@@ -427,7 +427,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
             columnFormat(strcmp(columnFormat, 'single'))={'numeric'};
             columnFormat(strcmp(columnFormat, 'string'))={'char'};
 
-            isNWBType = startsWith(columnFormat, 'types.core');
+            isNWBType = startsWith(columnFormat, nansen.module.nwb.internal.lookup.getMatNWBTypeName('core'));
 
             for i = find(isNWBType)
                 colFormatData{i} = obj.getNWBTypeOptionsForDropdown( columnFormat{i} );
@@ -539,7 +539,7 @@ classdef UIDynamicTable < handle & nansen.ui.mixin.HasPropertyArgs & applify.mix
         function tf = isNWBType(obj, columnNumber)
             columnNames = obj.DynamicTable.Properties.VariableNames(columnNumber);
             columnFormat = cellfun(@(c) class( obj.DynamicTable.(c) ), columnNames, 'UniformOutput', false );
-            tf = startsWith(columnFormat, 'types.core');
+            tf = startsWith(columnFormat, nansen.module.nwb.internal.lookup.getMatNWBTypeName('core'));
         end
 
         function nwbType = getNWBType(obj, columnNumber)

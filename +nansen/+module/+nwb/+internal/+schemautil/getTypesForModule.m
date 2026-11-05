@@ -31,7 +31,7 @@ function [neuroDataTypes, descriptions] = getTypesForModule(moduleName)
     % The module column of the configuration table starts on a placeholder
     % rather than a real module, and the dropdown offers it as the first
     % entry. Answer with empties instead of looking it up.
-    if strcmp(moduleName, '<Select an NWB module>')
+    if strcmp(moduleName, nansen.module.nwb.internal.getUnsetPlaceholders().NwbModule)
         neuroDataTypes = string.empty;
         descriptions = string.empty;
         return

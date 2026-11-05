@@ -134,6 +134,15 @@ classdef getRequiredPropertiesTest < matlab.unittest.TestCase
             testCase.verifyEqual(spatialProps, "data")
         end
 
+        function nonScalarTypeNameIsRejected(testCase)
+        % The function resolves a single type, so an array of names is a
+        % caller error rather than a request for several results.
+
+            testCase.verifyError( ...
+                @() requiredPropertiesFor(["TimeSeries", "SpatialSeries"]), ...
+                'MATLAB:validation:IncompatibleSize')
+        end
+
         function unknownTypeNameThrows(testCase)
         % An unresolvable type name must raise rather than return empty,
         % because callers cannot otherwise distinguish "no required
