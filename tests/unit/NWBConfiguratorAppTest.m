@@ -153,6 +153,34 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
             testCase.verifyEqual(choices(2).Name, "NotRegistered")
         end
 
+        function showsADefaultConverterAsTheRunnersChoice(testCase, ListBackend)
+            % The pilot configurator wrote "Default" for no converter, and
+            % the registry resolves such an item from its source.
+            item = speedItem();
+            item.ConverterName = "Default";
+            app = testCase.createApp(configurationWith(item), ListBackend);
+
+            state = app.panelState();
+
+            testCase.verifyEqual(app.listTable().Converter, "Auto (let the runner decide)")
+            testCase.verifyEqual(state.ConverterName, "")
+            testCase.verifyEqual(state.Status, "ok")
+        end
+
+        function editsThePlacementMetadataAndArgumentsOfTheItem(testCase, ListBackend)
+            app = testCase.createApp(configurationWith(speedItem()), ListBackend);
+
+            app.setPlacement("Processing", "behavior")
+            app.setMetadata(struct("description", "running speed"))
+            app.setConverterArgs(struct("Gain", 2))
+
+            item = app.Config.DataItems(1);
+            testCase.verifyEqual([item.PrimaryGroup, item.NWBModule], ["Processing", "behavior"])
+            testCase.verifyEqual(item.Metadata, struct("description", "running speed"))
+            testCase.verifyEqual(item.ConverterArgs, struct("Gain", 2))
+            testCase.verifyEqual(app.listTable().Placement, "Processing/behavior")
+        end
+
         function opensAnItemWhoseGroupIsNotAnNwbGroup(testCase, ListBackend)
             % A pilot configuration can hold a lower-case group name.
             item = speedItem();
@@ -262,6 +290,19 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
 
             app.saveConfiguration()
             testCase.verifyFalse(app.IsDirty)
+        end
+
+        function refusesToSaveAPilotConfigurationOverItsJson(testCase, ListBackend)
+            % The JSON beside a pilot .mat may hold later edits.
+            folder = testCase.temporaryFolder();
+            jsonPath = fullfile(folder, "nwb_conversion_configuration.json");
+            writelines("{""existing"": true}", jsonPath)
+            app = testCase.createApp(configurationWith(speedItem()), ListBackend, ...
+                FilePath=fullfile(folder, "nwb_conversion_configuration.mat"));
+
+            testCase.verifyError(@() app.saveConfiguration(), ...
+                "nansen:nwb:configurationExists")
+            testCase.verifyEqual(strtrim(string(fileread(jsonPath))), "{""existing"": true}")
         end
 
         function rejectsSavingWithoutAFilePath(testCase, ListBackend)

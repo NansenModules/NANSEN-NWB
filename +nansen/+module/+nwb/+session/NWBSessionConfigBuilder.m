@@ -73,12 +73,13 @@ classdef NWBSessionConfigBuilder
             %   folder records no time of day gets it from the recording
             %   itself this way.
             %
-            %   CONFIG = buildConfig(...,SubjectAge=TEXT) also fills the
-            %   subject's age from TEXT when the subject record supplies
-            %   none, as a session table does when it carries the
-            %   subject's state at the time of the session. TEXT is an
-            %   ISO 8601 duration such as "P90D", a value and unit such
-            %   as "6 month" or "90 days", or a range such as "6-8 weeks".
+            %   CONFIG = buildConfig(...,SubjectAge=TEXT) also sets the
+            %   subject's age from TEXT, as a session table does when it
+            %   carries the subject's state at the time of the session.
+            %   It replaces any age the subject record gives, being the
+            %   age at this session. TEXT is an ISO 8601 duration such as
+            %   "P90D", a value and unit such as "6 month" or "90 days",
+            %   or a range such as "6-8 weeks".
             %
             %   A converter argument whose value is, or contains, the text
             %   "${session.<name>}" takes that property of the session
@@ -102,6 +103,10 @@ classdef NWBSessionConfigBuilder
             %     nansen:nwb:unknownSessionPlaceholder - a converter
             %                     argument names a session property that
             %                     does not exist or has no value.
+            %     nansen:nwb:invalidSessionPlaceholder - a converter
+            %                     argument names a session property that
+            %                     holds more than one value, such as a
+            %                     vector or a cell array.
 
             arguments
                 sessionObject (1,1)
@@ -637,6 +642,18 @@ function isoDuration = ageTextToIso8601(ageText)
     text = strtrim(ageText);
 
     if startsWith(text, "P")
+        % A duration, or a range of two, each with at least one number
+        % and its designator, such as "P90D", "P1Y6M" or "P6W/P8W".
+        durationPattern = '^P(?=\d|T\d)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+S)?)?$';
+        parts = split(text, "/");
+        isDuration = numel(parts) <= 2 && all(arrayfun( ...
+            @(part) ~isempty(regexp(char(part), durationPattern, 'once')), parts));
+        if ~isDuration
+            error("nansen:nwb:invalidSubjectAge", ...
+                ['''%s'' is not an ISO 8601 duration. Give one such as ', ...
+                 '"P90D" or "P6W/P8W", or a value and unit such as ', ...
+                 '"6 month".'], ageText)
+        end
         isoDuration = text;
         return
     end
@@ -767,8 +784,13 @@ function converterArgs = withPlaceholderDefaults(dataItem)
     try
         descriptor = nansen.module.nwb.conversion.ConverterRegistry.instance() ...
             .resolveForItem(dataItem);
-    catch
+    catch cause
         % An item no converter resolves is reported when it converts.
+        % Anything else is a fault that would leave placeholders unfilled.
+        if ~ismember(string(cause.identifier), ["nansen:nwb:unknownConverter", ...
+                "nansen:nwb:unresolvedConverter", "nansen:nwb:ambiguousConverter"])
+            rethrow(cause)
+        end
         return
     end
 
@@ -777,11 +799,7 @@ function converterArgs = withPlaceholderDefaults(dataItem)
         return
     end
 
-    itemArgs = converterArgs;
-    converterArgs = defaultArgs;
-    for fieldName = string(fieldnames(itemArgs))'
-        converterArgs.(fieldName) = itemArgs.(fieldName);
-    end
+    converterArgs = nansen.module.nwb.internal.mergeConverterArgs(defaultArgs, converterArgs);
 end
 
 function tf = holdsPlaceholder(value)
@@ -816,24 +834,43 @@ function text = sessionPropertyText(sessionObject, name)
 %   The session is a NANSEN session object, whose table columns are
 %   properties, or a struct standing in for one. A property that is
 %   missing or empty is an error rather than empty text: an argument
-%   silently left blank would reach the file unnoticed.
+%   silently left blank would reach the file unnoticed. A property that
+%   holds more than one value has no single text to put in its place.
 
     if isstruct(sessionObject)
         hasProperty = isfield(sessionObject, name);
     else
         hasProperty = isprop(sessionObject, name);
     end
-
-    text = string.empty;
-    if hasProperty
-        text = string(sessionObject.(name));
-    end
-
-    if ~(isscalar(text) && strlength(text) > 0)
+    if ~hasProperty
         error("nansen:nwb:unknownSessionPlaceholder", ...
             ['The converter argument placeholder "${session.%s}" cannot be ', ...
-             'filled: session ''%s'' has no property %s with a value. Add ', ...
-             'the column to the session table or remove the placeholder.'], ...
-            name, sessionObject.sessionID, name)
+             'filled: session ''%s'' has no property %s. Add the column to ', ...
+             'the session table or remove the placeholder.'], ...
+            name, string(sessionObject.sessionID), name)
+    end
+
+    value = sessionObject.(name);
+    isSingleValue = (ischar(value) && isrow(value)) || (isscalar(value) && ...
+        (isstring(value) || isnumeric(value) || islogical(value) ...
+        || isdatetime(value) || iscategorical(value)));
+    if ~isempty(value) && ~isSingleValue
+        error("nansen:nwb:invalidSessionPlaceholder", ...
+            ['The converter argument placeholder "${session.%s}" cannot be ', ...
+             'filled: the property %s of session ''%s'' is a %s of size %s, ', ...
+             'not one text or number.'], ...
+            name, name, string(sessionObject.sessionID), class(value), mat2str(size(value)))
+    end
+
+    text = string.empty;
+    if ~isempty(value)
+        text = string(value);
+    end
+    if isempty(text) || ismissing(text) || strlength(text) == 0
+        error("nansen:nwb:unknownSessionPlaceholder", ...
+            ['The converter argument placeholder "${session.%s}" cannot be ', ...
+             'filled: session ''%s'' has no value for %s. Fill in the column ', ...
+             'for this session or remove the placeholder.'], ...
+            name, string(sessionObject.sessionID), name)
     end
 end
