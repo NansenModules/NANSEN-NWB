@@ -938,6 +938,10 @@ classdef NWBConfiguratorApp < handle
             % with a warning, while a converter's default arguments are
             % authored as strings.
             converterArgs = convertContainedStringsToChars(converterArgs);
+            % A dropdown shows its first choice even while the argument is
+            % blank, so each choice list gets a placeholder entry that
+            % stands for no value and is saved as blank text.
+            converterArgs = nansen.module.nwb.internal.addUnsetPlaceholders(converterArgs);
             if isempty(fieldnames(converterArgs))
                 uialert(obj.Figure, ...
                     "This converter takes no arguments.", "Converter arguments", "Icon", "info")
@@ -949,6 +953,7 @@ classdef NWBConfiguratorApp < handle
             if wasAborted
                 return
             end
+            edited = nansen.module.nwb.internal.removeUnsetPlaceholders(edited);
             obj.setConverterArgs(utility.struct.removeConfigFields(edited))
         end
 
@@ -1306,7 +1311,7 @@ function name = firstUnsetHintedArgument(item, descriptor)
 %firstUnsetHintedArgument - The first hinted argument the item leaves unset
 %   A converter declares hints for arguments the user must usually supply.
 %   An argument counts as set when the item or the converter's defaults
-%   give it any value other than blank text.
+%   give it any value other than blank text or a placeholder.
 
     name = "";
     hintNames = string(fieldnames(descriptor.ConverterArgHints));
@@ -1325,7 +1330,7 @@ function name = firstUnsetHintedArgument(item, descriptor)
 end
 
 function tf = isUnsetArgument(args, name)
-%isUnsetArgument - Whether a converter argument is absent or blank text
+%isUnsetArgument - Whether an argument is absent, blank or a placeholder
 
     if ~isfield(args, name)
         tf = true;
@@ -1334,5 +1339,5 @@ function tf = isUnsetArgument(args, name)
     value = args.(name);
     isTextScalar = (ischar(value) && (isrow(value) || isempty(value))) ...
         || (isstring(value) && isscalar(value));
-    tf = isTextScalar && strlength(strtrim(string(value))) == 0;
+    tf = isTextScalar && isUnsetText(value);
 end
