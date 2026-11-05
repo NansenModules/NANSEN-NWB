@@ -246,7 +246,7 @@ classdef NWBConfiguratorApp < handle
 
             if ~any(obj.configuredVariables() == variableName)
                 error("nansen:nwb:unknownVariable", ...
-                    "''%s'' is not in the configuration.", variableName)
+                    "'%s' is not in the configuration.", variableName)
             end
 
             obj.SelectedVariable = variableName;
@@ -1016,7 +1016,12 @@ classdef NWBConfiguratorApp < handle
                     "CancelOption", "Cancel");
                 switch answer
                     case "Save"
-                        obj.saveConfiguration()
+                        % A save that fails is reported, and the window
+                        % stays open with the changes in it.
+                        obj.runUiAction(@() obj.saveConfiguration())
+                        if obj.IsDirty
+                            return
+                        end
                     case "Discard"
                         % Close without saving.
                     otherwise
