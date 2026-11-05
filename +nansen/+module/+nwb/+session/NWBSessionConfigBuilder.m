@@ -103,6 +103,10 @@ classdef NWBSessionConfigBuilder
             %     nansen:nwb:unknownSessionPlaceholder - a converter
             %                     argument names a session property that
             %                     does not exist or has no value.
+            %     nansen:nwb:invalidSessionPlaceholder - a converter
+            %                     argument names a session property that
+            %                     holds more than one value, such as a
+            %                     vector or a cell array.
 
             arguments
                 sessionObject (1,1)
@@ -829,24 +833,43 @@ function text = sessionPropertyText(sessionObject, name)
 %   The session is a NANSEN session object, whose table columns are
 %   properties, or a struct standing in for one. A property that is
 %   missing or empty is an error rather than empty text: an argument
-%   silently left blank would reach the file unnoticed.
+%   silently left blank would reach the file unnoticed. A property that
+%   holds more than one value has no single text to put in its place.
 
     if isstruct(sessionObject)
         hasProperty = isfield(sessionObject, name);
     else
         hasProperty = isprop(sessionObject, name);
     end
-
-    text = string.empty;
-    if hasProperty
-        text = string(sessionObject.(name));
-    end
-
-    if ~(isscalar(text) && strlength(text) > 0)
+    if ~hasProperty
         error("nansen:nwb:unknownSessionPlaceholder", ...
             ['The converter argument placeholder "${session.%s}" cannot be ', ...
-             'filled: session ''%s'' has no property %s with a value. Add ', ...
-             'the column to the session table or remove the placeholder.'], ...
-            name, sessionObject.sessionID, name)
+             'filled: session ''%s'' has no property %s. Add the column to ', ...
+             'the session table or remove the placeholder.'], ...
+            name, string(sessionObject.sessionID), name)
+    end
+
+    value = sessionObject.(name);
+    isSingleValue = (ischar(value) && isrow(value)) || (isscalar(value) && ...
+        (isstring(value) || isnumeric(value) || islogical(value) ...
+        || isdatetime(value) || iscategorical(value)));
+    if ~isempty(value) && ~isSingleValue
+        error("nansen:nwb:invalidSessionPlaceholder", ...
+            ['The converter argument placeholder "${session.%s}" cannot be ', ...
+             'filled: the property %s of session ''%s'' is a %s of size %s, ', ...
+             'not one text or number.'], ...
+            name, name, string(sessionObject.sessionID), class(value), mat2str(size(value)))
+    end
+
+    text = string.empty;
+    if ~isempty(value)
+        text = string(value);
+    end
+    if isempty(text) || ismissing(text) || strlength(text) == 0
+        error("nansen:nwb:unknownSessionPlaceholder", ...
+            ['The converter argument placeholder "${session.%s}" cannot be ', ...
+             'filled: session ''%s'' has no value for %s. Fill in the column ', ...
+             'for this session or remove the placeholder.'], ...
+            name, string(sessionObject.sessionID), name)
     end
 end

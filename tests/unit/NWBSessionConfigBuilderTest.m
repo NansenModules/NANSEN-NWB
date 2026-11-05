@@ -445,6 +445,32 @@ classdef NWBSessionConfigBuilderTest < matlab.unittest.TestCase
             testCase.verifyEqual(converterArgs.Gain, 5)
         end
 
+        function fillsAPlaceholderFromASessionObject(testCase)
+            item = dataItem("abf");
+            item.ConverterArgs = struct("cell_id", "${session.cell_id}");
+
+            config = buildFor(SessionObjectStub(), DataItems=item);
+
+            testCase.verifyEqual(config.DataItems(1).ConverterArgs.cell_id, "170518_1")
+        end
+
+        function rejectsAPlaceholderWhosePropertyIsMissing(testCase)
+            item = dataItem("abf");
+            item.ConverterArgs = struct("cell_id", "${session.cell_without_value}");
+
+            testCase.verifyError(@() buildFor(SessionObjectStub(), DataItems=item), ...
+                "nansen:nwb:unknownSessionPlaceholder")
+        end
+
+        function rejectsAPlaceholderWhosePropertyHoldsSeveralValues(testCase)
+            % A vector has no single text to put in the placeholder's place.
+            item = dataItem("abf");
+            item.ConverterArgs = struct("Sweeps", "${session.sweep_numbers}");
+
+            testCase.verifyError(@() buildFor(SessionObjectStub(), DataItems=item), ...
+                "nansen:nwb:invalidSessionPlaceholder")
+        end
+
         function rejectsAPlaceholderTheSessionCannotFill(testCase)
         % An argument left empty would reach the file unnoticed, so a
         % missing session property stops the build.
