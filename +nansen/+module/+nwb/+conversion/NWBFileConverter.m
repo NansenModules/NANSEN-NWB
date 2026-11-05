@@ -544,7 +544,8 @@ classdef NWBFileConverter < handle
                     obj.resolveDescriptor(dataItems(i));
                 catch cause
                     if ~ismember(string(cause.identifier), ...
-                            ["nansen:nwb:unknownConverter", "nansen:nwb:unresolvedConverter"])
+                            ["nansen:nwb:unknownConverter", "nansen:nwb:unresolvedConverter", ...
+                             "nansen:nwb:ambiguousConverter"])
                         rethrow(cause)
                     end
                     warning("nansen:nwb:converterFailed", ...

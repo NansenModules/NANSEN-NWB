@@ -232,8 +232,9 @@ classdef ConverterRegistry < handle
             %   Errors:
             %     nansen:nwb:unknownConverter - the named converter is not
             %                     registered.
-            %     nansen:nwb:unresolvedConverter - no converter matches, or
-            %                     several match equally well.
+            %     nansen:nwb:unresolvedConverter - no converter matches.
+            %     nansen:nwb:ambiguousConverter - several converters match
+            %                     equally well.
 
             arguments
                 obj
@@ -288,7 +289,7 @@ classdef ConverterRegistry < handle
                      'type generically.'], dataItem.VariableName)
             end
 
-            error("nansen:nwb:unresolvedConverter", ...
+            error("nansen:nwb:ambiguousConverter", ...
                 ['Several converters match ''%s'' equally well: %s. Set ', ...
                  'ConverterName on the data item to choose one.'], ...
                 dataItem.VariableName, strjoin([candidates.Name], ", "))
