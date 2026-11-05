@@ -390,9 +390,14 @@ classdef NWBConfiguratorApp < handle
         function saveConfiguration(obj)
             %saveConfiguration - Write the configuration as JSON
             %
+            %   A pilot .mat configuration is saved as JSON beside it.
+            %
             %   Errors:
             %     nansen:nwb:missingFilePath - the app was opened without a
             %                     file to save to.
+            %     nansen:nwb:configurationExists - a pilot configuration
+            %                     would be saved over a JSON configuration
+            %                     that is already beside it.
 
             if strlength(obj.FilePath) == 0
                 error("nansen:nwb:missingFilePath", ...
@@ -404,7 +409,14 @@ classdef NWBConfiguratorApp < handle
             % kept as JSON beside it.
             [folder, name, extension] = fileparts(obj.FilePath);
             if lower(string(extension)) == ".mat"
-                obj.FilePath = string(fullfile(folder, name + ".json"));
+                jsonPath = string(fullfile(folder, name + ".json"));
+                if isfile(jsonPath)
+                    error("nansen:nwb:configurationExists", ...
+                        ['''%s'' already exists, and saving this pilot ', ...
+                         'configuration would replace it. Open that file ', ...
+                         'instead, or move it aside to keep this one.'], jsonPath)
+                end
+                obj.FilePath = jsonPath;
             end
 
             nansen.module.nwb.config.saveConfiguration(obj.Config, obj.FilePath)

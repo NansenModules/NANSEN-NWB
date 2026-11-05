@@ -278,6 +278,19 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
             testCase.verifyFalse(app.IsDirty)
         end
 
+        function refusesToSaveAPilotConfigurationOverItsJson(testCase, ListBackend)
+            % The JSON beside a pilot .mat may hold later edits.
+            folder = testCase.temporaryFolder();
+            jsonPath = fullfile(folder, "nwb_conversion_configuration.json");
+            writelines("{""existing"": true}", jsonPath)
+            app = testCase.createApp(configurationWith(speedItem()), ListBackend, ...
+                FilePath=fullfile(folder, "nwb_conversion_configuration.mat"));
+
+            testCase.verifyError(@() app.saveConfiguration(), ...
+                "nansen:nwb:configurationExists")
+            testCase.verifyEqual(strtrim(string(fileread(jsonPath))), "{""existing"": true}")
+        end
+
         function rejectsSavingWithoutAFilePath(testCase, ListBackend)
             app = testCase.createApp(configurationWith(speedItem()), ListBackend);
 
