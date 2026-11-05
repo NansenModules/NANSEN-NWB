@@ -276,6 +276,29 @@ classdef builtinConverterTest < matlab.unittest.TestCase
                 "nansen:nwb:converterFailed")
         end
 
+        function startsEverySweepAtZeroWithoutRecordedTimes(testCase)
+            nwbFile = testCase.convert(patchClampRecording("mV", 2), "PatchClampSweeps", ...
+                NWBVariableName="Vm");
+
+            series = nwbFile.acquisition.get("Vm_sweep002");
+            testCase.verifyEqual(series.starting_time, 0)
+            testCase.verifySubstring(string(series.comments), "not recorded")
+        end
+
+        function warnsWhenRecordedStartsDoNotMatchTheSweeps(testCase)
+            % Saying the file records no start times would be false here.
+            recording = patchClampRecording("mV", 3);
+            recording.Header = struct("sweepStartInPts", [0; 5000]);
+
+            nwbFile = testCase.verifyWarning( ...
+                @() testCase.convert(recording, "PatchClampSweeps", NWBVariableName="Vm"), ...
+                "nansen:nwb:sweepStartTimesMismatch");
+
+            series = nwbFile.acquisition.get("Vm_sweep003");
+            testCase.verifyEqual(series.starting_time, 0)
+            testCase.verifySubstring(string(series.comments), "do not match")
+        end
+
         function rejectsAChannelInAUnitThatIsNeitherVoltageNorCurrent(testCase)
             testCase.verifyError( ...
                 @() testCase.convert(patchClampRecording("degC", 1), "PatchClampSweeps"), ...

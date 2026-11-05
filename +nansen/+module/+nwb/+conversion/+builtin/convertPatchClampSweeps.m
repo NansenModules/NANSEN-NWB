@@ -24,7 +24,8 @@ function nwbFile = convertPatchClampSweeps(context)
 %   abfload reads from the file's synch array. A file without one, such
 %   as an ABF 1 file recorded in a fixed-length mode, records no start
 %   time per sweep: every sweep then starts at 0 and the comment of each
-%   series says so.
+%   series says so. A file whose start times do not match its sweeps is
+%   warned about and handled the same way.
 %
 %   Converter arguments:
 %       DeviceMetadata      - name, description and manufacturer of the
@@ -83,7 +84,8 @@ function nwbFile = convertPatchClampSweeps(context)
             'ClampMode must be "current" or "voltage", but was "%s".', clampMode)
     end
 
-    sweepStartTimes = sweepStartTimesOf(recording, numSweeps);
+    [sweepStartTimes, startTimeNote] = sweepStartTimesOf(recording, numSweeps, ...
+        context.DataItem.VariableName);
 
     nwbFile = context.NwbFile;
     device = getOrCreateDevice(nwbFile, getConverterArg(args, "DeviceMetadata", struct()));
@@ -91,11 +93,7 @@ function nwbFile = convertPatchClampSweeps(context)
         getConverterArg(args, "ElectrodeMetadata", struct()), device);
 
     seriesMetadata = itemMetadata(context.Metadata);
-    comments = "";
-    if isempty(sweepStartTimes)
-        comments = "Sweep start times are not recorded in the file; every sweep starts at 0.";
-        sweepStartTimes = zeros(1, numSweeps);
-    end
+    comments = startTimeNote;
     if isfield(seriesMetadata, "comments")
         comments = strtrim(string(seriesMetadata.comments) + " " + comments);
         seriesMetadata = rmfield(seriesMetadata, "comments");
@@ -171,21 +169,33 @@ function clampMode = defaultClampMode(unit, variableName)
     end
 end
 
-function startTimes = sweepStartTimesOf(recording, numSweeps)
-%sweepStartTimesOf - Sweep start times in seconds, or empty when not recorded
+function [startTimes, note] = sweepStartTimesOf(recording, numSweeps, variableName)
+%sweepStartTimesOf - Sweep start times in seconds, and a note when they are not known
 %
 %   abfload gives sweepStartInPts in samples of one channel from the
-%   start of the recording, read from the file's synch array.
+%   start of the recording, read from the file's synch array. Without
+%   usable start times every sweep starts at 0, and the note, written
+%   into each series' comments, says why.
 
-    startTimes = [];
+    startTimes = zeros(1, numSweeps);
+    note = "Sweep start times are not recorded in the file; every sweep starts at 0.";
     if ~isfield(recording, "Header") || ~isstruct(recording.Header) ...
             || ~isfield(recording.Header, "sweepStartInPts")
         return
     end
+
     startInSamples = double(recording.Header.sweepStartInPts(:))';
-    if numel(startInSamples) == numSweeps
-        startTimes = startInSamples / recording.SamplingRate;
+    if numel(startInSamples) ~= numSweeps
+        warning("nansen:nwb:sweepStartTimesMismatch", ...
+            ['''%s'' records %d sweep start times for %d sweeps, so they ', ...
+             'cannot be matched to the sweeps; every sweep starts at 0.'], ...
+            variableName, numel(startInSamples), numSweeps)
+        note = "The file's sweep start times do not match its sweeps; every sweep starts at 0.";
+        return
     end
+
+    startTimes = startInSamples / recording.SamplingRate;
+    note = "";
 end
 
 function assertRecording(recording, variableName)
