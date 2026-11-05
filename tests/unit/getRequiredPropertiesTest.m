@@ -82,9 +82,9 @@ classdef getRequiredPropertiesTest < matlab.unittest.TestCase
     methods (Test) % Return value contract
 
         function returnsCellArrayOfCharacterVectors(testCase)
-        % checkNWBConfiguration indexes the result with braces and
-        % passes the elements to isfield, so the cell-of-char shape is
-        % part of the contract rather than an incidental detail.
+        % The result is indexed with braces and its elements passed to
+        % isfield, so the cell-of-char shape is part of the contract
+        % rather than an incidental detail.
 
             props = requiredPropertiesFor("TimeSeries");
 
@@ -147,8 +147,8 @@ classdef getRequiredPropertiesTest < matlab.unittest.TestCase
         % An unresolvable type name must raise rather than return empty,
         % because callers cannot otherwise distinguish "no required
         % properties" from "type does not exist". The identifier is part
-        % of the contract: checkNWBConfiguration needs it to tell an
-        % unknown type from an unexpected failure.
+        % of the contract: a caller needs it to tell an unknown type from
+        % an unexpected failure.
 
             testCase.verifyError( ...
                 @() requiredPropertiesFor("NotARealNeurodataType"), ...
