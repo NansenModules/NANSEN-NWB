@@ -7,10 +7,16 @@ function result = convertWithNeuroconv(context)
 %
 %   The runner creates the NWB file and writes the session, subject and
 %   general metadata into it before any converter runs, so this converter
-%   always appends and passes only the item's own metadata. Appending
-%   drops the fields NeuroConv would otherwise require inside its NWBFile
-%   metadata section, which is what makes that split work; the section
-%   itself is still required, so it is sent empty.
+%   always appends and never sends session metadata. Appending drops the
+%   fields NeuroConv would otherwise require inside its NWBFile metadata
+%   section, which is what makes that split work; the section itself is
+%   still required, so it is sent empty.
+%
+%   What it sends instead is the metadata the interface reads out of its
+%   own files, with the item's metadata laid over it. NeuroConv's writers
+%   require the sections get_metadata fills: an imaging interface needs
+%   its Ophys device and imaging plane, and an AbfInterface the electrodes
+%   and recording tables it derives from the file headers.
 %
 %   An interface times its data from the start of its own recording. The
 %   data are shifted so that they count from the session_start_time of the
@@ -27,9 +33,9 @@ function result = convertWithNeuroconv(context)
 %       RunConversionArgs  - Extra arguments forwarded to run_conversion
 %       UseInterfaceMetadata - Whether to start from the metadata the
 %                            interface reads out of its own files, with
-%                            the item's metadata laid over it. Needed by
-%                            interfaces that derive electrodes or tables
-%                            from file headers, such as AbfInterface
+%                            the item's metadata laid over it. True by
+%                            default; false sends only the item's
+%                            metadata
 %       IcephysExperimentType - For AbfInterface: "current_clamp",
 %                            "voltage_clamp" or "izero", the clamp mode
 %                            of every file's recording session. NeuroConv
@@ -88,7 +94,7 @@ function result = convertWithNeuroconv(context)
         runArguments = [runArguments, {"RunConversionArgs", runConversionArgs}];
     end
 
-    useInterfaceMetadata = getConverterArg(args, "UseInterfaceMetadata", false);
+    useInterfaceMetadata = getConverterArg(args, "UseInterfaceMetadata", true);
     runArguments = [runArguments, {"UseInterfaceMetadata", logical(useInterfaceMetadata)}];
 
     fileStartTime = nansen.module.nwb.neuroconv.internal.readFileSessionStartTime(context.FilePath);
