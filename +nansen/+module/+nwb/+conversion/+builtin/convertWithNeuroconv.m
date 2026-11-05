@@ -41,7 +41,8 @@ function result = convertWithNeuroconv(context)
 %   Errors:
 %     nansen:nwb:missingConverterArg - InterfaceClassName is not set.
 %     nansen:nwb:invalidConverterArg - IcephysExperimentType is not one
-%                     of the values above.
+%                     of the values above, or the interface's arguments
+%                     have no file_paths.
 %     nansen:nwb:missingOutputFile - the NWB file to append to is absent.
 %
 %   See also nansen.module.nwb.neuroconv.runConversion,
@@ -90,7 +91,7 @@ function result = convertWithNeuroconv(context)
     useInterfaceMetadata = getConverterArg(args, "UseInterfaceMetadata", false);
     runArguments = [runArguments, {"UseInterfaceMetadata", logical(useInterfaceMetadata)}];
 
-    fileStartTime = fileSessionStartTime(context.FilePath);
+    fileStartTime = nansen.module.nwb.neuroconv.internal.readFileSessionStartTime(context.FilePath);
     if ~isempty(fileStartTime)
         runArguments = [runArguments, {"AlignToStartTime", fileStartTime}];
     end
@@ -98,59 +99,14 @@ function result = convertWithNeuroconv(context)
     metadata = itemMetadata(context);
     experimentType = string(getConverterArg(args, "IcephysExperimentType", ""));
     if strlength(experimentType) > 0
-        sourceArgumentName = string(getConverterArg(args, "SourceArgumentName", ""));
-        metadata = addIcephysExperimentType(metadata, ...
-            string(sourceArg.(sourceArgumentName)), experimentType);
+        metadata = nansen.module.nwb.neuroconv.internal.addIcephysExperimentType( ...
+            metadata, sourceArg, experimentType);
     end
 
     nansen.module.nwb.neuroconv.runConversion(interfaceClassName, sourceArg, ...
         context.FilePath, metadata, runArguments{:});
 
     result = struct("DidWriteFile", true);
-end
-
-function startTime = fileSessionStartTime(filePath)
-%fileSessionStartTime - The session_start_time of an NWB file on disk
-%
-%   Empty when the file holds no start time this function can read, in
-%   which case the interface's data are left as NeuroConv times them.
-
-    startTime = datetime.empty;
-    try
-        text = string(h5read(filePath, "/session_start_time"));
-    catch
-        % A file without the dataset is not an NWB file the runner wrote;
-        % NeuroConv reports what is wrong with it when it appends.
-        return
-    end
-    startTime = nansen.module.nwb.internal.iso8601ToDatetime(text(1));
-end
-
-function metadata = addIcephysExperimentType(metadata, filePaths, experimentType)
-%addIcephysExperimentType - Set the clamp mode of every ABF file's session
-%
-%   AbfInterface keeps one Icephys session per file, named by the file's
-%   name, and NeuroConv merges caller metadata into it by that name. A
-%   cell array keeps the sessions a list when there is only one file.
-
-    validTypes = ["current_clamp", "voltage_clamp", "izero"];
-    if ~any(experimentType == validTypes)
-        error("nansen:nwb:invalidConverterArg", ...
-            ['IcephysExperimentType must be "current_clamp", ', ...
-             '"voltage_clamp" or "izero", but was "%s".'], experimentType)
-    end
-
-    sessions = cell(1, numel(filePaths));
-    for i = 1:numel(filePaths)
-        [~, name, extension] = fileparts(filePaths(i));
-        sessions{i} = struct("name", name + extension, ...
-            "icephys_experiment_type", experimentType);
-    end
-
-    if ~isfield(metadata, "Icephys")
-        metadata.Icephys = struct();
-    end
-    metadata.Icephys.Sessions = sessions;
 end
 
 function metadata = itemMetadata(context)

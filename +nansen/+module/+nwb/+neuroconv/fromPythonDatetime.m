@@ -6,8 +6,6 @@ function value = fromPythonDatetime(pythonDatetime)
 %   wall-clock time and the offset both survive; a naive one gives a
 %   datetime without a time zone.
 %
-%   This is the inverse of the datetime case of toPythonValue.
-%
 %   See also nansen.module.nwb.neuroconv.toPythonValue, datetime
 
     arguments

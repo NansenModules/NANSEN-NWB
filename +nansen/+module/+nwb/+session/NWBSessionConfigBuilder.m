@@ -73,12 +73,13 @@ classdef NWBSessionConfigBuilder
             %   folder records no time of day gets it from the recording
             %   itself this way.
             %
-            %   CONFIG = buildConfig(...,SubjectAge=TEXT) also fills the
-            %   subject's age from TEXT when the subject record supplies
-            %   none, as a session table does when it carries the
-            %   subject's state at the time of the session. TEXT is an
-            %   ISO 8601 duration such as "P90D", a value and unit such
-            %   as "6 month" or "90 days", or a range such as "6-8 weeks".
+            %   CONFIG = buildConfig(...,SubjectAge=TEXT) also sets the
+            %   subject's age from TEXT, as a session table does when it
+            %   carries the subject's state at the time of the session.
+            %   It replaces any age the subject record gives, being the
+            %   age at this session. TEXT is an ISO 8601 duration such as
+            %   "P90D", a value and unit such as "6 month" or "90 days",
+            %   or a range such as "6-8 weeks".
             %
             %   Errors:
             %     nansen:nwb:missingSessionIdentifier - the session has no
@@ -580,6 +581,18 @@ function isoDuration = ageTextToIso8601(ageText)
     text = strtrim(ageText);
 
     if startsWith(text, "P")
+        % A duration, or a range of two, each with at least one number
+        % and its designator, such as "P90D", "P1Y6M" or "P6W/P8W".
+        durationPattern = '^P(?=\d|T\d)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+S)?)?$';
+        parts = split(text, "/");
+        isDuration = numel(parts) <= 2 && all(arrayfun( ...
+            @(part) ~isempty(regexp(char(part), durationPattern, 'once')), parts));
+        if ~isDuration
+            error("nansen:nwb:invalidSubjectAge", ...
+                ['''%s'' is not an ISO 8601 duration. Give one such as ', ...
+                 '"P90D" or "P6W/P8W", or a value and unit such as ', ...
+                 '"6 month".'], ageText)
+        end
         isoDuration = text;
         return
     end
