@@ -184,7 +184,8 @@ classdef NWBSessionConfigBuilder
             %   sourceInfo = sourceInfoForItem(sessionObject,dataItem)
             %   returns what the project knows about where the item's data
             %   comes from: the class the file adapter produces, the
-            %   adapter itself as a format name, and the file path.
+            %   adapter itself as a format name, the variable's file type,
+            %   and the file path.
             %
             %   This reads the variable model rather than loading data, so
             %   a configurator can offer sensible converters for a session
@@ -215,6 +216,7 @@ classdef NWBSessionConfigBuilder
                     .sourceInfoFromVariableInfo(variableInfo);
                 sourceInfo.MatlabClass = evidence.MatlabClass;
                 sourceInfo.Format = evidence.Format;
+                sourceInfo.FileType = evidence.FileType;
             end
         end
 
@@ -268,10 +270,12 @@ classdef NWBSessionConfigBuilder
         function sourceInfo = sourceInfoFromVariableInfo(variableInfo)
             %sourceInfoFromVariableInfo - Evidence from a variable model entry
             %   sourceInfo = sourceInfoFromVariableInfo(variableInfo) reads
-            %   the DataType and FileAdapter fields of a variable model
-            %   entry. A named file adapter identifies the source format:
-            %   a Suite2p adapter means Suite2p output whatever the file is
-            %   called. The default adapter says nothing.
+            %   the DataType, FileAdapter and FileType fields of a variable
+            %   model entry. A named file adapter identifies the source
+            %   format: a Suite2p adapter means Suite2p output whatever the
+            %   file is called. The default adapter says nothing. The file
+            %   type is kept as extension evidence, which suggests a format
+            %   without ruling any converter out.
 
             sourceInfo = nansen.module.nwb.config.NWBDataItemConfig.emptySourceInfo();
             if ~isstruct(variableInfo)
@@ -279,6 +283,7 @@ classdef NWBSessionConfigBuilder
             end
 
             sourceInfo.MatlabClass = readField(variableInfo, "DataType");
+            sourceInfo.FileType = readField(variableInfo, "FileType");
 
             fileAdapter = readField(variableInfo, "FileAdapter");
             if fileAdapter ~= "Default"

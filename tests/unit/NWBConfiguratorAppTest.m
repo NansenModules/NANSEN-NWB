@@ -98,6 +98,41 @@ classdef NWBConfiguratorAppTest < matlab.unittest.TestCase
             testCase.verifyTrue(any([choices.Name] == "GenericNeurodataType"))
         end
 
+        function leavesOutConvertersTheEvidenceRulesOut(testCase, ListBackend)
+            % speed's format and class evidence rules out the converters
+            % that accept neither, so the dropdown does not offer them.
+            app = testCase.createApp(configurationWith(speedItem()), ListBackend);
+
+            choices = app.converterChoices();
+
+            testCase.verifyFalse(any([choices.Name] == "ProcessingOne"))
+            testCase.verifyFalse(any([choices.Name] == "PythonOne"))
+        end
+
+        function showsAllConvertersWhenAsked(testCase, ListBackend)
+            % Source evidence can be wrong or missing, so every converter
+            % stays reachable behind the checkbox.
+            app = testCase.createApp(configurationWith(speedItem()), ListBackend);
+
+            app.setShowAllConverters(true)
+            choices = app.converterChoices();
+
+            testCase.verifyTrue(any([choices.Name] == "ProcessingOne"))
+            testCase.verifyEqual([choices(1:3).Name], ["", "FormatMatch", "ClassMatch"])
+        end
+
+        function keepsTheItemsConverterWhenFilteringWouldHideIt(testCase, ListBackend)
+            % An item can name a converter the current evidence rules out,
+            % and the dropdown has to keep showing that value.
+            item = speedItem();
+            item.ConverterName = "ProcessingOne";
+            app = testCase.createApp(configurationWith(item), ListBackend);
+
+            choices = app.converterChoices();
+
+            testCase.verifyTrue(any([choices.Name] == "ProcessingOne"))
+        end
+
         function choosingAConverterTakesItsDefaultPlacement(testCase, ListBackend)
             app = testCase.createApp(configurationWith(speedItem()), ListBackend);
 

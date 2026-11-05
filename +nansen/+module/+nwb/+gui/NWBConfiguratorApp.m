@@ -32,6 +32,7 @@ classdef NWBConfiguratorApp < handle
 %       removeVariable    - Remove the data item of a variable
 %       selectVariable    - Select the item the panel edits
 %       setConverter      - Choose the selected item's converter
+%       setShowAllConverters - Choose whether the dropdown lists every converter
 %       setNWBName        - Name the selected item's output in the file
 %       setTargetType     - Set the module and type the generic converter builds
 %       setPlacement      - Set the selected item's group and module
@@ -47,6 +48,7 @@ classdef NWBConfiguratorApp < handle
 %       Config           - The configuration being edited
 %       FilePath         - Where saveConfiguration writes
 %       SelectedVariable - The variable whose item the panel shows
+%       ShowAllConverters - Whether the dropdown also lists ruled-out converters
 %       IsDirty          - Whether Config differs from what was last saved
 %
 %   See also nansen.module.nwb.config.NWBFileConfiguration,
@@ -71,6 +73,7 @@ classdef NWBConfiguratorApp < handle
         Config (1,1) nansen.module.nwb.config.NWBFileConfiguration % The configuration being edited
         FilePath (1,1) string = ""          % Where saveConfiguration writes
         SelectedVariable (1,1) string = ""  % The variable whose item the panel shows
+        ShowAllConverters (1,1) logical = false % Whether the dropdown also lists converters the evidence rules out
     end
 
     properties (Dependent, SetAccess = private)
@@ -92,6 +95,7 @@ classdef NWBConfiguratorApp < handle
         List
         FittedColumnWidths (1,:) double = []  % Column widths last given to the list
         ConverterDropdown
+        ShowAllCheckbox
         DescriptionLabel
         PythonLabel
         ModuleRow
@@ -288,6 +292,23 @@ classdef NWBConfiguratorApp < handle
             end
 
             obj.updateSelectedItem(item)
+        end
+
+        function setShowAllConverters(obj, showAll)
+            %setShowAllConverters - Choose whether the dropdown lists every converter
+            %   setShowAllConverters(APP,showAll) lists every registered
+            %   converter in the converter dropdown when showAll is true.
+            %   When it is false, the default, the dropdown lists only the
+            %   converters the selected variable's source evidence does not
+            %   rule out.
+
+            arguments
+                obj
+                showAll (1,1) logical
+            end
+
+            obj.ShowAllConverters = showAll;
+            obj.fillPanel()
         end
 
         function setNWBName(obj, nwbName)
@@ -492,23 +513,34 @@ classdef NWBConfiguratorApp < handle
             %   fields Label, Name and IsSuggested, in the order the
             %   dropdown lists them: the converters matching the
             %   variable's source evidence first, best match first, then
-            %   every other converter. The first entry leaves the choice
-            %   to the runner. A converter the item names that is not
-            %   registered follows it, so the dropdown can show the
-            %   item's current value.
+            %   the other converters the evidence does not rule out, in
+            %   display-name order. With ShowAllConverters set, every
+            %   registered converter is listed instead; source evidence can
+            %   be wrong or missing, so the ruled-out converters stay
+            %   reachable. The first entry leaves the choice to the runner.
+            %   A converter the item names is always listed, registered or
+            %   not, so the dropdown can show the item's current value.
 
             choices = struct("Label", obj.AUTO_LABEL, "Name", "", "IsSuggested", false);
 
             suggested = nansen.module.nwb.conversion.NWBConverterDescriptor.empty(0, 1);
+            others = obj.Registry.list();
             if strlength(obj.SelectedVariable) > 0
                 item = obj.selectedItem();
                 [matches, ranks] = obj.Registry.findForSourceInfo(item.SourceInfo);
                 suggested = matches(ranks > 1);
+                if ~obj.ShowAllConverters
+                    others = matches;
+                end
 
                 converterName = obj.namedConverter(item);
-                if strlength(converterName) > 0 && ~obj.isRegistered(converterName)
-                    choices(end+1) = struct("Label", obj.labelForName(converterName), ...
-                        "Name", converterName, "IsSuggested", false);
+                if strlength(converterName) > 0
+                    if ~obj.isRegistered(converterName)
+                        choices(end+1) = struct("Label", obj.labelForName(converterName), ...
+                            "Name", converterName, "IsSuggested", false);
+                    elseif ~any([others.Name] == converterName)
+                        others(end+1) = obj.Registry.get(converterName);
+                    end
                 end
             end
 
@@ -517,7 +549,6 @@ classdef NWBConfiguratorApp < handle
                     "Name", suggested(i).Name, "IsSuggested", true); %#ok<AGROW>
             end
 
-            others = obj.Registry.list();
             if ~isempty(suggested)
                 others = others(~ismember([others.Name], [suggested.Name]));
             end
@@ -696,9 +727,9 @@ classdef NWBConfiguratorApp < handle
             container.Layout.Column = 2;
 
             % The label column fits its longest label, "Converter arguments".
-            panel = uigridlayout(container, [14, 2]);
+            panel = uigridlayout(container, [15, 2]);
             panel.ColumnWidth = {130, "1x"};
-            panel.RowHeight = {28, 24, 48, 36, 24, 24, 24, 24, 24, 24, 24, 8, "1x", 0};
+            panel.RowHeight = {28, 24, 20, 48, 36, 24, 24, 24, 24, 24, 24, 24, 8, "1x", 0};
             panel.Padding = [12, 8, 12, 8];
             panel.RowSpacing = 6;
 
@@ -710,49 +741,55 @@ classdef NWBConfiguratorApp < handle
             obj.ConverterDropdown.ValueChangedFcn = ...
                 @(src, ~) obj.runUiAction(@() obj.setConverter(string(src.Value)));
 
+            obj.ShowAllCheckbox = uicheckbox(panel, "Text", "Show all converters");
+            obj.ShowAllCheckbox.Layout.Row = 3;
+            obj.ShowAllCheckbox.Layout.Column = 2;
+            obj.ShowAllCheckbox.ValueChangedFcn = ...
+                @(src, ~) obj.runUiAction(@() obj.setShowAllConverters(src.Value));
+
             obj.DescriptionLabel = uilabel(panel, "Text", "", "WordWrap", "on", "FontSize", 11);
-            obj.DescriptionLabel.Layout.Row = 3;
+            obj.DescriptionLabel.Layout.Row = 4;
             obj.DescriptionLabel.Layout.Column = [1, 2];
 
             obj.PythonLabel = uilabel(panel, "Text", "", "WordWrap", "on", ...
                 "FontSize", 11, "FontColor", [0.7, 0.3, 0], "Visible", "off");
-            obj.PythonLabel.Layout.Row = 4;
+            obj.PythonLabel.Layout.Row = 5;
             obj.PythonLabel.Layout.Column = [1, 2];
 
-            [obj.ModuleDropdown, obj.ModuleRow] = obj.addRow(panel, 5, "NWB module", @uidropdown);
+            [obj.ModuleDropdown, obj.ModuleRow] = obj.addRow(panel, 6, "NWB module", @uidropdown);
             obj.ModuleDropdown.ValueChangedFcn = ...
                 @(src, ~) obj.runUiAction(@() obj.setTargetType(obj.dropdownValue(src), ""));
 
-            [obj.TypeDropdown, obj.TypeRow] = obj.addRow(panel, 6, "Target type", @uidropdown);
+            [obj.TypeDropdown, obj.TypeRow] = obj.addRow(panel, 7, "Target type", @uidropdown);
             obj.TypeDropdown.ValueChangedFcn = ...
                 @(src, ~) obj.runUiAction(@() obj.setTargetType(obj.selectedItem().NWBModule, obj.dropdownValue(src)));
 
-            obj.GroupDropdown = obj.addRow(panel, 7, "Group", @uidropdown);
+            obj.GroupDropdown = obj.addRow(panel, 8, "Group", @uidropdown);
             obj.GroupDropdown.Items = cellstr( ...
                 nansen.module.nwb.conversion.NWBConverterDescriptor.VALID_PRIMARY_GROUPS);
             obj.GroupDropdown.ValueChangedFcn = ...
                 @(src, ~) obj.runUiAction(@() obj.setPlacement(string(src.Value), obj.selectedItem().NWBModule));
 
-            [obj.PlacementModuleDropdown, obj.PlacementModuleRow] = obj.addRow(panel, 8, "Module", @uidropdown);
+            [obj.PlacementModuleDropdown, obj.PlacementModuleRow] = obj.addRow(panel, 9, "Module", @uidropdown);
             obj.PlacementModuleDropdown.ValueChangedFcn = ...
                 @(src, ~) obj.runUiAction(@() obj.setPlacement(obj.selectedItem().PrimaryGroup, obj.dropdownValue(src)));
 
-            obj.NameField = obj.addRow(panel, 9, "NWB name", @uieditfield);
+            obj.NameField = obj.addRow(panel, 10, "NWB name", @uieditfield);
             obj.NameField.ValueChangedFcn = ...
                 @(src, ~) obj.runUiAction(@() obj.setNWBName(string(src.Value)));
 
-            [obj.MetadataButton, obj.MetadataStatusLabel] = obj.addEditRow(panel, 10, "Metadata");
+            [obj.MetadataButton, obj.MetadataStatusLabel] = obj.addEditRow(panel, 11, "Metadata");
             obj.MetadataButton.ButtonPushedFcn = @(~, ~) obj.runUiAction(@() obj.editMetadata());
 
-            [obj.ArgsButton, obj.ArgsStatusLabel] = obj.addEditRow(panel, 11, "Converter arguments");
+            [obj.ArgsButton, obj.ArgsStatusLabel] = obj.addEditRow(panel, 12, "Converter arguments");
             obj.ArgsButton.ButtonPushedFcn = @(~, ~) obj.runUiAction(@() obj.editConverterArgs());
 
             obj.StatusLabel = uilabel(panel, "Text", "", "WordWrap", "on", "VerticalAlignment", "top");
-            obj.StatusLabel.Layout.Row = 13;
+            obj.StatusLabel.Layout.Row = 14;
             obj.StatusLabel.Layout.Column = [1, 2];
 
-            obj.PanelControls = [obj.ConverterDropdown, obj.GroupDropdown, obj.NameField, ...
-                obj.MetadataButton, obj.ArgsButton];
+            obj.PanelControls = [obj.ConverterDropdown, obj.ShowAllCheckbox, ...
+                obj.GroupDropdown, obj.NameField, obj.MetadataButton, obj.ArgsButton];
         end
 
         function [control, label] = addRow(~, panel, row, labelText, createFcn)
@@ -826,6 +863,7 @@ classdef NWBConfiguratorApp < handle
             obj.ConverterDropdown.Items = cellstr([choices.Label]);
             obj.ConverterDropdown.ItemsData = cellstr([choices.Name]);
             obj.ConverterDropdown.Value = char(state.ConverterName);
+            obj.ShowAllCheckbox.Value = obj.ShowAllConverters;
 
             obj.DescriptionLabel.Text = state.Description;
             obj.PythonLabel.Visible = state.NeedsPython;
