@@ -8,6 +8,7 @@ A [NANSEN](https://github.com/VervaekeLab/NANSEN) module for converting the sess
 - [NANSEN](https://github.com/VervaekeLab/NANSEN)
 - [matnwb](https://github.com/NeurodataWithoutBorders/matnwb)
 - [entity-table](https://github.com/ehennestad/entity-table), at the commit pinned in `requirements.txt`
+- [MatBox](https://github.com/ehennestad/matbox), to install entity-table from `requirements.txt`
 - Optional: Python with the packages in `python/requirements.txt`, for the NeuroConv-based converters and the NWB Inspector check
 
 ## Installation
@@ -18,7 +19,7 @@ A [NANSEN](https://github.com/VervaekeLab/NANSEN) module for converting the sess
    git clone https://github.com/NansenModules/NANSEN-NWB.git
    ```
 
-2. In MATLAB, add the repository folder to the path and install entity-table:
+2. In MATLAB, add the repository folder to the path and install entity-table with MatBox. MatBox does not come with MATLAB; install it first as the [MatBox README](https://github.com/ehennestad/matbox#installation) describes.
 
    ```matlab
    addpath("path/to/NANSEN-NWB")
