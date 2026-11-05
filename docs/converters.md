@@ -89,6 +89,7 @@ The constructor validates the descriptor, so an inconsistent one fails where it 
 | `PlacementPolicy` | `config` (default) or `converter` |
 | `AllowsPlacementOverride` | Whether a result may move its own output |
 | `RequiresPython` | Whether the converter needs Python |
+| `RequiredPythonPackages` | Python packages the converter imports when it runs, by the names pip installs them under. The configurator marks a converter `needs packages` while any of them is missing. Requires `RequiresPython` |
 | `NeedsData` | Whether the runner should resolve the data at all |
 | `MetadataSchema` | Fields and defaults for the metadata form |
 | `DefaultConverterArgs` | Arguments merged under the item's own |

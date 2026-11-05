@@ -35,6 +35,7 @@ classdef NWBConverterDescriptor
 %       PlacementPolicy         - Whether config or converter places output
 %       AllowsPlacementOverride - Whether a result may override placement
 %       RequiresPython          - Whether the converter needs Python
+%       RequiredPythonPackages  - Python packages it imports when it runs
 %       NeedsData               - Whether the runner resolves the data
 %       MetadataSchema          - Fields and defaults for the metadata form
 %       DefaultConverterArgs    - Arguments merged under per-item arguments
@@ -64,6 +65,7 @@ classdef NWBConverterDescriptor
         PlacementPolicy (1,1) string {mustBeMember(PlacementPolicy, ["config", "converter"])} = "config" % Whether config or converter places output
         AllowsPlacementOverride (1,1) logical = false % Whether a result may override placement
         RequiresPython (1,1) logical = false % Whether the converter needs Python
+        RequiredPythonPackages (1,:) string = strings(1, 0) % Python packages it imports when it runs
         NeedsData (1,1) logical = true      % Whether the runner resolves the data
         MetadataSchema = struct()           % Fields and defaults for the metadata form
         DefaultConverterArgs (1,1) struct = struct() % Arguments merged under per-item arguments
@@ -90,6 +92,7 @@ classdef NWBConverterDescriptor
                     {mustBeMember(options.PlacementPolicy, ["config", "converter"])} = "config"
                 options.AllowsPlacementOverride (1,1) logical = false
                 options.RequiresPython (1,1) logical = false
+                options.RequiredPythonPackages (1,:) string = strings(1, 0)
                 options.NeedsData (1,1) logical = true
                 options.MetadataSchema = struct()
                 options.DefaultConverterArgs (1,1) struct = struct()
@@ -113,6 +116,7 @@ classdef NWBConverterDescriptor
             obj.PlacementPolicy = options.PlacementPolicy;
             obj.AllowsPlacementOverride = options.AllowsPlacementOverride;
             obj.RequiresPython = options.RequiresPython;
+            obj.RequiredPythonPackages = options.RequiredPythonPackages;
             obj.NeedsData = options.NeedsData;
             obj.MetadataSchema = options.MetadataSchema;
             obj.DefaultConverterArgs = options.DefaultConverterArgs;
@@ -145,6 +149,11 @@ classdef NWBConverterDescriptor
             obj.assertNonEmptyText(obj.ProducesNWBType, "ProducesNWBType")
             obj.assertNonEmptyText(obj.NWBModuleTags, "NWBModuleTags")
             obj.assertNonEmptyText(obj.RequiresNWBTypes, "RequiresNWBTypes")
+            obj.assertNonEmptyText(obj.RequiredPythonPackages, "RequiredPythonPackages")
+
+            if ~isempty(obj.RequiredPythonPackages) && ~obj.RequiresPython
+                obj.fail("names RequiredPythonPackages, so it must set RequiresPython=true.")
+            end
 
             if ~any(obj.PrimaryGroup == obj.VALID_PRIMARY_GROUPS)
                 obj.fail("PrimaryGroup must be one of: %s.", ...
@@ -186,6 +195,7 @@ classdef NWBConverterDescriptor
             S.PlacementPolicy = obj.PlacementPolicy;
             S.AllowsPlacementOverride = obj.AllowsPlacementOverride;
             S.RequiresPython = obj.RequiresPython;
+            S.RequiredPythonPackages = obj.RequiredPythonPackages;
             S.NeedsData = obj.NeedsData;
             S.MetadataSchema = obj.MetadataSchema;
             S.DefaultConverterArgs = obj.DefaultConverterArgs;
@@ -245,6 +255,7 @@ classdef NWBConverterDescriptor
                 "PlacementPolicy", string(S.PlacementPolicy), ...
                 "AllowsPlacementOverride", logical(S.AllowsPlacementOverride), ...
                 "RequiresPython", logical(S.RequiresPython), ...
+                "RequiredPythonPackages", string(S.RequiredPythonPackages), ...
                 "NeedsData", logical(S.NeedsData), ...
                 "MetadataSchema", S.MetadataSchema, ...
                 "DefaultConverterArgs", S.DefaultConverterArgs, ...
@@ -268,6 +279,7 @@ classdef NWBConverterDescriptor
                 "PlacementPolicy", "config", ...
                 "AllowsPlacementOverride", false, ...
                 "RequiresPython", false, ...
+                "RequiredPythonPackages", strings(1, 0), ...
                 "NeedsData", true, ...
                 "MetadataSchema", struct(), ...
                 "DefaultConverterArgs", struct());
