@@ -1,11 +1,16 @@
-# Python packages the NeuroConv-backed converters and the NWB Inspector
-# validation step need, at the versions this module was verified against.
-# Install into the Python MATLAB is configured for, or point MATLAB at a
-# virtual environment with pyenv(Version=...):
-#   python -m venv ~/.venvs/nansen-nwb
-#   ~/.venvs/nansen-nwb/bin/pip install -r python/requirements.txt
-neuroconv==0.9.3
+# Python packages for the NeuroConv-backed converters and the NWB Inspector
+# check that writeNwbFile runs on each written file. The "Python" section of
+# README.md says how to install them and point MATLAB at them.
+#
+# The neuroconv extras add the packages each NeuroConv converter in the
+# registry needs: abf, tiff, scanimage, suite2p, image and deeplabcut.
+neuroconv[abf,tiff,scanimage,suite2p,image,deeplabcut]==0.10.2
 neo==0.14.5
 pynwb==4.2.0
 hdmf==6.2.0
 nwbinspector==0.7.2
+
+# NeuroConv 0.10.2 fails on import with zarr 3, which no longer has
+# zarr.codec_registry, and hdmf-zarr 0.14 requires zarr 3.
+hdmf-zarr==0.13.0
+zarr==2.18.7

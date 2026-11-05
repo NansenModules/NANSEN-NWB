@@ -52,24 +52,44 @@ A [NANSEN](https://github.com/VervaekeLab/NANSEN) module for converting the sess
 
 ## Python
 
-The NeuroConv converters and the NWB Inspector check after each write run through MATLAB's Python interface. Everything else works without Python.
+Converters backed by [NeuroConv](https://neuroconv.readthedocs.io/) data interfaces, and the NWB Inspector check that `writeNwbFile` runs on each written file, call Python through MATLAB's `py.*` interface. Everything else works without Python.
 
-Create a virtual environment and install the packages listed in `python/requirements.txt` of the cloned NANSEN-NWB repository (commands for macOS and Linux):
+1. Install a Python version that both NeuroConv and your MATLAB release support. NeuroConv 0.10.2 needs Python 3.10 or later, and MathWorks lists the versions each release supports in [Versions of Python Compatible with MATLAB Products by Release](https://www.mathworks.com/support/requirements/python-compatibility.html). R2024b, for example, supports 3.10, 3.11 and 3.12.
 
-```bash
-cd path/to/NANSEN-NWB
-python -m venv ~/.venvs/nansen-nwb
-~/.venvs/nansen-nwb/bin/pip install -r python/requirements.txt
-```
+2. Create a virtual environment and install the packages listed in `python/requirements.txt` of the cloned NANSEN-NWB repository. On macOS or Linux:
 
-Then point MATLAB at that environment and check that NeuroConv is found:
+   ```bash
+   cd path/to/NANSEN-NWB
+   python3.12 -m venv ~/.venvs/nansen-nwb
+   ~/.venvs/nansen-nwb/bin/pip install -r python/requirements.txt
+   ```
 
-```matlab
-pyenv(Version="~/.venvs/nansen-nwb/bin/python", ExecutionMode="OutOfProcess")
-[isAvailable, report] = nansen.module.nwb.neuroconv.hasNeuroconv()
-```
+   On Windows the environment's programs are in `Scripts` rather than `bin`, for example `%USERPROFILE%\.venvs\nansen-nwb\Scripts\pip.exe`.
 
-When `isAvailable` is false, `report.Message` says what is missing.
+3. Point MATLAB at the environment's Python before anything in the session has loaded Python:
+
+   ```matlab
+   pyenv(Version="~/.venvs/nansen-nwb/bin/python", ExecutionMode="OutOfProcess")
+   ```
+
+   MATLAB saves this setting, so later sessions use the same Python. Once a session has loaded Python, `pyenv` cannot switch to another: restart MATLAB, or, when Python runs out of process, call `terminate(pyenv)` first.
+
+4. Check that MATLAB can run NeuroConv:
+
+   ```matlab
+   [isAvailable, report] = nansen.module.nwb.neuroconv.hasNeuroconv("Refresh")
+   ```
+
+   `report.Message` says what is missing when `isAvailable` is false. `hasNeuroconv` keeps its result for the MATLAB session, and `"Refresh"` checks again.
+
+With the versions in `python/requirements.txt`, the NeuroConv converters behave as follows:
+
+| Converter | With these versions |
+|---|---|
+| `NeuroConvAbfInterface` | Converts. NeuroConv 0.10 deprecates `AbfInterface` and removes it in 0.12, so each conversion prints a `FutureWarning`. |
+| `NeuroConvTiffImagingInterface` | Converts. |
+| `NeuroConvImageInterface` | Fails. NeuroConv 0.10.2 cannot append an image to an existing NWB file (`'chunks' must have same rank as dataset shape`), and `writeNwbFile` always appends. |
+| `NeuroConvScanImageImagingInterface`, `NeuroConvSuite2pSegmentationInterface`, `NeuroConvDeepLabCutInterface` | Their packages are installed; no conversion has been checked with these versions. |
 
 ## Custom converters
 
