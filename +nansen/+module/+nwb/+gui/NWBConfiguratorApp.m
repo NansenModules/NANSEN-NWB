@@ -1080,11 +1080,9 @@ classdef NWBConfiguratorApp < handle
                 resolution.Message = exception.message;
                 switch exception.identifier
                     case "nansen:nwb:unresolvedConverter"
-                        if contains(exception.message, "Several")
-                            resolution.Status = "ambiguous";
-                        else
-                            resolution.Status = "unresolved";
-                        end
+                        resolution.Status = "unresolved";
+                    case "nansen:nwb:ambiguousConverter"
+                        resolution.Status = "ambiguous";
                     case "nansen:nwb:unknownConverter"
                         resolution.Status = "unknown converter";
                     otherwise
